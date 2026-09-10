@@ -1,0 +1,208 @@
+"""Browser adapter. Only ExecutionLayer grants action-time fencing callbacks."""
+
+from typing import Protocol
+import time
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
+from .store import fingerprint
+from .types import Observation, Recovery
+
+
+class DesktopAdapter(Protocol):
+    def observe(self) -> Observation: ...
+    def ensure_company(self, company_id: str) -> dict: ...
+    def ensure_invoice_open(self, invoice_id: str) -> dict: ...
+    def ensure_editable(self) -> dict: ...
+    def set_field(self, field: str, value: str) -> dict: ...
+    def save_and_verify(self, expected_result: dict) -> dict: ...
+
+
+class NativeWindowsAdapter:
+    """Extension point only. No QuickBooks or native desktop support is claimed."""
+
+    def __init__(self, *args, **kwargs):
+        raise NotImplementedError("Inspect and test the actual Windows application interfaces first")
+
+
+class BrowserAdapter:
+    def __init__(self, settings, store):
+        self.store = store
+        self.playwright = sync_playwright().start()
+        self.browser = self.playwright.chromium.launch(headless=settings.headless)
+        self.context = self.browser.new_context(
+            viewport={"width": 1200, "height": 800},
+            extra_http_headers={"Authorization": f"Bearer {settings.worker_token}"},
+        )
+        self.page = self.context.new_page()
+        self.page.set_default_timeout(6000)
+        self.page.goto(settings.backend_url + "/mock")
+        self.page.wait_for_function("window.appState !== undefined")
+        self.fence = lambda: (_ for _ in ()).throw(PermissionError("No execution authority"))
+        self.job = None
+
+    def close(self):
+        self.browser.close()
+        self.playwright.stop()
+
+    def observe(self):
+        self.page.evaluate("sync()")
+        state = self.page.evaluate("window.appState")
+        targets = self.page.locator("[data-target]").evaluate_all(
+            """els => els.filter(e => e.getBoundingClientRect().width && !e.closest('#app')?.hidden).map(e => {const r=e.getBoundingClientRect();return {target:e.dataset.target,label:e.getAttribute('aria-label')||e.innerText,x:r.x+r.width/2,y:r.y+r.height/2,width:r.width,height:r.height}})"""
+        )
+        png = self.page.screenshot()
+        screenshot = self.store.artifact(png) if hasattr(self.store, "artifact") else "test.png"
+        shape = {"state": state, "targets": targets, "width": 1200, "height": 800}
+        return Observation(
+            revision=fingerprint(shape),
+            timestamp=time.time(),
+            screenshot=screenshot,
+            state=state,
+            targets=targets,
+        )
+
+    def ready(self):
+        try:
+            self.page.wait_for_function("window.appReady && !window.busy", timeout=6000)
+        except PlaywrightTimeout:
+            raise Recovery("temporary", "Accounting view is still loading") from None
+        state = self.page.evaluate("window.appState")
+        if state["dialog"]:
+            kind = "known" if state["dialog"] == "info" else "unfamiliar"
+            raise Recovery(kind, f"Visible {state['dialog']} dialog")
+        return state
+
+    def click_target(self, target):
+        self.fence()
+        self.page.locator(f'[data-target="{target}"]').click()
+        self.page.wait_for_function("!window.busy")
+        if self.page.evaluate("window.lastError || null"):
+            error = self.page.evaluate("window.lastError")
+            self.page.evaluate("window.lastError=null")
+            raise Recovery("unfamiliar", error)
+        return self.page.evaluate("window.appState")
+
+    def ensure_company(self, company_id):
+        state = self.ready()
+        if state["company_id"] != company_id:
+            self.click_target("company")
+        if self.page.evaluate("window.appState.company_id") != company_id:
+            raise PermissionError("Company identity mismatch")
+        return {"company_id": company_id}
+
+    def ensure_invoice_open(self, invoice_id):
+        state = self.ready()
+        if state["invoice_id"] != invoice_id or state["view"] != "invoice":
+            self.click_target("invoices")
+            self.ready()
+            self.click_target(f"open-{invoice_id}")
+        state = self.ready()
+        if state["invoice_id"] != invoice_id:
+            raise PermissionError("Invoice identity mismatch")
+        return {"invoice_id": invoice_id}
+
+    def ensure_editable(self):
+        state = self.ready()
+        if (
+            state["company_id"] != self.job["company_id"]
+            or state["invoice_id"] != self.job["invoice_id"]
+            or state["view"] != "invoice"
+        ):
+            raise Recovery("unfamiliar", "Record identity changed; re-establish the scoped invoice")
+        return state
+
+    def set_field(self, field, value):
+        self.ensure_editable()
+        self.fence()
+        locator = self.page.locator(f'[data-target="{field}"]')
+        locator.fill(str(value))
+        locator.press("Tab")
+        self.page.wait_for_function("!window.busy")
+        state = self.page.evaluate("window.appState")
+        if state["fields"].get(field) != str(value):
+            raise Recovery("unfamiliar", "Field value did not persist in the draft form")
+        return {"field": field, "value": str(value)}
+
+    def saved_result(self, expected):
+        state = self.page.evaluate("window.appState")
+        draft = next((d for d in state["drafts"] if d["operation_id"] == self.job["id"]), None)
+        if draft and any(draft[k] != expected[k] for k in ("company_id", "invoice_id", "amount")):
+            raise Recovery("ambiguous", "Existing draft does not match expected result")
+        return draft
+
+    def save_and_verify(self, expected_result):
+        existing = self.saved_result(expected_result)
+        if existing:
+            return existing
+        self.ensure_editable()
+        self.click_target("save")
+        if self.page.evaluate("window.appState.dialog"):
+            raise Recovery(
+                "ambiguous", "Save confirmation interrupted; inspect persisted draft before another save"
+            )
+        result = self.saved_result(expected_result)
+        if not result:
+            raise Recovery("ambiguous", "No persisted result found after Save")
+        return result
+
+    def tool_action(self, name, args):
+        if name == "observe_app":
+            return self.observe().model_dump()
+        if name == "click":
+            obs = self.observe()
+            target = args.get("target")
+            if args.get("x") is not None:
+                x, y = float(args["x"]), float(args["y"])
+                matches = [
+                    t
+                    for t in obs.targets
+                    if abs(x - t["x"]) <= t["width"] / 2 and abs(y - t["y"]) <= t["height"] / 2
+                ]
+                if not matches:
+                    raise PermissionError("Correction is not an actionable scoped control")
+                target = matches[-1]["target"]
+            # Coordinates resolve to a known DOM control; never arbitrary script, URL, or desktop clicks.
+            if target not in {
+                "dialog-review",
+                "dialog-keep",
+                "dialog-discard",
+                "dialog-acknowledge",
+                "invoices",
+                "company",
+                f"open-{self.job['invoice_id']}",
+            }:
+                raise PermissionError("Click target outside assistance scope")
+            self.click_target(target)
+            return {"clicked": target}
+        if name == "set_field":
+            if args["field"] not in {"amount", "note"}:
+                raise PermissionError("Field outside draft scope")
+            return self.set_field(args["field"], args["value"])
+        if name == "save_draft":
+            return self.save_and_verify(self.job["expected"])
+        raise PermissionError("Unknown tool")
+
+
+class ThreadedBrowserAdapter:
+    """Playwright owns one thread; LangGraph tools may execute on other threads."""
+
+    def __init__(self, settings, store):
+        from concurrent.futures import ThreadPoolExecutor
+
+        object.__setattr__(self, "_pool", ThreadPoolExecutor(max_workers=1, thread_name_prefix="desktop"))
+        object.__setattr__(self, "_adapter", self._pool.submit(BrowserAdapter, settings, store).result())
+
+    def __getattr__(self, name):
+        if name in {"job", "fence"}:
+            return self._pool.submit(getattr, self._adapter, name).result()
+
+        def call(*args, **kwargs):
+            return self._pool.submit(getattr(self._adapter, name), *args, **kwargs).result()
+
+        return call
+
+    def __setattr__(self, name, value):
+        self._pool.submit(setattr, self._adapter, name, value).result()
+
+    def close(self):
+        self._pool.submit(self._adapter.close).result()
+        self._pool.shutdown()

@@ -1,0 +1,539 @@
+Build a working prototype of an enterprise digital worker that combines a cyclic LangGraph workflow, a supervised Deep Agent fallback, and a developer-reviewed improvement process.
+
+The goal is to demonstrate this cycle:
+
+Known procedures execute through tested code.
+Unfamiliar situations trigger supervised model assistance.
+Staff demonstrate or correct the work.
+Recorded experience becomes a proposed code change.
+A developer reviews it.
+Passing CI and developer approval allow deployment.
+Future jobs can use the improved procedure.
+
+Implement a small, complete demonstration. Verify current library APIs before using them.
+
+1. PROTOTYPE SCOPE
+
+Start with one worker, one desktop session, and a bounded accounting task:
+
+- Open a synthetic invoice.
+- Compare it with a synthetic purchase order.
+- Identify a discrepancy.
+- Prepare and save a correction draft.
+- Verify the saved result.
+
+Build a mock accounting application with realistic navigation, tables, forms, dialogs, and persistent synthetic records.
+
+Allow deliberately introduced conditions:
+- Starting from different pages.
+- Having the wrong invoice open.
+- Reordered table rows.
+- Delayed loading.
+- A known informational popup.
+- An unsaved-changes dialog.
+- An unfamiliar dialog.
+- A changed field label or layout.
+- A save that succeeds but whose confirmation is interrupted.
+
+Demonstrate the architecture against this application before attempting real QuickBooks Desktop integration.
+
+2. DEPLOYMENT STRUCTURE
+
+Central backend:
+- Accepts jobs and maintains the user conversation.
+- Dispatches jobs to an authorized worker.
+- Manages access, progress, questions, approvals, and audit records.
+- Provides shared organizational knowledge within explicit scopes.
+- Stores or references execution evidence and proposed improvements.
+
+Worker VM/PC:
+- Runs the role-level LangGraph.
+- Initializes Deep Agent fallback in the same worker application.
+- Hosts the application automation adapter.
+- Controls its assigned desktop session.
+- Uses credentials scoped to its assigned role and environment.
+
+The model can be hosted remotely. Deep Agent does not require a separate VM or service.
+
+For the prototype, backend and worker may run as separate processes on one development machine. Keep their interfaces suitable for separating them later.
+
+Permit only one active desktop job per worker session.
+
+3. ROLE-LEVEL CYCLIC LANGGRAPH
+
+Build one cyclic graph for the bounded role.
+
+Its responsibilities include:
+- Accepting and validating a job.
+- Selecting a supported procedure.
+- Establishing required application conditions.
+- Performing work.
+- Verifying business results.
+- Recovering from known interruptions.
+- Invoking supervised Deep Agent assistance.
+- Continuing remaining work or completing the job.
+
+Use deterministic routing when sufficient. Use model decisions where judgment is required.
+
+A node should represent a meaningful operation, such as opening a specified invoice or verifying a saved correction. Individual clicks can be implementation details inside reusable operations.
+
+Distinguish:
+- Unsupported task or unfamiliar UI.
+- Temporary condition that can be retried safely.
+- Ambiguous outcome requiring reconciliation.
+- Permission denial.
+- Staff rejection.
+- Cancellation.
+
+Permission denial, rejection, and cancellation must not become routes around the restriction through Deep Agent.
+
+Bound retries, recovery attempts, model calls, and execution time.
+
+4. STRICT AND AUTO APPROVAL MODES
+
+Implement two user-selectable modes per job: Strict and Auto.
+Default new jobs to Strict.
+
+Strict:
+- Require staff approval before every executable node in the outer,
+  role-level LangGraph.
+- Show what the node will do, its relevant inputs, the target
+  application and record, and its expected result.
+- Include a current screenshot when desktop interaction is involved.
+- Approval authorizes that specific node invocation.
+- Internal desktop actions are covered by the approval only within
+  the disclosed operation.
+- Unexpected conditions or changes to the proposed operation pause
+  execution and require a fresh decision.
+- START and END markers do not require separate approval.
+
+Auto:
+- Automatically approve role-level LangGraph node execution.
+- Continue enforcing job scope, permissions, verification, timeouts,
+  cancellation, and recovery rules.
+- Auto approval does not expand the worker's underlying access rights.
+
+A node containing multiple clicks receives one node-level approval.
+Make this scope clear in the preview. Split nodes when staff need
+separate approval over distinct business operations.
+
+Runtime observation and logging needed to prepare an approval preview
+can run automatically. They must not perform business mutations.
+
+5. DEEP AGENT FALLBACK ALWAYS USES STRICT MODE
+
+Whenever a live job enters Deep Agent fallback:
+- Enforce Strict mode regardless of the selected job mode.
+- Require approval before every Deep Agent tool call, including reads.
+- Show the tool, relevant arguments, intended effect, and available
+  evidence.
+- Require individual approval for each call when the model proposes
+  multiple tools.
+- Prevent Deep Agent from changing its mode or approving its own calls.
+
+Apply approval to outer role-level graph nodes and individual Deep
+Agent tool calls. Do not separately gate every internal node of Deep
+Agent's implementation graph.
+
+Deep Agent receives:
+- The job goal and relevant business context.
+- Verified progress.
+- The failure or unsupported-case reason.
+- Fresh application observations.
+- Relevant past episodes when available.
+- The same scoped tools and permissions as the scripted path.
+
+It can investigate unfamiliar situations and propose actions.
+It cannot bypass the shared execution layer.
+
+For desktop action proposals, display:
+- The current screenshot.
+- A red circle around a proposed click target.
+- A brief action explanation.
+- A preview of text to be entered.
+- Approve, reject, and correct controls.
+
+Staff can correct a target by clicking the screenshot and optionally
+adding an explanation. Allow correction of proposed text and other
+relevant arguments.
+
+Bind approval to the exact action, arguments, observation, and relevant
+screen geometry. Revalidate before execution. If relevant state changed,
+obtain a fresh proposal or correction.
+
+Record the original proposal, staff decision, corrected proposal,
+executed action, and observed result separately.
+
+The execution layer may capture observations automatically to prepare
+previews. This is distinct from a tool call requested by Deep Agent.
+
+6. MODE TRANSITIONS
+
+Persist both:
+- Selected job mode: Strict or Auto.
+- Effective execution mode: what is currently enforced.
+
+Expected behavior:
+- Selected Strict → graph Strict → fallback Strict → graph Strict.
+- Selected Auto → graph Auto → fallback Strict → graph Auto.
+
+Restore the selected mode only after fallback finishes and the worker
+verifies the conditions for resuming the scripted graph.
+
+Display the effective mode prominently. During fallback, show:
+"Strict — staff approval required during assistance."
+
+Authorized staff can change the selected job mode.
+Apply changes at execution boundaries.
+
+Changing modes must not:
+- Release queued fallback tool calls.
+- Revive rejected or cancelled actions.
+- Authorize actions against stale observations.
+
+Enforce approval in the shared execution layer, not only in the UI
+or model instructions. Persist approval decisions across reconnects.
+
+7. SEPARATE WORKFLOW PROGRESS FROM LIVE APPLICATION STATE
+
+Persist business progress:
+- Job, company, and record identifiers.
+- Completed and pending operations.
+- Expected business results.
+- Attempted mutations and confirmed or uncertain outcomes.
+- Graph version and checkpoint.
+- Outstanding approvals.
+
+Maintain desktop observations separately:
+- Active application and window.
+- Company/account identity when observable.
+- Current view and selected record.
+- Visible dialogs.
+- Loading and editability state.
+- Unsaved changes when detectable.
+- Screenshot and available DOM/accessibility information.
+- Observation timestamp and revision.
+
+Historical observations are evidence, not guaranteed current state.
+
+At job start, resume, control handoff, and before meaningful actions,
+observe the application and check the conditions required for the
+next operation.
+
+Do not assume the previous job left the application on a particular
+page. Returning to a standard idle view may be a convenience, but
+correctness must not depend on it.
+
+LangGraph checkpoints do not restore external application state.
+
+8. SHARED DESKTOP EXECUTION LAYER
+
+Scripted operations and Deep Agent actions must use one shared layer.
+
+Provide:
+- Observation.
+- Target resolution.
+- Permission and approval enforcement.
+- Exclusive desktop control.
+- Action execution.
+- Readiness checks and bounded waiting.
+- Result verification.
+- Structured event and evidence recording.
+
+Prefer:
+1. Appropriate application APIs, where available and authorized.
+2. DOM or accessibility interfaces.
+3. Visual target recognition.
+4. Coordinates tied to a fresh observation.
+
+Use an appropriate browser automation adapter for the mock application.
+Define a pluggable native Windows adapter interface. Do not claim
+QuickBooks support without inspecting and testing its actual interfaces.
+
+Build reusable operations such as:
+- ensure_company(company_id)
+- ensure_invoice_open(invoice_id)
+- ensure_editable()
+- set_field(field, value)
+- save_and_verify(expected_result)
+
+These are application functions to implement, not assumed LangGraph APIs.
+
+Each operation needs:
+- Typed inputs and outputs.
+- Applicability and starting conditions.
+- Expected results.
+- Timeouts and retry rules.
+- Required permissions.
+- Mutation and recovery behavior.
+- A description suitable for the staff approval preview.
+
+9. OBSERVATION AND UI RECOVERY
+
+Implement reusable handling for recurring situations.
+
+Known informational popup:
+Recognize it and use an explicitly allowed response, subject to the
+current execution approval.
+
+Unsaved-changes or unfamiliar dialog:
+Inspect and pause for supervised resolution when necessary.
+Do not implement "dismiss every popup."
+
+Slow field or page:
+Wait for a specific readiness condition, with a timeout.
+
+Reordered table:
+Find the record by its identifier and verify its identity.
+
+Wrong page:
+Use a known navigation procedure to establish the required view.
+
+Wrong company, customer, or invoice:
+Establish the correct identity before modifying data.
+
+Unrecognized or ambiguous state:
+Return a structured recovery request to the graph.
+
+Avoid a model call for every successful scripted action. Use
+deterministic checks where the application interfaces support them.
+
+After recovery, verify conditions for a valid continuation point.
+Do not blindly resume the next click of an interrupted script.
+
+10. EXCLUSIVE CONTROL AND HANDOFFS
+
+Only one controller may issue desktop actions at a time:
+- Scripted workflow.
+- Deep Agent.
+- Staff during direct takeover.
+
+Implement an explicit control owner with a lease or equivalent
+mechanism. Reject stale-owner commands and prevent queued actions
+from executing after ownership changes.
+
+When transferring control:
+- Pause the outgoing controller.
+- Finish or reconcile any in-flight action.
+- Invalidate pending actions and stale observations.
+- Transfer ownership.
+- Capture fresh state before continuing.
+
+Staff screenshot corrections normally execute through the shared
+tools. Direct staff takeover pauses automation until staff releases
+control.
+
+On return from Deep Agent or staff:
+- Capture fresh application state.
+- Verify reported accomplishments.
+- Reconcile business progress.
+- Resume at a valid graph continuation point.
+- Apply the selected job mode to subsequent graph execution.
+
+If Deep Agent completed an operation, verify and record its result
+instead of repeating it.
+
+11. MUTATION SAFETY AND CRASH RECOVERY
+
+Distinguish:
+- Not attempted.
+- Attempted, outcome uncertain.
+- Confirmed succeeded.
+- Confirmed failed.
+
+A timeout after clicking Save must not automatically trigger another Save.
+
+Use operation identifiers, application-supported idempotency, or
+inspection of existing business results as appropriate.
+
+A local action log alone cannot guarantee exactly-once effects in an
+external application. Approval also does not prove an action executed
+or succeeded.
+
+When success cannot be established, pause for reconciliation.
+
+On restart:
+- Restore durable job progress.
+- Reacquire desktop control.
+- Observe the actual application.
+- Reconcile uncertain operations and outstanding approvals.
+- Continue only from verified conditions.
+
+Do not treat restoring a graph checkpoint or VM screenshot as rolling
+back business transactions.
+
+12. ONE USER EXPERIENCE
+
+Keep the same job and conversation visible across scripted execution,
+Deep Agent assistance, and staff correction.
+
+Stream:
+- Progress.
+- Current selected and effective approval modes.
+- Node and tool proposals.
+- Approval requests.
+- Questions.
+- Corrections.
+- Verified outcomes.
+- Failures and cancellation status.
+
+Show brief explanations and relevant evidence, not private model
+reasoning.
+
+Users should understand what is proposed and when assistance is needed
+without needing to understand the internal harness arrangement.
+
+Cancellation must reach both execution paths and invalidate pending
+actions. Reconnecting the interface must recover the actual pending
+decision without submitting it twice.
+
+13. EPISODIC EVIDENCE
+
+Store episodes containing:
+- Task and relevant inputs.
+- Application and graph versions.
+- Selected and effective approval modes.
+- Before observations and screenshots.
+- Proposed nodes, tool calls, and target annotations.
+- Staff approvals, rejections, and corrections.
+- Executed actions.
+- After observations.
+- Verified business results.
+- Recovery reasons.
+- Staff acceptance of the completed task.
+
+Use an access-controlled artifact store, with a local implementation
+for the prototype.
+
+Commit selected sanitized or synthetic fixtures with proposed code
+and tests. Reference full episodes by ID or link.
+
+Retrieve relevant episodes by task, application, version, and observed
+situation. Do not inject the entire screenshot history into every
+model call.
+
+Past success and staff acceptance are evidence, not proof that a
+procedure generalizes.
+
+14. DEVELOPER-REVIEWED IMPROVEMENT PROCESS
+
+Build a separate development process that:
+- Reads selected accepted episodes and failure traces.
+- Inspects the existing graph and operation library.
+- Identifies recurring gaps.
+- Proposes the smallest useful change.
+- Reuses existing operations where appropriate.
+- Adds regression tests and explains the evidence.
+
+Possible changes:
+- A target resolver.
+- A popup handler.
+- A readiness check.
+- A verification rule.
+- A navigation procedure.
+- A routing condition.
+- A reusable node or subgraph.
+
+Do not assume every episode requires a new node.
+Do not hard-code one invoice, coordinate, or screenshot into a
+supposedly general procedure.
+
+Run this process in an isolated development checkout and test
+environment with explicitly configured development permissions.
+It must not edit the live worker, control its desktop, access its
+production credentials, or approve its own deployment.
+
+Produce an MR/PR if repository integration is configured.
+Otherwise produce a local patch, test results, evidence references,
+and review summary.
+
+The developer can approve, request changes, or reject.
+
+Run CI on the proposal. Deployment requires developer approval and
+passing checks on the approved version.
+
+Pin running jobs to their graph version. Update idle workers, perform
+health checks, and support rollback. Define how old checkpoints are
+handled before removing or changing nodes.
+
+Initially provide a manual improvement command and an interface for
+idle-time scheduling. Do not install an overnight schedule without
+configuration.
+
+15. IMPLEMENTATION CHOICES
+
+Use Python for LangGraph and Deep Agents. Select a minimal backend,
+frontend, persistence layer, and browser adapter appropriate to the
+repository.
+
+Keep provider and model ID configurable. Verify available APIs and
+computer-use capabilities rather than inventing a model identifier.
+
+GPT-6 Astra is a requested candidate only if the chosen environment
+actually exposes suitable capabilities.
+
+Provide an explicitly labeled simulated model mode when credentials
+are unavailable. Keep simulated results separate from live-model
+evaluation.
+
+Keep durable state outside the worker process so that restarting the
+worker does not erase progress, approvals, or evidence.
+
+16. VALIDATION
+
+Include focused tests covering:
+- Strict approval before each executable role-level graph node.
+- Auto execution without node approval prompts.
+- Strict approval for every fallback tool call under either job mode.
+- Safe mode changes and mode restoration after fallback.
+- Rejected, cancelled, stale, or duplicated approvals.
+- Starting jobs from different views.
+- Wrong-record detection.
+- Reordered rows and delayed loading.
+- Known, unfamiliar, and unsaved-changes dialogs.
+- Staff correction and direct takeover.
+- Exclusive control and stale commands.
+- Permission enforcement through both execution paths.
+- Restart after an ambiguous save.
+- Fallback completion without duplicate execution.
+- Reuse of an improved procedure on different records and UI variants.
+
+Track:
+- Verified completion rate.
+- Incorrect actions.
+- Approval requests and corrective staff interventions separately.
+- Fallback frequency.
+- Model calls and token usage when available.
+- Execution time.
+- Regression failures after proposed changes.
+
+17. DELIVERABLES
+
+Deliver:
+- Runnable backend, staff interface, worker, and mock application.
+- One cyclic role graph.
+- Shared desktop execution layer.
+- Strict and Auto modes enforced in the worker.
+- Supervised Deep Agent integration.
+- Durable progress, approval, and evidence storage.
+- A complete teaching and correction demonstration.
+- A proposed reusable improvement with tests and a review artifact.
+- A demonstration that the improved procedure handles a new job.
+- Setup instructions, environment examples, and documented limitations.
+
+The demonstration should show:
+1. A known procedure running in Strict mode with node approvals.
+2. The same procedure running in Auto.
+3. An unexpected UI condition during Auto execution.
+4. A switch to Strict Deep Agent assistance.
+5. Staff approving or correcting individual tool calls.
+6. Verified return to the graph and restoration of Auto.
+7. An improvement proposal derived from the recorded episode.
+8. The reviewed improvement handling a new instance without fallback.
+
+Inspect the existing workspace and relevant project instructions first.
+Implement a small end-to-end path, then add recovery and the improvement
+demonstration.
+
+Make reasonable implementation choices and proceed. Clearly distinguish
+what is implemented, simulated, tested, and deferred.
