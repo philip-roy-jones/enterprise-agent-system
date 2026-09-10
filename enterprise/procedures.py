@@ -1,7 +1,7 @@
 """Versioned selectors: improvements change this library in an isolated checkout."""
 
-GRAPH_VERSION = "v1"
-AMOUNT_LABELS = ("Correction amount",)
+GRAPH_VERSION = "v2"
+AMOUNT_LABELS = ("Correction amount", "Adjusted total")
 KNOWN_POPUPS = {"info": "acknowledge"}
 
 
