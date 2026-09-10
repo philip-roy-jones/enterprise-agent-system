@@ -228,6 +228,24 @@ def deploy(folder, settings, token):
     manifest = verify_candidate(folder)
     if manifest["review"] != "approve" or manifest["approved_commit"] != manifest["commit"]:
         raise PermissionError("Deployment requires developer approval of this exact checked commit")
+    if manifest.get("pull_request"):
+        remote = json.loads(
+            subprocess.check_output(
+                ["gh", "pr", "view", manifest["pull_request"], "--json", "headRefOid,statusCheckRollup"],
+                cwd=manifest["checkout"],
+                text=True,
+            )
+        )
+        if remote["headRefOid"] != manifest["commit"]:
+            raise ValueError("Pull request head changed after developer review")
+        checks = remote.get("statusCheckRollup") or []
+        if not checks or any(
+            (check.get("conclusion") != "SUCCESS" or check.get("status") != "COMPLETED")
+            if check.get("__typename") == "CheckRun"
+            else check.get("state") != "SUCCESS"
+            for check in checks
+        ):
+            raise ValueError("Published proposal requires passing GitHub CI on the approved commit")
     # Load the checked library in an isolated subprocess. Do not trust editable manifest labels.
     output = subprocess.check_output(
         [

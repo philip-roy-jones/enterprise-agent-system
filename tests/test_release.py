@@ -100,3 +100,27 @@ def test_changed_candidate_or_evidence_invalidates_review(candidate, tmp_path, a
     path.write_text(path.read_text() + "\nchanged")
     with pytest.raises(ValueError):
         verify_candidate(candidate)
+
+
+def test_published_candidate_requires_remote_ci_on_approved_commit(candidate, tmp_path, monkeypatch):
+    settings = Settings(data_dir=tmp_path / "live")
+    manifest = review(candidate, "approve", "Test developer", settings.developer_token, settings)
+    manifest["pull_request"] = "https://github.com/example/fixture/pull/1"
+    (candidate / "manifest.json").write_text(json.dumps(manifest))
+    original = subprocess.check_output
+
+    def failing_ci(command, **kwargs):
+        if command[0] == "gh":
+            return json.dumps(
+                {
+                    "headRefOid": manifest["commit"],
+                    "statusCheckRollup": [
+                        {"__typename": "CheckRun", "status": "COMPLETED", "conclusion": "FAILURE"}
+                    ],
+                }
+            )
+        return original(command, **kwargs)
+
+    monkeypatch.setattr(subprocess, "check_output", failing_ci)
+    with pytest.raises(ValueError, match="GitHub CI"):
+        deploy(candidate, settings, settings.developer_token)
