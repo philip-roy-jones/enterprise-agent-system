@@ -24,6 +24,9 @@ class ExecutionLayer:
         if not operation or operation.permission not in job["permissions"]:
             raise PermissionError(f"Missing permission for {name}")
         self.adapter.job = job
+        prepare = getattr(self.adapter, "prepare_observation", None)
+        if prepare:
+            prepare(job_id, owner, lease["epoch"])
         observation = self.adapter.observe()
         self.store.event(job_id, "observation", observation.model_dump())
         proposal = dict(
@@ -83,7 +86,11 @@ class ExecutionLayer:
         self.adapter.fence = lambda: self.store.check(job_id, owner, lease["epoch"])
         try:
             self.adapter.fence()
+            if name == "save_draft":
+                self.store.update_job(job_id, {"mutation": "attempted_uncertain"})
             result = execute(arguments)
+            if name == "save_draft":
+                self.store.update_job(job_id, {"mutation": "confirmed_succeeded"})
             after = self.adapter.observe().model_dump()
             result = {"value": result, "after": after}
             self.store.finish_action(job_id, invocation, result, approval_id)

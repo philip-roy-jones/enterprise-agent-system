@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import json
 import os
+import signal
 from pathlib import Path
 import subprocess
 import sys
@@ -121,15 +122,26 @@ def test_amount_label_variants(labels, expected):
         "EAS_MODEL_MODE": "simulated",
         "EAS_TEST_CANDIDATE_LABELS": "1",
     }
-    checks = subprocess.run(
-        [sys.executable, "-m", "pytest", "-q"],
-        cwd=checkout,
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=300,
-    )
-    (folder / "checks.txt").write_text(checks.stdout + checks.stderr)
+    checks_path = folder / "checks.txt"
+    with checks_path.open("w") as check_log:
+        checks = subprocess.Popen(
+            [sys.executable, "-m", "pytest", "-q", "-x"],
+            cwd=checkout,
+            env=env,
+            stdout=check_log,
+            stderr=subprocess.STDOUT,
+            start_new_session=os.name == "posix",
+        )
+        try:
+            checks.wait(timeout=600)
+        except subprocess.TimeoutExpired:
+            # Stop the isolated test servers too; retain evidence and a failed manifest.
+            if os.name == "posix":
+                os.killpg(checks.pid, signal.SIGKILL)
+            else:
+                checks.kill()
+            checks.wait()
+            check_log.write("\nIsolated checks exceeded the 600-second time limit.\n")
     manifest = dict(
         id=proposal_id,
         checkout=str(checkout),

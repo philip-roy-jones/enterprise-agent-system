@@ -29,6 +29,8 @@ The shared platform is department-agnostic; the first runnable workflow belongs 
 - **Browser fixture:** quick local setup and automated regression tests, using the commands below.
 - **Windows VM:** native **DemoBooks Desktop** running on the accounting machine, with the same approval workflow and actual Windows screenshots. Follow the [Windows installation and connection guide](docs/windows-accounting-machine.md).
 
+![Native DemoBooks Desktop on the Windows accounting machine](docs/images/demobooks-windows.png)
+
 ## Quick start
 
 Requires Python 3.11+ (tested on 3.12), Git, and a Chromium-compatible development machine. Linux is the tested platform.
@@ -77,6 +79,7 @@ The **New job** dialog selects an invoice, approval mode, and optional interrupt
 | Unfamiliar dialog | Screenshot with a red target circle; click the screenshot to correct the proposed target |
 | Save confirmation interrupted | The saved draft is inspected and reconciled; Save is not blindly repeated |
 | Wrong invoice, reordered rows, or another page | The assigned record is found by identity before editing |
+| Covered or minimized Windows app | DemoBooks is restored automatically before the next approval preview |
 | Staff takeover | Automation pauses and existing proposals become stale |
 
 Approvals authorize **one named operation**, which may contain several disclosed internal clicks. Assistant tools receive **individual approvals, including reads**. Selecting Auto never changes the worker's permissions or releases pending assistant calls. Rejecting or cancelling stops the job.
@@ -109,6 +112,8 @@ flowchart LR
     end
     Shared --> Browser[Playwright / one Chromium session]
     Browser --> App[Persistent mock accounting app]
+    Shared --> Native[Windows adapter / SSH tunnel]
+    Native --> DemoBooks[Native DemoBooks Desktop]
     State --> Dev[Isolated development checkout]
     Dev --> Review[Tests + developer review]
     Review --> Release[Versioned release for idle workers]

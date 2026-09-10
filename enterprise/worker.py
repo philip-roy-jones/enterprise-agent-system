@@ -1,4 +1,7 @@
 import logging
+import os
+import faulthandler
+import signal
 import sqlite3
 import time
 from langgraph.checkpoint.sqlite import SqliteSaver
@@ -13,6 +16,10 @@ log = logging.getLogger(__name__)
 
 
 def run_worker(settings=None, once=False):
+    if hasattr(signal, "SIGUSR1"):
+        faulthandler.register(signal.SIGUSR1, all_threads=True)
+    if os.getenv("EAS_WORKER_DIAGNOSTICS") == "1":
+        faulthandler.dump_traceback_later(45, repeat=True)
     settings = settings or Settings()
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     store = RemoteStore(settings.backend_url, settings.worker_token)

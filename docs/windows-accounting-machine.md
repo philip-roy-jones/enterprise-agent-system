@@ -28,7 +28,7 @@ Accounting state lives in `...\DemoBooks\data\accounting-records.json`, separate
 Create an SSH tunnel from the backend/worker machine:
 
 ```bash
-ssh -N -L 127.0.0.1:8765:127.0.0.1:8765 versahn-win@100.66.6.90
+ssh -N -L 127.0.0.1:8765:127.0.0.1:8765 versahn@100.66.6.90
 ```
 
 Set these values in your ignored `.env`, using the token from the VM:
@@ -41,7 +41,7 @@ EAS_WINDOWS_TOKEN=the-private-token-from-the-vm
 
 Restart `enterprise dev`. Create a Finance invoice-correction job in the staff console. The **same graph** now uses the native Windows adapter, and its screenshots come from the actual Windows application window. The console's demonstration controls configure that native application's test conditions. The browser accounting page becomes a staff mirror of the same native records.
 
-Use **Take control** before editing in the VM or through the staff mirror, and **Release control** to resume. Automated actions require DemoBooks to be the foreground application. If the session is locked, disconnected without a usable desktop, or the app is covered by another window, restore the desktop and bring DemoBooks forward before approving a fresh proposal. Screen geometry and native state are revalidated against each approved action.
+Use **Take control** before editing in the VM or through the staff mirror, and **Release control** to resume. Before capturing an approval preview, the worker automatically restores a minimized or covered DemoBooks window while it owns the desktop lease. It first requests normal activation; if Windows declines, it raises its own window and clicks a verified inert header location. This bounded setup does not dismiss dialogs or change accounting records. Staff takeover prevents activation and existing approvals are revalidated after release. A locked session or secure desktop still requires restoring an interactive Windows session. Screen geometry and native state are revalidated against each approved action.
 
 ## Adapter and evidence
 
@@ -56,3 +56,7 @@ dotnet run --project windows/AccountingSmoke/AccountingSmoke.csproj -c Release
 ```
 
 Compilation and accounting-model tests can run on Linux. Native GUI and screenshot validation must run on the actual Windows VM; those results are reported separately from browser tests.
+
+## Verified on the Windows VM
+
+The native app was installed and exercised in an interactive Windows session. Strict, Auto, changed-label assistance, and interrupted-save reconciliation all completed. A separate covering window and a minimized app were recovered automatically; the worker left focus alone during staff takeover and recovered after release. Model responses and staff decisions in these tests were explicitly simulated. See [recorded validation](validation.md).

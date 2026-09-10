@@ -1,7 +1,7 @@
 param(
     [string]$Source = "$PSScriptRoot\publish",
     [string]$InstallDirectory = "$env:LOCALAPPDATA\EnterpriseAgentSystem\DemoBooks",
-    [string]$DesktopUser = "$env:USERDOMAIN\$env:USERNAME"
+    [string]$DesktopUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 )
 $ErrorActionPreference = 'Stop'
 if (-not (Test-Path "$Source\DemoBooks.exe")) { throw 'Publish DemoBooks first, or extract the Windows package next to this script.' }

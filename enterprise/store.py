@@ -354,6 +354,18 @@ class Store:
             db.execute("UPDATE approvals SET data=? WHERE id=?", (canonical(a), approval_id))
             self._event(db, a["job_id"], "stale_proposal", {"approval_id": approval_id})
 
+    def begin_window_recovery(self, job_id, owner, epoch, invocation):
+        """Reserve non-business setup of the assigned window before capturing a preview."""
+        with self.db() as db:
+            job = self._job(db, job_id)
+            lease = json.loads(db.execute("SELECT data FROM lease WHERE id=1").fetchone()[0])
+            self._check(job, lease, owner, epoch)
+            if owner == "staff" or lease["inflight"]:
+                raise Stale("Desktop is not available for window recovery")
+            lease["inflight"] = invocation
+            self._set_lease(db, lease)
+            self._event(db, job_id, "window_recovery_started", {"invocation": invocation})
+
     def begin_action(self, job_id, owner, epoch, invocation, action, approval_id=None):
         with self.db() as db:
             job = self._job(db, job_id)

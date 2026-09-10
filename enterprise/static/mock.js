@@ -109,8 +109,12 @@ async function sync() {
   try {
     const r = await fetch("/api/mock/state");
     if (r.ok) {
-      state = await r.json();
-      render();
+      const observed = await r.json();
+      // An earlier poll must never overwrite a newer action response.
+      if (!busy && (!state || observed.revision >= state.revision)) {
+        state = observed;
+        render();
+      }
     }
   } catch {}
 }

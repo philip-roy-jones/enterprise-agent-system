@@ -1,0 +1,50 @@
+{
+  "model_mode": "simulated",
+  "staff": "simulated",
+  "results": [
+    {
+      "title": "Known procedure / Strict",
+      "job_id": "c0889cc7f69e4781814ddb86df0c14fd",
+      "status": "completed",
+      "graph_version": "v1",
+      "fallback_count": 0,
+      "model_calls": 0,
+      "effective_mode": "strict",
+      "approval_requests": 7,
+      "execution_seconds": 8.92
+    },
+    {
+      "title": "Known procedure / Auto",
+      "job_id": "42710772325640b7878e449fa986c11e",
+      "status": "completed",
+      "graph_version": "v1",
+      "fallback_count": 0,
+      "model_calls": 0,
+      "effective_mode": "auto",
+      "approval_requests": 0,
+      "execution_seconds": 1.77
+    },
+    {
+      "title": "Changed field / supervised assistance",
+      "job_id": "2c8158b7109c47f29b2145a2a124dd7a",
+      "status": "completed",
+      "graph_version": "v1",
+      "fallback_count": 1,
+      "model_calls": 4,
+      "effective_mode": "auto",
+      "approval_requests": 4,
+      "execution_seconds": 6.75
+    },
+    {
+      "title": "Interrupted save / reconciliation",
+      "job_id": "f106545ea9634aef9069441c4164dd81",
+      "status": "completed",
+      "graph_version": "v1",
+      "fallback_count": 0,
+      "model_calls": 0,
+      "effective_mode": "auto",
+      "approval_requests": 0,
+      "execution_seconds": 2.15
+    }
+  ]
+}

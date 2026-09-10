@@ -53,6 +53,7 @@ public sealed class AccountingWindow : Form
         ClientSize = new(1180, 790);
         MinimumSize = new(1000, 700);
         StartPosition = FormStartPosition.CenterScreen;
+        WindowState = FormWindowState.Maximized;
         BackColor = Color.White;
         var menu = new MenuStrip();
         foreach (string name in new[] { "File", "Edit", "View", "Company", "Vendors", "Reports", "Help" }) menu.Items.Add(name);
@@ -251,7 +252,8 @@ public sealed class AccountingWindow : Form
                         case "/state": result = store.State; break;
                         case "/observe": result = Observe(); break;
                         case "/scenario": store.Scenario(data); Render(); result = store.State; break;
-                        case "/activate": SetForegroundWindow(Handle); result = new { activated = true }; break;
+                        case "/window": result = new { foreground = GetForegroundWindow() == Handle, minimized = WindowState == FormWindowState.Minimized }; break;
+                        case "/activate": result = WindowActivation.Restore(this); break;
                         case "/action": result = ExecuteBridgeAction(data); break;
                         default: throw new ArgumentException("Unknown bridge endpoint");
                     }

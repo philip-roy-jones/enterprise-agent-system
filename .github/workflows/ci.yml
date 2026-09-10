@@ -20,12 +20,15 @@ jobs:
       - run: python -m playwright install --with-deps chromium
       - run: ruff check enterprise tests
       - run: ruff format --check enterprise tests
-      - run: pytest -q --junitxml=runtime/test-results.xml
+      - run: pytest -q -x --basetemp=runtime/test-temp --junitxml=runtime/test-results.xml
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
-          path: runtime/test-results.xml
+          path: |
+            runtime/test-results.xml
+            runtime/test-temp/integration*/worker.log
+            runtime/test-temp/integration*/backend.log
   native-build:
     runs-on: ubuntu-latest
     timeout-minutes: 10

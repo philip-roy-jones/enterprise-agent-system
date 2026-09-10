@@ -8,6 +8,7 @@ from .types import Observation, Recovery
 
 
 class DesktopAdapter(Protocol):
+    def prepare_observation(self, job_id, owner, epoch) -> None: ...
     def observe(self) -> Observation: ...
     def ensure_company(self, company_id: str) -> dict: ...
     def ensure_invoice_open(self, invoice_id: str) -> dict: ...
@@ -42,6 +43,10 @@ class BrowserAdapter:
     def close(self):
         self.browser.close()
         self.playwright.stop()
+
+    def prepare_observation(self, job_id, owner, epoch):
+        # This adapter owns a dedicated browser page, independent of OS focus.
+        return None
 
     def observe(self):
         self.page.evaluate("sync()")
@@ -134,7 +139,12 @@ class BrowserAdapter:
         if existing:
             return existing
         self.ensure_editable()
-        self.click_target("save")
+        try:
+            self.click_target("save")
+        except PlaywrightTimeout:
+            raise Recovery(
+                "ambiguous", "Save timed out; reconcile the persisted result before retrying"
+            ) from None
         if self.page.evaluate("window.appState.dialog"):
             raise Recovery(
                 "ambiguous", "Save confirmation interrupted; inspect persisted draft before another save"

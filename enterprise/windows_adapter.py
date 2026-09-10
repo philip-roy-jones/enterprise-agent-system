@@ -7,7 +7,7 @@ scoped application controls and real Windows screenshots; never arbitrary code.
 import base64
 import time
 import httpx
-from .store import fingerprint
+from .store import fingerprint, uid
 from .types import Observation, Recovery, Stale
 
 
@@ -43,6 +43,25 @@ class WindowsAdapter:
 
     def close(self):
         self.bridge.client.close()
+
+    def prepare_observation(self, job_id, owner, epoch):
+        if self.bridge.call("/window")["foreground"]:
+            return
+        invocation = f"{job_id}:window:{uid()}"
+        self.store.begin_window_recovery(job_id, owner, epoch, invocation)
+        result = {"recovered": False}
+        try:
+            self.bridge.call("/activate", {})
+            deadline = time.monotonic() + 3
+            while time.monotonic() < deadline:
+                self.store.check(job_id, owner, epoch)
+                if self.bridge.call("/window")["foreground"]:
+                    result = {"recovered": True, "application": "DemoBooks Desktop"}
+                    return
+                time.sleep(0.1)
+            raise Recovery("temporary", "The assigned Windows application could not be activated")
+        finally:
+            self.store.finish_action(job_id, invocation, result, cache=False)
 
     def observe(self):
         raw = self.bridge.call("/observe")
@@ -138,7 +157,12 @@ class WindowsAdapter:
         if saved:
             return saved
         self.ensure_editable()
-        result = self.click_target("save")
+        try:
+            result = self.click_target("save")
+        except httpx.TimeoutException:
+            raise Recovery(
+                "ambiguous", "Native Save timed out; reconcile the persisted result before retrying"
+            ) from None
         if result["dialog"]:
             raise Recovery(
                 "ambiguous",

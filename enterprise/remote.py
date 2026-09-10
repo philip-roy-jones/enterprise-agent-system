@@ -14,6 +14,7 @@ WORKER_METHODS = {
     "approvals",
     "stale_approval",
     "begin_action",
+    "begin_window_recovery",
     "finish_action",
     "result",
     "relevant_episodes",

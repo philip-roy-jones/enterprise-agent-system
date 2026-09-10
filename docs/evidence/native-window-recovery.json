@@ -1,0 +1,26 @@
+[
+  {
+    "condition": "covered",
+    "before": {
+      "foreground": false,
+      "minimized": false
+    },
+    "recovered": true,
+    "respected_staff_takeover": true,
+    "job_id": "a40f9a2834a8493c92a77c8c23093bf0",
+    "status": "completed",
+    "recovery_events": 1
+  },
+  {
+    "condition": "minimized",
+    "before": {
+      "foreground": false,
+      "minimized": true
+    },
+    "recovered": true,
+    "respected_staff_takeover": true,
+    "job_id": "77f4f67929624e8ab88b367c2e56b78d",
+    "status": "completed",
+    "recovery_events": 1
+  }
+]

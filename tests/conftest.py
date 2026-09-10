@@ -39,6 +39,7 @@ def server(tmp_path_factory):
         EAS_WORKER_TOKEN="test-worker",
         EAS_DEVELOPER_TOKEN="test-developer",
         EAS_HEADLESS="true",
+        EAS_WORKER_DIAGNOSTICS="1",
         EAS_DESKTOP_ADAPTER="browser",
         EAS_JOB_TIMEOUT_SECONDS="120",
     )

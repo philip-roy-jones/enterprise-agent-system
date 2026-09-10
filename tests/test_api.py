@@ -4,7 +4,7 @@ from enterprise.config import Settings
 
 
 def test_authentication_artifacts_and_worker_role(tmp_path):
-    client = TestClient(create_app(Settings(data_dir=tmp_path)))
+    client = TestClient(create_app(Settings(data_dir=tmp_path, desktop_adapter="browser")))
     assert client.get("/api/jobs").status_code == 401
     assert client.get("/api/mock/state").status_code == 401
     assert client.get("/api/artifacts/" + "a" * 32 + ".png").status_code == 401
@@ -18,7 +18,8 @@ def test_authentication_artifacts_and_worker_role(tmp_path):
 
 def test_default_mode_and_scoped_permissions(tmp_path):
     client = TestClient(
-        create_app(Settings(data_dir=tmp_path)), headers={"Authorization": "Bearer local-staff-demo"}
+        create_app(Settings(data_dir=tmp_path, desktop_adapter="browser")),
+        headers={"Authorization": "Bearer local-staff-demo"},
     )
     job = client.post("/api/jobs", json={"invoice_id": "INV-1042"}).json()
     assert job["selected_mode"] == job["effective_mode"] == "strict"

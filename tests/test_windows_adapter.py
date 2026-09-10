@@ -29,3 +29,34 @@ def test_native_bridge_classifies_restrictions(status, reason, exception):
     with pytest.raises(exception):
         bridge.call("/action", {"name": "click", "args": {"target": "save"}})
     bridge.client.close()
+
+
+def test_window_recovery_reserves_control_and_never_mutates_accounting(store, job):
+    from enterprise.windows_adapter import WindowsAdapter
+    from enterprise.types import Stale
+
+    class Bridge:
+        focused = False
+        calls = []
+
+        def call(self, path, data=None):
+            self.calls.append(path)
+            if path == "/activate":
+                with pytest.raises(Stale):
+                    store.transfer(job["id"], "staff")
+                self.focused = True
+            return {"foreground": self.focused}
+
+    adapter = object.__new__(WindowsAdapter)
+    adapter.store, adapter.bridge = store, Bridge()
+    lease = store.lease()
+    adapter.prepare_observation(job["id"], "script", lease["epoch"])
+    assert adapter.bridge.calls == ["/window", "/activate", "/window"]
+    assert store.lease()["inflight"] is None
+    assert store.get_job(job["id"])["mutation"] == "not_attempted"
+    assert store.approvals(job["id"]) == []
+    store.transfer(job["id"], "staff")
+    adapter.bridge.focused = False
+    with pytest.raises(Stale):
+        adapter.prepare_observation(job["id"], "script", lease["epoch"])
+    assert adapter.bridge.calls.count("/activate") == 1
