@@ -20,6 +20,7 @@ jobs:
       - run: python -m playwright install --with-deps chromium
       - run: ruff check enterprise tests
       - run: ruff format --check enterprise tests
+      - run: mkdir -p runtime
       - run: pytest -q -x --basetemp=runtime/test-temp --junitxml=runtime/test-results.xml
       - uses: actions/upload-artifact@v4
         if: always()

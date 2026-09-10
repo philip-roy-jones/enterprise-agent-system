@@ -20,6 +20,8 @@ DemoBooks was installed in the logged-in Windows desktop session and connected t
 | DemoBooks minimized | Restored automatically and completed the job |
 | Staff takeover while another window is active | Left focus alone until staff released control |
 
+The native app also passed known-notice, unfamiliar-dialog, unsaved-dialog, wrong-record, reordered-row, delayed-view, and changed-layout checks. Known interruptions completed in Auto without assistance; unfamiliar and unsaved dialogs required individually approved assistant tools. See [native recovery variants](evidence/native-recovery-variants.json).
+
 See [native demo results](evidence/native-demo-report.json) and [window recovery evidence](evidence/native-window-recovery.json). The desktop recovery tests deliberately introduced another process's window and minimized DemoBooks. Recovery required no manual minimize or focus action. The header-click fallback targets only DemoBooks' verified inert header; it does not dismiss application dialogs or operate arbitrary desktop controls.
 
 ## Limits

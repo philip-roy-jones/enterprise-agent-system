@@ -1,0 +1,55 @@
+{
+  "model_mode": "simulated",
+  "staff": "simulated",
+  "results": [
+    {
+      "condition": "known_notice",
+      "job_id": "476990f11051470fabebf9ec4c683014",
+      "status": "completed",
+      "fallback_count": 0,
+      "approval_requests": 0
+    },
+    {
+      "condition": "unfamiliar_dialog",
+      "job_id": "96f38db5df874e92ab95179a12ff73e3",
+      "status": "completed",
+      "fallback_count": 1,
+      "approval_requests": 3
+    },
+    {
+      "condition": "unsaved_dialog",
+      "job_id": "b119968af85842c3b31ce688bb8dc25d",
+      "status": "completed",
+      "fallback_count": 1,
+      "approval_requests": 3
+    },
+    {
+      "condition": "wrong_record",
+      "job_id": "ab7edbcbca4b45628a8bbd56f0d74920",
+      "status": "completed",
+      "fallback_count": 0,
+      "approval_requests": 0
+    },
+    {
+      "condition": "reordered_rows",
+      "job_id": "07b67db6a09d4303adb3daebb7794ee4",
+      "status": "completed",
+      "fallback_count": 0,
+      "approval_requests": 0
+    },
+    {
+      "condition": "delayed_view",
+      "job_id": "81d2c710950342829747eef49cdd3d42",
+      "status": "completed",
+      "fallback_count": 0,
+      "approval_requests": 0
+    },
+    {
+      "condition": "changed_layout",
+      "job_id": "50ef5b4b982941bba873864e54525566",
+      "status": "completed",
+      "fallback_count": 0,
+      "approval_requests": 0
+    }
+  ]
+}
