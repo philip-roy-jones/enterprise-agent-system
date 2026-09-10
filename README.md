@@ -1,6 +1,6 @@
 <div align="center">
 
-# Relay · Enterprise Agent System
+# Enterprise Agent System
 
 **A digital worker that follows tested procedures, asks for help, and learns through reviewed code.**
 
@@ -12,13 +12,22 @@ Python · LangGraph · Deep Agents · Playwright · FastAPI · SQLite
 
 ---
 
-Relay is a working, local prototype of an accounts payable worker. It opens a synthetic invoice, compares it with a purchase order, identifies a discrepancy, and saves and verifies a correction draft. Staff can approve each operation, supervise unfamiliar situations, correct proposed actions, or take over the desktop.
+Enterprise Agent System is a department-agnostic platform for supervised digital workers. Departments supply role-specific workflows, tools, permissions, and knowledge scopes; the platform provides job dispatch, approvals, evidence, recovery, and developer-reviewed improvements.
+
+The first runnable example is a Finance workflow: a worker opens a synthetic invoice, compares it with a purchase order, identifies a discrepancy, and saves and verifies a correction draft. Staff can approve each operation, supervise unfamiliar situations, correct proposed actions, or take over the desktop.
 
 An accepted episode can become a small, tested code proposal. A developer reviews the exact candidate before it can be released to idle workers. Future jobs pin the improved procedure version.
 
 **Default: simulated model, real LangGraph and Deep Agents harnesses, real Chromium automation, and persistent synthetic records. No model credentials are needed.** This is not a QuickBooks integration and does not handle real accounting data.
 
-![Relay staff console showing a correction draft approval](docs/images/console.png)
+![Enterprise Agent System console showing an example Finance workflow approval](docs/images/console.png)
+
+## Choose an accounting machine
+
+The shared platform is department-agnostic; the first runnable workflow belongs to **Finance**. [Department workflow extensions](docs/departments.md) explain how other departments bring their own input schemas, graphs, adapters, and permissions.
+
+- **Browser fixture:** quick local setup and automated regression tests, using the commands below.
+- **Windows VM:** native **DemoBooks Desktop** running on the accounting machine, with the same approval workflow and actual Windows screenshots. Follow the [Windows installation and connection guide](docs/windows-accounting-machine.md).
 
 ## Quick start
 
@@ -205,7 +214,9 @@ enterprise/
 ├── graph.py            Cyclic role workflow and recovery routing
 ├── assistance.py       Deep Agents harness and simulated/live model selection
 ├── execution.py        Shared approval, permission and execution boundary
-├── adapter.py          Browser adapter + native Windows extension point
+├── roles.py            Department workflow registry and input schemas
+├── adapter.py          Browser fixture adapter
+├── windows_adapter.py  Native DemoBooks bridge adapter
 ├── store.py            Durable jobs, decisions, leases and audit events
 ├── mock.py             Persistent synthetic accounting application
 ├── operations.py       Operation descriptions and execution contracts
@@ -213,6 +224,7 @@ enterprise/
 ├── improve.py          Isolated proposal, review, release and rollback
 ├── demo.py             Explicit synthetic staff demonstration driver
 └── static/             Staff console and mock accounting interface
+windows/                Native DemoBooks app, installer, accounting model tests
 tests/                  Focused authority and browser regression tests
 docs/                   Architecture and API verification notes
 original-prompt.txt     Original project specification
@@ -224,7 +236,7 @@ original-prompt.txt     Original project specification
 | --- | --- |
 | **Implemented** | Runnable console, backend, worker, mock app; real cyclic LangGraph and Deep Agents; real browser automation; durable approval/evidence storage; Strict/Auto enforcement; correction/takeover; bounded recovery; save reconciliation; isolated improvement proposal; manual review, version pinning, release and rollback |
 | **Simulated by default** | The model's decisions, all accounting records, and staff decisions only when the explicit demo/test driver is used |
-| **Bounded prototype choices** | One company, one worker/session, three synthetic invoices, correction drafts only, one deterministic improvement generator, local token roles, SQLite persistence, versioned resolver deployment |
-| **Deferred** | Real QuickBooks/native Windows automation; real-model quality evaluation; production SSO and tenant isolation; hardened development sandbox; general autonomous code generation; arbitrary graph-code deployment and checkpoint migration; multiworker fleet orchestration |
+| **Bounded prototype choices** | One company, one worker/session, pluggable department roles, three synthetic Finance invoices, correction drafts only, one deterministic improvement generator, local token roles, SQLite persistence, versioned resolver deployment |
+| **Deferred** | Real QuickBooks and generic third-party Windows automation; real-model quality evaluation; production SSO and tenant isolation; hardened development sandbox; general autonomous code generation; arbitrary graph-code deployment and checkpoint migration; multiworker fleet orchestration |
 
-The native Windows adapter is an explicit unimplemented interface. No real accounting integration or production readiness is claimed.
+The native adapter targets our own DemoBooks application. Generic Windows automation and real QuickBooks integration remain separate future adapters. No real accounting integration or production readiness is claimed.

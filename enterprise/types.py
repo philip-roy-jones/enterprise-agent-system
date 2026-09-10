@@ -6,11 +6,15 @@ TERMINAL = {"completed", "cancelled", "rejected", "denied", "failed"}
 
 
 class JobInput(BaseModel):
-    company_id: Literal["ACME"] = "ACME"
-    invoice_id: str = Field(pattern=r"^INV-\d{4}$")
-    task: str = "invoice_correction"
+    organization_id: str = "acme"
+    department_id: str = "finance"
+    role_id: str = "invoice_correction"
+    inputs: dict[str, Any] = Field(default_factory=dict)
+    company_id: str | None = None
+    invoice_id: str | None = Field(default=None, pattern=r"^INV-\d{4}$")
+    task: str | None = None
     selected_mode: Mode = "strict"
-    permissions: list[str] = Field(default_factory=lambda: ["read", "navigate", "draft"])
+    permissions: list[str] | None = None
 
 
 class Decision(BaseModel):

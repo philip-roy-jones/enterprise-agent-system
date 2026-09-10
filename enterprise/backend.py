@@ -16,7 +16,12 @@ from .remote import WORKER_METHODS
 def create_app(settings=None):
     settings = settings or Settings()
     store = Store(settings.data_dir)
-    mock = MockAccounting(store)
+    if settings.desktop_adapter == "windows":
+        from .windows_adapter import WindowsAccountingProxy
+
+        mock = WindowsAccountingProxy(store, settings)
+    else:
+        mock = MockAccounting(store)
     app = FastAPI(title="Enterprise worker prototype")
     app.state.store, app.state.settings = store, settings
     static = Path(__file__).parent / "static"
@@ -71,6 +76,7 @@ def create_app(settings=None):
             "model_mode": settings.model_mode,
             "application": "synthetic",
             "release": store.get_value("release")["version"],
+            "desktop_adapter": settings.desktop_adapter,
         }
 
     @app.post("/api/session")
@@ -85,14 +91,18 @@ def create_app(settings=None):
         r.set_cookie("eas_session", token, httponly=True, samesite="strict", max_age=86400)
         return r
 
+    @app.get("/api/roles", dependencies=[Depends(staff)])
+    def roles():
+        from .roles import load_roles
+
+        return [role.public() for role in load_roles().values()]
+
     @app.get("/api/jobs", dependencies=[Depends(staff)])
     def jobs():
         return store.list_jobs()
 
     @app.post("/api/jobs", dependencies=[Depends(staff)])
     def create_job(body: JobInput):
-        if set(body.permissions) - {"read", "navigate", "draft"}:
-            raise PermissionError("Worker role cannot be granted these permissions")
         return store.create_job(body.model_dump(), settings.model_mode, settings.job_timeout)
 
     @app.get("/api/jobs/{job_id}", dependencies=[Depends(staff)])
@@ -165,7 +175,7 @@ def create_app(settings=None):
             "job": store.get_job(job_id),
             "events": store.events(job_id),
             "approvals": store.approvals(job_id),
-            "app_version": "mock-1",
+            "app_version": store.get_job(job_id).get("app_version", "mock-1"),
         }
 
     @app.get("/api/metrics", dependencies=[Depends(staff)])

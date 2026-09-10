@@ -50,15 +50,15 @@ def test_batched_model_tools_each_require_their_own_approval(store, job, monkeyp
     adapter = ReadAdapter()
     layer = ExecutionLayer(store, adapter)
     agent = build_assistant(Settings(), store, layer, InMemorySaver(), job["id"], "batch")
-    result = run_assistant(agent, {}, "batch")
+    result = run_assistant(agent, {}, "batch", store, job["id"])
     assert result.get("__interrupt__")
     approvals = store.approvals(job["id"])
     assert len(approvals) == 2 and not adapter.executed
     store.decide(approvals[0]["id"], {"decision": "approve"})
-    result = run_assistant(agent, {}, "batch")
+    result = run_assistant(agent, {}, "batch", store, job["id"])
     assert result.get("__interrupt__") and len(adapter.executed) == 1
     assert store.approvals(job["id"])[1]["status"] == "pending"
     store.decide(approvals[1]["id"], {"decision": "approve"})
-    result = run_assistant(agent, {}, "batch")
+    result = run_assistant(agent, {}, "batch", store, job["id"])
     assert not result.get("__interrupt__") and len(adapter.executed) == 2
     assert store.get_job(job["id"])["effective_mode"] == "strict"

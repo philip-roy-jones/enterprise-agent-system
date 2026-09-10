@@ -16,6 +16,9 @@ class Settings:
     model_mode: str = os.getenv("EAS_MODEL_MODE", "simulated")
     model_provider: str = os.getenv("EAS_MODEL_PROVIDER", "")
     model_id: str = os.getenv("EAS_MODEL_ID", "")
+    desktop_adapter: str = os.getenv("EAS_DESKTOP_ADAPTER", "browser")
+    windows_bridge_url: str = os.getenv("EAS_WINDOWS_BRIDGE_URL", "http://127.0.0.1:8765")
+    windows_token: str = os.getenv("EAS_WINDOWS_TOKEN", "")
     headless: bool = os.getenv("EAS_HEADLESS", "true").lower() == "true"
     job_timeout: int = int(os.getenv("EAS_JOB_TIMEOUT_SECONDS", "900"))
     max_model_calls: int = int(os.getenv("EAS_MAX_MODEL_CALLS", "12"))

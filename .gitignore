@@ -7,3 +7,6 @@ __pycache__/
 *.egg-info/
 runtime/
 .sites-runtime/
+windows/**/bin/
+windows/**/obj/
+windows/publish/

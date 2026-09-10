@@ -2,10 +2,9 @@ import logging
 import sqlite3
 import time
 from langgraph.checkpoint.sqlite import SqliteSaver
-from .adapter import ThreadedBrowserAdapter
 from .config import Settings
 from .execution import ExecutionLayer
-from .graph import RoleGraph
+from .roles import get_role
 from .remote import RemoteStore
 from .store import uid
 from .types import Stale, Stopped, TERMINAL
@@ -17,13 +16,12 @@ def run_worker(settings=None, once=False):
     settings = settings or Settings()
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     store = RemoteStore(settings.backend_url, settings.worker_token)
-    adapter = ThreadedBrowserAdapter(settings, store)
+    adapter = None
+    active_role = None
+    graph = None
     worker_id = uid()
     graph_db = sqlite3.connect(settings.data_dir / "worker-checkpoints.sqlite", check_same_thread=False)
     assist_db = sqlite3.connect(settings.data_dir / "assistant-checkpoints.sqlite", check_same_thread=False)
-    graph = RoleGraph(
-        settings, store, ExecutionLayer(store, adapter), SqliteSaver(graph_db), SqliteSaver(assist_db)
-    ).graph
     try:
         while True:
             job = store.claim(worker_id)
@@ -34,6 +32,20 @@ def run_worker(settings=None, once=False):
                 continue
             job_id = job["id"]
             try:
+                role_id = job.get("role_id", "invoice_correction")
+                if role_id != active_role:
+                    if adapter:
+                        adapter.close()
+                    role = get_role(role_id)
+                    adapter = role.adapter_factory(settings, store)
+                    graph = role.graph_factory(
+                        settings,
+                        store,
+                        ExecutionLayer(store, adapter, role.operations),
+                        SqliteSaver(graph_db),
+                        SqliteSaver(assist_db),
+                    ).graph
+                    active_role = role_id
                 if store.lease()["owner"] == "staff":
                     time.sleep(0.5)
                     continue
@@ -68,6 +80,7 @@ def run_worker(settings=None, once=False):
                 return
             time.sleep(0.5)
     finally:
-        adapter.close()
+        if adapter:
+            adapter.close()
         graph_db.close()
         assist_db.close()

@@ -39,6 +39,7 @@ def server(tmp_path_factory):
         EAS_WORKER_TOKEN="test-worker",
         EAS_DEVELOPER_TOKEN="test-developer",
         EAS_HEADLESS="true",
+        EAS_DESKTOP_ADAPTER="browser",
         EAS_JOB_TIMEOUT_SECONDS="120",
     )
     root = Path(__file__).resolve().parents[1]

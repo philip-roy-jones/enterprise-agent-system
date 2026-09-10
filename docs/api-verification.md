@@ -24,3 +24,11 @@ Deep Agents provides `interrupt_on` for tool approval. This prototype uses custo
 No live provider/model ID is assumed. `EAS_MODEL_PROVIDER` and `EAS_MODEL_ID` must name a provider integration and model actually available to your account. Install that provider's supported LangChain package and credentials, then select `EAS_MODEL_MODE=live`. GPT-6 Astra is not hard-coded or claimed as a computer-use model. The prototype's computer interaction is implemented by Playwright tools, not a vendor-specific computer-use API.
 
 The default simulated model subclasses LangChain's `BaseChatModel`, so tests execute the actual Deep Agents harness and its checkpoint/tool middleware without an API key. Those runs assess the harness and deterministic fixture policy, not real-model intelligence or reliability.
+
+Native Windows build references (verified 2026-09-10):
+
+- [.NET 10 SDK downloads](https://dotnet.microsoft.com/en-us/download/dotnet/10.0), SDK 10.0.401 used for the build.
+- [Building Windows targets on Linux with EnableWindowsTargeting](https://learn.microsoft.com/en-us/dotnet/core/tools/sdk-errors/netsdk1100).
+- [Windows Forms overview](https://learn.microsoft.com/en-us/dotnet/desktop/winforms/overview/).
+
+DemoBooks targets `net10.0-windows` and publishes a self-contained Windows x64 executable. Its accounting model has a separate cross-platform smoke-test project.

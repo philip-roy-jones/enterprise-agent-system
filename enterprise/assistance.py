@@ -147,11 +147,21 @@ def build_assistant(settings, store, layer, checkpointer, job_id, thread_id):
     )
 
 
-def run_assistant(agent, context, thread_id):
+def run_assistant(agent, context, thread_id, store, job_id):
     config = {"configurable": {"thread_id": thread_id}, "recursion_limit": 60, "max_concurrency": 1}
     snapshot = agent.get_state(config)
-    if snapshot.next:
-        value = Command(resume=True)
+    if snapshot.interrupts:
+        decisions = {a["id"]: a["status"] for a in store.approvals(job_id)}
+        ready = {
+            item.id: True
+            for item in snapshot.interrupts
+            if decisions.get(item.value.get("approval")) in {"approved", "corrected", "stale", "executing"}
+        }
+        if not ready:
+            return {"__interrupt__": snapshot.interrupts}
+        value = Command(resume=ready)
+    elif snapshot.next:
+        value = None
     elif snapshot.values:
         return snapshot.values
     else:

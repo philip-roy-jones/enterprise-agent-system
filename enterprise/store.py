@@ -76,6 +76,9 @@ class Store:
         )
 
     def create_job(self, inputs, model_mode="simulated", timeout=900):
+        from .roles import get_role
+
+        inputs = get_role(inputs.get("role_id", "invoice_correction")).normalize(inputs)
         with self.db() as db:
             release = json.loads(db.execute("SELECT data FROM kv WHERE key='release'").fetchone()[0])
             job = dict(
@@ -93,7 +96,9 @@ class Store:
                 expected=None,
                 mutation="not_attempted",
                 model_mode=model_mode,
-                app_version="mock-1",
+                app_version="demobooks-windows-1"
+                if inputs.get("application") == "DemoBooks Desktop (Windows)"
+                else "mock-1",
                 accepted=False,
                 model_calls=0,
                 tokens=0,
@@ -419,7 +424,10 @@ class Store:
             dict(episode_id=j["id"], task=j["task"], version=j["graph_version"], expected=j["expected"])
             for j in self.list_jobs()
             if j["id"] != job_id
-            and j["company_id"] == job["company_id"]
+            and j.get("organization_id", "acme") == job.get("organization_id", "acme")
+            and j.get("department_id", "finance") == job.get("department_id", "finance")
+            and j.get("role_id", "invoice_correction") == job.get("role_id", "invoice_correction")
+            and j.get("company_id") == job.get("company_id")
             and j["task"] == job["task"]
             and j["accepted"]
             and j["graph_version"] == job["graph_version"]

@@ -40,7 +40,9 @@ def main():
             else:
                 raise RuntimeError("Backend did not become healthy")
             worker = subprocess.Popen([sys.executable, "-m", "enterprise.cli", "worker"])
-            print("\nRelay console: http://127.0.0.1:8000\nCtrl+C stops both processes.\n", flush=True)
+            print(
+                "\nEnterprise Agent System: http://127.0.0.1:8000\nCtrl+C stops both processes.\n", flush=True
+            )
             while backend.poll() is None and worker.poll() is None:
                 time.sleep(1)
         except KeyboardInterrupt:

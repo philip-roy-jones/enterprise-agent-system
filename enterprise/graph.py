@@ -240,6 +240,6 @@ class RoleGraph:
             "observation": self.layer.adapter.observe().model_dump(),
             "past_episodes": self.store.relevant_episodes(job_id, state["reason"]),
         }
-        result = contextvars.Context().run(run_assistant, agent, context, thread_id)
+        result = contextvars.Context().run(run_assistant, agent, context, thread_id, self.store, job_id)
         if result.get("__interrupt__"):
             raise Paused("Strict — staff approval required during assistance.")

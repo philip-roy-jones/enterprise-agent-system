@@ -6,8 +6,9 @@ from .types import Paused, Recovery, Stale, Stopped
 
 
 class ExecutionLayer:
-    def __init__(self, store, adapter):
+    def __init__(self, store, adapter, operations=None):
         self.store, self.adapter = store, adapter
+        self.operations = operations or OPERATIONS
 
     def run(self, job_id, invocation, name, arguments, execute, kind="node"):
         cached = self.store.result(invocation)
@@ -19,7 +20,7 @@ class ExecutionLayer:
         if owner == "staff":
             raise Paused("Staff has desktop control")
         self.store.check(job_id, owner, lease["epoch"])
-        operation = OPERATIONS.get(name)
+        operation = self.operations.get(name)
         if not operation or operation.permission not in job["permissions"]:
             raise PermissionError(f"Missing permission for {name}")
         self.adapter.job = job
@@ -32,11 +33,15 @@ class ExecutionLayer:
             description=operation.description,
             expected=operation.expected,
             inputs={
-                "company_id": job["company_id"],
-                "invoice_id": job["invoice_id"],
+                "organization_id": job.get("organization_id", "acme"),
+                "department_id": job.get("department_id", "finance"),
+                "role_id": job.get("role_id", "invoice_correction"),
+                "company_id": job.get("company_id"),
+                "record_id": job.get("record_id", job.get("invoice_id")),
+                "invoice_id": job.get("invoice_id"),
                 "expected": job["expected"],
             },
-            application="Ledger (synthetic)",
+            application=job.get("application", "Ledger (synthetic)"),
             observation=observation.model_dump(),
             epoch=lease["epoch"],
             operation_spec=operation.__dict__,
