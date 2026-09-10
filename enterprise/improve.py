@@ -69,6 +69,7 @@ def propose(episode, root, output, publish=False):
         "model_mode": episode["job"]["model_mode"],
     }
     fixture_path = checkout / "examples" / "improvement" / "accepted-label-episode.json"
+    fixture_path.parent.mkdir(parents=True, exist_ok=True)
     fixture_path.write_text(json.dumps(fixture, indent=2) + "\n")
     test = checkout / "tests" / "test_proposed_label.py"
     test.write_text("""from enterprise.procedures import resolve_amount_label
