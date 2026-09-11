@@ -14,6 +14,12 @@ class Settings:
     bind_port: int = int(os.getenv("EAS_BIND_PORT", "8000"))
     staff_token: str = os.getenv("EAS_STAFF_TOKEN", "local-staff-demo")
     worker_token: str = os.getenv("EAS_WORKER_TOKEN", "local-worker-demo")
+    worker_organization_id: str = os.getenv("EAS_WORKER_ORGANIZATION_ID", "acme")
+    worker_role_ids: tuple[str, ...] = tuple(
+        value.strip()
+        for value in os.getenv("EAS_WORKER_ROLE_IDS", "invoice_correction").split(",")
+        if value.strip()
+    )
     developer_token: str = os.getenv("EAS_DEVELOPER_TOKEN", "local-developer-demo")
     model_mode: str = os.getenv("EAS_MODEL_MODE", "simulated")
     model_provider: str = os.getenv("EAS_MODEL_PROVIDER", "")

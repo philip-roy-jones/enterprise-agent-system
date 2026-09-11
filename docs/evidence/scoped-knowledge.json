@@ -1,0 +1,34 @@
+{
+  "job_id": "77f114a0b364417992ddfc4f09384785",
+  "worker_platform": "Windows",
+  "model": "openai/gpt-5.6-luna",
+  "provider": "openrouter",
+  "staff": "explicit automated simulator; search scope and report checked",
+  "status": "completed",
+  "model_calls": 2,
+  "tokens": 6463,
+  "mutation": "not_attempted",
+  "document_id": "02e1b3fa8c8446a3a42e33863d8eb4ce",
+  "report": "**Guidance found**\n\n- **Document:** \u201cSynthetic invoice correction guidance\u201d\n- **Document ID:** `02e1b3fa8c8446a3a42e33863d8eb4ce`\n- **Revision:** `1`\n\n**Permitted actions**\n- Compare the assigned invoice with its purchase order.\n- Prepare a correction draft using the purchase-order total.\n- Include the purchase-order identifier in the explanation.\n\n**Prohibited actions**\n- Do not post a payment.\n- Do not alter the original invoice.\n- Do not claim that a draft has been approved for payment.\n\nThe guidance states that it is synthetic demonstration guidance, not accounting advice or a real company policy. I did not edit or save anything.",
+  "approvals": [
+    {
+      "kind": "tool",
+      "name": "search_knowledge",
+      "arguments": {
+        "query": "invoice correction permitted prohibited actions draft review approval changing original invoice amount purchase order discrepancy"
+      },
+      "status": "executed"
+    },
+    {
+      "kind": "node",
+      "name": "review_discovery",
+      "arguments": {
+        "assistant_report": "**Guidance found**\n\n- **Document:** \u201cSynthetic invoice correction guidance\u201d\n- **Document ID:** `02e1b3fa8c8446a3a42e33863d8eb4ce`\n- **Revision:** `1`\n\n**Permitted actions**\n- Compare the assigned invoice with its purchase order.\n- Prepare a correction draft using the purchase-order total.\n- Include the purchase-order identifier in the explanation.\n\n**Prohibited actions**\n- Do not post a payment.\n- Do not alter the original invoice.\n- Do not claim that a draft has been approved for payment.\n\nThe guidance states that it is synthetic demonstration guidance, not accounting advice or a real company policy. I did not edit or save anything.",
+        "company_id": "ACME",
+        "invoice_id": "INV-1043",
+        "reason": ""
+      },
+      "status": "executed"
+    }
+  ]
+}

@@ -13,7 +13,6 @@ import time
 import httpx
 from .config import Settings
 from .store import Store, uid
-from .types import TERMINAL
 
 
 def git(root, *args):
@@ -292,6 +291,23 @@ def idle_scheduler_interface():
     }
 
 
+def rollback(settings, token):
+    if not hmac.compare_digest(token, settings.developer_token):
+        raise PermissionError("Developer credential required")
+    store = Store(settings.data_dir)
+    with store.db() as db:
+        active = db.execute(
+            "SELECT 1 FROM jobs WHERE json_extract(data,'$.status') NOT IN ('completed','cancelled','rejected','denied','failed') LIMIT 1"
+        ).fetchone()
+        if active:
+            raise ValueError("Wait until workers are idle")
+        release = json.loads(db.execute("SELECT data FROM kv WHERE key='release'").fetchone()[0])
+        if not release.get("previous"):
+            raise ValueError("No previous release")
+        db.execute("UPDATE kv SET data=? WHERE key='release'", (json.dumps(release["previous"]),))
+        return release["previous"]
+
+
 def main(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument("command", choices=["improve", "review", "deploy", "rollback"])
@@ -325,13 +341,4 @@ def main(argv):
             parser.error("--proposal is required")
         print(json.dumps(deploy(args.proposal, settings, args.developer_token), indent=2))
     elif args.command == "rollback":
-        if not hmac.compare_digest(args.developer_token, settings.developer_token):
-            raise PermissionError("Developer credential required")
-        store = Store(settings.data_dir)
-        if any(j["status"] not in TERMINAL for j in store.list_jobs()):
-            raise ValueError("Wait until workers are idle")
-        release = store.get_value("release")
-        if not release.get("previous"):
-            raise ValueError("No previous release")
-        store.put_value("release", release["previous"])
-        print(json.dumps(release["previous"], indent=2))
+        print(json.dumps(rollback(settings, args.developer_token), indent=2))

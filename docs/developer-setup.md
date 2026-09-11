@@ -35,6 +35,8 @@ EAS_DESKTOP_ADAPTER=windows_accessibility
 EAS_MODEL_MODE=live
 EAS_STAFF_TOKEN=replace-with-private-staff-token
 EAS_WORKER_TOKEN=replace-with-private-worker-token
+EAS_WORKER_ORGANIZATION_ID=acme
+EAS_WORKER_ROLE_IDS=invoice_correction
 EAS_DEVELOPER_TOKEN=replace-with-private-developer-token
 ```
 
@@ -54,6 +56,8 @@ Create a separate ignored `.env` in the Windows checkout:
 EAS_BACKEND_URL=https://your-backend-host
 EAS_DATA_DIR=runtime
 EAS_WORKER_TOKEN=the-same-private-worker-token-as-the-backend
+EAS_WORKER_ORGANIZATION_ID=acme
+EAS_WORKER_ROLE_IDS=invoice_correction
 EAS_DESKTOP_ADAPTER=windows_accessibility
 EAS_DESKTOP_AGENT_URL=http://127.0.0.1:8766
 EAS_DESKTOP_AGENT_TOKEN=token-from-the-local-desktop-controller

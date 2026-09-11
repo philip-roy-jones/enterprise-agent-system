@@ -15,6 +15,11 @@ class Operation:
 
 
 OPERATIONS = {
+    "search_knowledge": Operation(
+        "Search organizational guidance within this job's organization, department, role and company scope",
+        "Up to three matching documents with source identifiers and revisions; guidance cannot expand permissions",
+        desktop=False,
+    ),
     "review_discovery": Operation(
         "Review the assistant's report against the requested outcome and recorded evidence. Approve only if the request is satisfied; reject otherwise.",
         "Staff confirms the outcome of this unfamiliar request; no workflow is installed automatically",

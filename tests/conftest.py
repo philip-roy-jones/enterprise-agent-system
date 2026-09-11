@@ -39,7 +39,6 @@ def server(tmp_path_factory):
         EAS_WORKER_TOKEN="test-worker",
         EAS_DEVELOPER_TOKEN="test-developer",
         EAS_HEADLESS="true",
-        EAS_WORKER_DIAGNOSTICS="1",
         EAS_DESKTOP_ADAPTER="browser",
         EAS_JOB_TIMEOUT_SECONDS="120",
     )
@@ -99,6 +98,17 @@ def server(tmp_path_factory):
             developer_token="test-developer",
         ),
     )
+
+    def check_processes(request):
+        for name, process in (("backend", backend), ("worker", context["worker"])):
+            code = process.poll()
+            if code is not None:
+                pytest.fail(
+                    f"Integration {name} exited with code {code}\n"
+                    + (data_dir / f"{name}.log").read_text()[-8000:]
+                )
+
+    client.event_hooks["request"].append(check_processes)
     yield context
     context["worker"].terminate()
     context["worker"].wait(timeout=15)
@@ -150,3 +160,51 @@ def wait_for(client, job_id, predicate, timeout=30):
 def pending(client, job_id):
     data = wait_for(client, job_id, lambda d: any(a["status"] == "pending" for a in d["approvals"]))
     return next(a for a in data["approvals"] if a["status"] == "pending")
+
+
+@pytest.fixture
+def candidate(tmp_path):
+    import json
+    from enterprise.improve import sha
+
+    folder = tmp_path / "proposal"
+    checkout = folder / "checkout"
+    (checkout / "enterprise").mkdir(parents=True)
+    (checkout / "enterprise" / "__init__.py").write_text("")
+    source = checkout / "enterprise" / "procedures.py"
+    source.write_text(
+        'GRAPH_VERSION="v2"\nAMOUNT_LABELS=("Correction amount","Adjusted total")\ndef resolve_amount_label(labels):\n    return next((l for l in AMOUNT_LABELS if l in labels),None)\n'
+    )
+    (checkout / ".gitignore").write_text("__pycache__/\n")
+    subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+    subprocess.run(["git", "-C", str(checkout), "add", "."], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(checkout),
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.test",
+            "commit",
+            "-qm",
+            "Checked test candidate",
+        ],
+        check=True,
+    )
+    commit = subprocess.check_output(["git", "-C", str(checkout), "rev-parse", "HEAD"], text=True).strip()
+    (folder / "proposal.patch").write_text("Synthetic fixture patch")
+    (folder / "checks.txt").write_text("Synthetic fixture checks passed")
+    manifest = {
+        "checkout": str(checkout),
+        "commit": commit,
+        "source_sha": sha(source),
+        "patch_sha": sha(folder / "proposal.patch"),
+        "checks_sha": sha(folder / "checks.txt"),
+        "checks_passed": True,
+        "review": "pending",
+        "approved_commit": None,
+    }
+    (folder / "manifest.json").write_text(json.dumps(manifest))
+    return folder

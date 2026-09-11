@@ -1,8 +1,5 @@
 import logging
-import os
 import platform
-import faulthandler
-import signal
 import sqlite3
 import time
 from langgraph.checkpoint.sqlite import SqliteSaver
@@ -16,11 +13,25 @@ from .types import Stale, Stopped, TERMINAL
 log = logging.getLogger(__name__)
 
 
+def validate_assignment(settings, job):
+    """Receiver-side authorization; dispatch is not proof of permission."""
+    if (
+        job.get("organization_id") != settings.worker_organization_id
+        or job.get("role_id") not in settings.worker_role_ids
+    ):
+        raise PermissionError("Job is outside this worker's configured organization and roles")
+    role = get_role(job["role_id"])
+    if job.get("department_id") != role.department_id:
+        raise PermissionError("Job department does not match the installed worker role")
+    if not set(job.get("permissions", [])).issubset(role.permissions):
+        raise PermissionError("Job permissions exceed the installed worker role")
+    normalized = role.normalize(job)
+    if any(normalized[field] != job.get(field) for field in role.input_model.model_fields):
+        raise PermissionError("Job inputs differ from the validated role inputs")
+    return role
+
+
 def run_worker(settings=None, once=False):
-    if hasattr(signal, "SIGUSR1"):
-        faulthandler.register(signal.SIGUSR1, all_threads=True)
-    if os.getenv("EAS_WORKER_DIAGNOSTICS") == "1":
-        faulthandler.dump_traceback_later(45, repeat=True)
     settings = settings or Settings()
     log.info("Worker started on %s; desktop adapter=%s", platform.system(), settings.desktop_adapter)
     settings.data_dir.mkdir(parents=True, exist_ok=True)
@@ -41,11 +52,11 @@ def run_worker(settings=None, once=False):
                 continue
             job_id = job["id"]
             try:
+                role = validate_assignment(settings, job)
                 role_id = job.get("role_id", "invoice_correction")
                 if role_id != active_role:
                     if adapter:
                         adapter.close()
-                    role = get_role(role_id)
                     adapter = role.adapter_factory(settings, store)
                     graph = role.graph_factory(
                         settings,

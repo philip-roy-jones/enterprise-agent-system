@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from .config import Settings
 from .store import Store, uid
 from .mock import MockAccounting
-from .types import JobInput, Decision, Stale, Stopped
+from .types import JobInput, Decision, KnowledgeDocument, Stale, Stopped
 from .remote import WORKER_METHODS
 
 
@@ -50,6 +50,10 @@ def create_app(settings=None):
     def worker(role=Depends(principal)):
         if role != "worker":
             raise HTTPException(403, "Worker access required")
+
+    @app.post("/api/knowledge", dependencies=[Depends(staff)])
+    def add_knowledge(document: KnowledgeDocument):
+        return store.add_knowledge(document.model_dump())
 
     @app.exception_handler(Stale)
     @app.exception_handler(Stopped)
@@ -226,6 +230,26 @@ def create_app(settings=None):
         if method not in WORKER_METHODS:
             raise HTTPException(403, "Worker method not permitted")
         body = await request.json()
+        if method == "claim":
+            args = body.get("args", [])
+            if len(args) != 1 or body.get("kwargs"):
+                raise ValueError(
+                    "Claim accepts one worker identifier; authorization is configured on the server"
+                )
+            return store.claim(
+                args[0],
+                {"organization_id": settings.worker_organization_id, "role_ids": settings.worker_role_ids},
+            )
+        if method == "search_knowledge":
+            args, kwargs = body.get("args", []), body.get("kwargs", {})
+            if len(args) != 2 or kwargs:
+                raise ValueError("Knowledge search accepts only job identifier and query")
+            job = store.get_job(args[0])
+            if (
+                job["organization_id"] != settings.worker_organization_id
+                or job["role_id"] not in settings.worker_role_ids
+            ):
+                raise PermissionError("Job is outside the configured worker scope")
         return getattr(store, method)(*body.get("args", []), **body.get("kwargs", {}))
 
     @app.post("/api/worker-artifacts", dependencies=[Depends(worker)])

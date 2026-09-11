@@ -225,3 +225,26 @@ def test_improved_library_on_new_record(browser_server, invoice, variant):
     result = drive(c, create(c, invoice=invoice))
     assert result["job"]["fallback_count"] == 0
     assert result["job"]["graph_version"] == "v2"
+
+
+def test_review_release_new_instance_and_rollback_in_isolated_demo(browser_server, candidate):
+    from enterprise.improve import deploy, review, rollback
+
+    c, settings = browser_server["client"], browser_server["settings"]
+    c.post("/api/mock/scenario", json={"variant": "renamed"}).raise_for_status()
+    original = drive(c, create(c))
+    assert original["job"]["fallback_count"] > 0
+    with pytest.raises(PermissionError, match="approval"):
+        deploy(candidate, settings, settings.developer_token)
+    # Fixture-only developer decisions exercise the gate; no real PR is approved.
+    review(candidate, "approve", "Simulated isolated-test reviewer", settings.developer_token, settings)
+    assert deploy(candidate, settings, settings.developer_token)["version"] == "v2"
+    c.post(
+        "/api/mock/scenario", json={"variant": "layout", "view": "invoices", "reordered": True}
+    ).raise_for_status()
+    improved = drive(c, create(c, invoice="INV-1044"))
+    assert improved["job"]["fallback_count"] == improved["job"]["model_calls"] == 0
+    assert improved["job"]["graph_version"] == "v2"
+    assert c.get("/api/jobs/" + original["job"]["id"]).json()["job"]["graph_version"] == "v1"
+    assert rollback(settings, settings.developer_token)["version"] == "v1"
+    assert browser_server["store"].get_value("release")["version"] == "v1"

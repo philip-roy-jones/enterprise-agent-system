@@ -18,6 +18,7 @@ WORKER_METHODS = {
     "finish_action",
     "result",
     "relevant_episodes",
+    "search_knowledge",
 }
 
 

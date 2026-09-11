@@ -23,6 +23,15 @@ class Decision(BaseModel):
     explanation: str = ""
 
 
+class KnowledgeDocument(BaseModel):
+    organization_id: str = Field(min_length=1, max_length=100)
+    department_id: str | None = Field(default=None, min_length=1, max_length=100)
+    role_id: str | None = Field(default=None, min_length=1, max_length=100)
+    company_id: str | None = Field(default=None, min_length=1, max_length=100)
+    title: str = Field(min_length=1, max_length=200)
+    content: str = Field(min_length=1, max_length=12000)
+
+
 class Observation(BaseModel):
     revision: str
     timestamp: float

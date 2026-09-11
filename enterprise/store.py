@@ -3,6 +3,7 @@
 from contextlib import contextmanager
 import hashlib
 import json
+import re
 from pathlib import Path
 import sqlite3
 import time
@@ -35,6 +36,7 @@ class Store:
             CREATE TABLE IF NOT EXISTS invocations(id TEXT PRIMARY KEY, job_id TEXT, result TEXT);
             CREATE TABLE IF NOT EXISTS lease(id INTEGER PRIMARY KEY CHECK(id=1), data TEXT);
             CREATE TABLE IF NOT EXISTS kv(key TEXT PRIMARY KEY, data TEXT);
+            CREATE TABLE IF NOT EXISTS knowledge(id TEXT PRIMARY KEY, data TEXT NOT NULL);
             """)
             db.execute(
                 "INSERT OR IGNORE INTO lease VALUES(1, ?)",
@@ -177,12 +179,19 @@ class Store:
                 a["status"] = "stale"
                 db.execute("UPDATE approvals SET data=? WHERE id=?", (canonical(a), row["id"]))
 
-    def claim(self, worker_id):
+    def claim(self, worker_id, scope=None):
+        def authorized(job):
+            return scope is None or (
+                job["organization_id"] == scope["organization_id"] and job["role_id"] in scope["role_ids"]
+            )
+
         with self.db() as db:
             lease = json.loads(db.execute("SELECT data FROM lease WHERE id=1").fetchone()[0])
             if lease["job_id"]:
                 job = self._job(db, lease["job_id"])
                 if job["status"] not in TERMINAL:
+                    if not authorized(job):
+                        return None
                     if lease.get("worker_id") != worker_id and lease["expires"] > time.time():
                         return None
                     if lease.get("worker_id") != worker_id:
@@ -197,12 +206,15 @@ class Store:
                     lease.update(worker_id=worker_id, expires=time.time() + 30)
                     self._set_lease(db, lease)
                     return job
-            row = db.execute(
-                "SELECT data FROM jobs WHERE json_extract(data,'$.status')='queued' ORDER BY rowid LIMIT 1"
-            ).fetchone()
-            if not row:
+            jobs = (
+                json.loads(row[0])
+                for row in db.execute(
+                    "SELECT data FROM jobs WHERE json_extract(data,'$.status')='queued' ORDER BY rowid"
+                )
+            )
+            job = next((job for job in jobs if authorized(job)), None)
+            if job is None:
                 return None
-            job = json.loads(row[0])
             job.update(status="running", started_at=time.time())
             lease.update(
                 job_id=job["id"],
@@ -215,6 +227,72 @@ class Store:
             self._set_lease(db, lease)
             self._put(db, job)
             return job
+
+    def add_knowledge(self, document):
+        from .types import KnowledgeDocument
+        from .roles import get_role
+
+        document = KnowledgeDocument.model_validate(document).model_dump()
+        if document["role_id"] and (
+            not document["department_id"]
+            or get_role(document["role_id"]).department_id != document["department_id"]
+        ):
+            raise ValueError("Role knowledge must specify its matching department")
+        record = dict(document, id=uid(), revision=1, created_at=time.time())
+        with self.db() as db:
+            db.execute("INSERT INTO knowledge VALUES(?,?)", (record["id"], canonical(record)))
+        return record
+
+    def search_knowledge(self, job_id, query):
+        if not isinstance(query, str) or not 1 <= len(query.strip()) <= 500:
+            raise ValueError("Knowledge query must contain 1 to 500 characters")
+        terms = set(re.findall(r"\w+", query.casefold()))
+        if not terms:
+            raise ValueError("Knowledge query must contain a search term")
+        with self.db() as db:
+            job = self._job(db, job_id)
+            if "read" not in job["permissions"]:
+                raise PermissionError("Knowledge access requires read permission")
+            lease = json.loads(db.execute("SELECT data FROM lease WHERE id=1").fetchone()[0])
+            self._check(job, lease, "assistant", lease["epoch"])
+            row = db.execute(
+                "SELECT data FROM approvals WHERE job_id=? AND invocation=? ORDER BY rowid DESC LIMIT 1",
+                (job_id, lease["inflight"]),
+            ).fetchone()
+            approval = json.loads(row[0]) if row else {}
+            if (
+                approval.get("status") != "executing"
+                or approval.get("name") != "search_knowledge"
+                or approval.get("corrected_arguments", approval.get("arguments")) != {"query": query}
+            ):
+                raise PermissionError("Knowledge retrieval requires approval of this exact search")
+            rows = db.execute(
+                """SELECT data FROM knowledge
+                   WHERE json_extract(data,'$.organization_id')=?
+                   AND (json_extract(data,'$.department_id') IS NULL OR json_extract(data,'$.department_id')=?)
+                   AND (json_extract(data,'$.role_id') IS NULL OR json_extract(data,'$.role_id')=?)
+                   AND (json_extract(data,'$.company_id') IS NULL OR json_extract(data,'$.company_id')=?)""",
+                (job["organization_id"], job["department_id"], job["role_id"], job.get("company_id")),
+            ).fetchall()
+            matches = []
+            for row in rows:
+                document = json.loads(row[0])
+                words = set(re.findall(r"\w+", (document["title"] + " " + document["content"]).casefold()))
+                score = len(terms & words)
+                if score:
+                    matches.append((score, document))
+            documents = [doc for _, doc in sorted(matches, key=lambda item: (-item[0], item[1]["id"]))[:3]]
+            result = {"query": query, "documents": documents}
+            self._event(
+                db,
+                job_id,
+                "knowledge_retrieved",
+                {
+                    "query": query,
+                    "documents": [{"id": d["id"], "revision": d["revision"]} for d in documents],
+                },
+            )
+            return result
 
     def check(self, job_id, owner, epoch):
         with self.db() as db:

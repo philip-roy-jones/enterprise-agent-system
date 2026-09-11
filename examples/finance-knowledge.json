@@ -1,0 +1,8 @@
+{
+  "organization_id": "acme",
+  "department_id": "finance",
+  "role_id": "invoice_correction",
+  "company_id": "ACME",
+  "title": "Synthetic invoice correction guidance",
+  "content": "For this prototype, compare the assigned invoice with its purchase order and prepare a correction draft for the purchase-order total. Include the purchase-order identifier in the explanation. Do not post a payment, alter the original invoice, or claim that a draft has been approved for payment. This is synthetic demonstration guidance, not accounting advice or a real company policy."
+}
