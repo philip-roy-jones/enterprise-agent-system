@@ -3,6 +3,7 @@ import asyncio
 import hmac
 import json
 import re
+import time
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -10,7 +11,7 @@ from .config import Settings
 from .evaluation import ActionAssessment, assess_action, assessment_metrics
 from .store import Store, uid
 from .mock import MockAccounting
-from .types import JobInput, Decision, KnowledgeDocument, Stale, Stopped
+from .types import JobInput, Decision, KnowledgeDocument, Stale, Stopped, TERMINAL
 from .remote import WORKER_METHODS
 from .conversation import Conversation, StaffMessage
 
@@ -210,7 +211,21 @@ def create_app(settings=None):
                 "fallback_jobs": sum(j["fallback_count"] > 0 for j in selected),
                 "model_calls": sum(j["model_calls"] for j in selected),
                 "tokens": sum(j["tokens"] for j in selected),
-                "execution_seconds": sum(j["elapsed_seconds"] for j in selected),
+                "execution_seconds": sum(
+                    j["elapsed_seconds"]
+                    if j["status"] in TERMINAL
+                    else max(0, time.time() - j["started_at"])
+                    if j.get("started_at")
+                    else 0
+                    for j in selected
+                ),
+                "jobs_missing_elapsed_time": sum(
+                    bool(j.get("started_at"))
+                    and j["status"] in TERMINAL
+                    and not j.get("ended_at")
+                    and not j["elapsed_seconds"]
+                    for j in selected
+                ),
                 **{
                     key: sum(a[key] for a in assessments)
                     for key in ("incorrect_actions_reported", "assessed_actions", "unassessed_actions")

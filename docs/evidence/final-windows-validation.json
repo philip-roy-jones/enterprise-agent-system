@@ -1,0 +1,27 @@
+{
+  "id": "5ea0900a49e147758a61e2f82c212ac0",
+  "invoice_id": "INV-1042",
+  "graph_version": "v2",
+  "status": "completed",
+  "mutation": "confirmed_succeeded",
+  "elapsed_seconds": 21.93,
+  "model_calls": 0,
+  "fallback_count": 0,
+  "source_commit": "b1d2c99716dc49176e1073a0bba8b3504742c9bf",
+  "worker_platform": "Windows",
+  "worker_sessions": [
+    1,
+    1
+  ],
+  "code_hashes_match": true,
+  "application_api_enabled": false,
+  "input_methods": [
+    "mouse_input",
+    "mouse_input",
+    "keyboard_input",
+    "keyboard_input",
+    "mouse_input"
+  ],
+  "staff": "simulated",
+  "frontend_validation": "Assessment submitted through Chromium; live assessed-actions count incremented; both sidebar tabs selected correctly; no JavaScript errors"
+}

@@ -138,6 +138,8 @@ Every correction uses a job-specific idempotency key. A save with an interrupted
 
 Read [the architecture and trust boundaries](docs/architecture.md) for state transitions, checkpoint behavior, recovery, access control, and deployment details. [API verification notes](docs/api-verification.md) record the current library APIs and installed versions used here.
 
+Staff can add guidance in the same job conversation. During assistance, the agent can propose a question and wait for an answer. New guidance causes queued proposals to be reconsidered; it never approves an action. The activity panel also allows staff to assess an executed operation. Evaluation metrics distinguish reported errors from unassessed operations, and an incorrect assessment revokes episode acceptance until resolved.
+
 ## Teach a reusable improvement
 
 The development command reads accepted episodes, joins staff-approved or corrected field actions with their observations and verified saved results, and inspects the graph and operation library. It groups recurring failures and proposes a resolver extension when the evidence establishes a missing amount label. Its generated tests exercise that label on different invoices and layouts. Labels and versions come from the evidence and source, rather than a predetermined patch.

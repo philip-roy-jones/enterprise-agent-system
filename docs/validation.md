@@ -74,10 +74,22 @@ The project developer explicitly approved PR #1 commit `cac88dea82cdd5aa05f78113
 
 Invoice INV-1042 completed with the changed “Adjusted total” label in **12.56 seconds**, with **zero fallback calls, zero model calls, and a confirmed saved draft**. The teaching episode used INV-1044 and remains pinned to v1. The successful check used the Windows edge harness and accessibility actions with DemoBooks' application API disabled. Staff acceptance was explicitly simulated; developer release approval was human. The previous v1 registry remains available for rollback. See [reviewed release evidence](evidence/reviewed-release.json).
 
-Two preceding mouse/keyboard checks paused on “Input focus changed before typing” and were cancelled without saving. The label itself was recognized. The first attempt to switch input modes was blocked by PowerShell's execution policy, so the second check still used keyboard input; the worker was then restarted successfully in accessibility mode. The demonstrated Windows environment now uses accessibility input. Keyboard focus recovery remains a documented limitation, and the successful procedure run is not a new live-model evaluation.
+Two preceding mouse/keyboard checks paused on “Input focus changed before typing” and were cancelled without saving. The label itself was recognized. The first attempt to switch input modes was blocked by PowerShell's execution policy, so the second check still used keyboard input; the worker was then restarted successfully in accessibility mode. That historical check used accessibility input. The focus race was subsequently diagnosed and fixed; the current Windows worker uses mouse/keyboard input. The later evidence is recorded below.
 
 ## Operation contracts, conversation, and focus recovery
 
 The updated local suite passed 124 tests, including malformed operation input/output rejection, deadline fencing, bounded retries with fresh approval, staff-guidance invalidation, durable agent questions, and evidence-derived improvement analysis. Question/answer integration tests use the real Deep Agent checkpoint machinery with explicitly simulated models.
 
 The native controller now waits up to 500ms for the exact approved edit control after `SetFocus`; losing the assigned foreground window still aborts input. An interactive Windows diagnostic observed stale focused-element reports on five of six immediate samples, with all six matching the intended target after 50ms. The subsequent mouse/keyboard job on INV-1043 verified a saved draft in 16.17 seconds with no fallback or model calls. This is a deterministic native check, not a live-model evaluation. See [focus evidence](evidence/windows-focus-recovery.json).
+
+## Completed acceptance checks
+
+The main implementation passed **134 tests** in [CI](https://github.com/philip-roy-jones/enterprise-agent-system/actions/runs/34558630698), with successful native accounting smoke checks and both Windows builds. A subsequent fix for terminal timing passed 27 focused checks; final CI runs the complete suite again. The [requirement audit](original-prompt-audit.md) maps all 17 sections.
+
+The evidence-derived v3 proposal passed **127 isolated tests** and GitHub checks. It learned its label from an actual recorded browser correction and generated new-record/layout regressions. The proposal is a draft, with no developer approval or deployment. This is separate from the previously human-approved v2 release. [Proposal evidence](evidence/derived-improvement.json).
+
+A live OpenRouter model on the Windows harness asked an approved question, waited for the simulated staff answer, and reported the requested purchase-order total without changing or saving data: 6 model calls, 24,567 tokens, 34.83 seconds. [Conversation evidence](evidence/live-staff-conversation.json).
+
+After the combined rollout, a native mouse/keyboard job on INV-1042 completed in 21.93 seconds with zero fallback/model calls and a verified saved draft. The application API remained disabled. Chromium then submitted an explicitly simulated staff assessment, verified that the live metric incremented, and checked both sidebar selections with no JavaScript errors. [Rollout evidence](evidence/final-windows-validation.json).
+
+Incorrect-action totals represent staff reports; unassessed operations are counted separately. They are not a general safety score. Historical debug runs with missing elapsed times are identified rather than backfilled with invented durations.

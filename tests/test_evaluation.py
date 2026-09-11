@@ -83,3 +83,20 @@ def test_only_staff_can_assess_and_metrics_separate_model_modes(tmp_path):
         metrics = c.get("/api/metrics").json()
         assert metrics["simulated"]["incorrect_actions_reported"] == 1
         assert metrics["live"]["incorrect_actions_reported"] == 0
+
+
+@pytest.mark.parametrize("status", ["cancelled", "failed", "denied", "rejected", "completed"])
+def test_terminal_timing_includes_unsuccessful_runs_and_does_not_grow_later(store, job, monkeypatch, status):
+    started = store.get_job(job["id"])["started_at"]
+    monkeypatch.setattr("enterprise.store.time.time", lambda: started + 12.5)
+    if status == "cancelled":
+        result = store.stop(job["id"])
+    else:
+        result = store.update_job(job["id"], {"status": status})
+    assert result["elapsed_seconds"] == 12.5
+    assert result["ended_at"] == started + 12.5
+    monkeypatch.setattr("enterprise.store.time.time", lambda: started + 100)
+    if status == "completed":
+        assert store.accept(job["id"])["elapsed_seconds"] == 12.5
+    else:
+        assert store.stop(job["id"])["elapsed_seconds"] == 12.5

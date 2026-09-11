@@ -69,6 +69,13 @@ class Store:
         return json.loads(row[0])
 
     def _put(self, db, job):
+        if job["status"] in TERMINAL and not job.get("ended_at"):
+            previous = db.execute("SELECT data FROM jobs WHERE id=?", (job["id"],)).fetchone()
+            if not previous or json.loads(previous[0])["status"] not in TERMINAL:
+                job["ended_at"] = time.time()
+                job["elapsed_seconds"] = (
+                    round(max(0, job["ended_at"] - job["started_at"]), 2) if job.get("started_at") else 0
+                )
         db.execute("INSERT OR REPLACE INTO jobs VALUES(?,?)", (job["id"], canonical(job)))
 
     def _event(self, db, job_id, kind, data):
