@@ -142,6 +142,8 @@ Staff can add guidance in the same job conversation. During assistance, the agen
 
 ## Teach a reusable improvement
 
+Here, **learning means turning demonstrated behavior into reviewed procedure code**. For example, [proposal #2](https://github.com/philip-roy-jones/enterprise-agent-system/pull/2) adds `Reviewed adjustment 0` to the amount-label tuple in `enterprise/procedures.py`, advances the procedure version, and adds evidence and tests. Before that rule is installed, the unfamiliar label requires assistance; afterward, the existing node can handle it without a model call. This particular teaching run used simulated staff and a simulated model. It demonstrates a small procedure improvement, not model training or automatic generation of arbitrary workflows.
+
 The development command reads accepted episodes, joins staff-approved or corrected field actions with their observations and verified saved results, and inspects the graph and operation library. It groups recurring failures and proposes a resolver extension when the evidence establishes a missing amount label. Its generated tests exercise that label on different invoices and layouts. Labels and versions come from the evidence and source, rather than a predetermined patch.
 
 Current `main` includes the reviewed **Adjusted total** example. To teach another label, use the optional browser fixture and choose **New amount label for teaching**, which displays **Revised draft amount**. The generator refuses redundant changes and insufficient or conflicting evidence. This deterministic analyzer supports one bounded change family; unsupported gap families still require developer implementation. Pulling merged code alone does not activate a release registry.

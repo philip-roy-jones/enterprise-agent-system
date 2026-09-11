@@ -10,6 +10,21 @@ The worker's two SQLite checkpoint files are on a durable volume, outside proces
 
 The independent Windows desktop controller also supports an application with its own API disabled. It observes UI Automation controls, screenshots the assigned window, and uses accessibility patterns or real input. The application-specific adapter decodes visible business values and verifies saved drafts through a unique reference in the explanation. See [legacy desktop behavior and limits](legacy-desktop.md).
 
+## Repository boundaries
+
+The current prototype is a monorepo. The intended separation for further development is:
+
+| Repository or package | Responsibility |
+| --- | --- |
+| Control plane | Staff frontend, backend, dispatch, approvals, audit storage, and release registry |
+| Edge harness | LangGraph and Deep Agent runtime, shared execution authority, desktop control, and adapter interfaces |
+| Workflow packages | Department graphs, reusable business operations, application-specific rules, and their regression tests |
+| DemoBooks | Independent synthetic Windows application |
+
+The harness should have its own repository in practice. Workflow packages can initially be a clearly separated part of that repository, then move into their own repositories as department-specific procedures grow. They are loaded by the harness, so this still represents three running applications; a workflow package is not another server or VM.
+
+An improvement such as proposal #2 belongs to the workflow package: it extends an amount-label rule consumed by the existing graph. It does not update the LangGraph dependency or change graph topology. Changes to the harness's approval, permission, and execution code are infrastructure changes with a different review scope. Separate repositories make that distinction clearer, while runtime authorization remains the harness's responsibility. This repository split is an architectural direction, not a migration already performed by the prototype.
+
 ## Role graph
 
 ```mermaid
