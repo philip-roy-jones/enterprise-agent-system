@@ -71,6 +71,7 @@ const scenarios = {
     view: "dashboard",
     dialog: null,
     variant: "standard",
+    amount_label: null,
     reordered: false,
     interrupt_save: false,
     unsaved: false,
@@ -87,6 +88,7 @@ const scenarios = {
   },
   unfamiliar: { dialog: "unfamiliar" },
   renamed: { variant: "renamed" },
+  new_label: { amount_label: "Revised draft amount" },
   layout: { variant: "layout" },
   ambiguous: { interrupt_save: true },
 };
@@ -235,6 +237,12 @@ function renderDetail(d) {
         ? "Staff approval before each operation"
         : "Procedures run with scoped permissions";
   $("job-error").textContent = j.error || "";
+  const staffQuestion = d.conversation?.questions.find(q => q.status === "pending");
+  $("staff-question").hidden = !staffQuestion || done;
+  $("staff-question").textContent = staffQuestion ? `The assistant needs your answer: ${staffQuestion.question}` : "";
+  $("message").placeholder = staffQuestion ? "Reply to the assistant’s question…" : "Add context or a review note…";
+  $("message").disabled = done;
+  $("message-form").querySelector("button").disabled = done;
   $("progress").innerHTML = Object.entries(readable)
     .map(
       ([id, label], i) =>
@@ -264,6 +272,7 @@ function renderDetail(d) {
         ? "You hold desktop control. Use the browser test workspace, then release control."
         : "You hold desktop control. Work in the application on the Windows machine, then release control."
       : "Worker is running or reconciling current state.";
+  if (staffQuestion && !done) $("waiting").textContent = "Waiting for your answer in the job conversation.";
   if (pending) {
     $("review-title").textContent =
       pending.kind === "tool"
@@ -273,6 +282,15 @@ function renderDetail(d) {
       pending.kind === "tool" ? "STRICT · TOOL APPROVAL" : "NODE APPROVAL";
     $("proposal-copy").innerHTML =
       `<h3>${esc(pending.name.replaceAll("_", " "))}</h3><p>${esc(pending.description)}</p><div class="proposal-meta"><span>Target<strong>${esc(pending.inputs.department_id || "finance")} / ${esc(pending.inputs.record_id || pending.inputs.invoice_id)}</strong></span><span>Expected result<strong>${esc(pending.expected)}</strong></span></div>${pending.inputs.assistant_report ? `<p><strong>Requested outcome</strong><br>${esc(pending.inputs.request)}</p><p><strong>Assistant report</strong><br>${esc(pending.inputs.assistant_report)}</p>` : ""}`;
+    const expected = pending.inputs.expected;
+    if (["prepare", "save", "save_draft"].includes(pending.name) && expected) {
+      $("proposal-copy").innerHTML += `<p><strong>Correction amount:</strong> $${esc((expected.amount / 100).toFixed(2))}<br><strong>Explanation:</strong> ${esc(expected.note)}</p>`;
+    }
+    if (pending.name === "set_field") {
+      $("proposal-copy").innerHTML += `<p><strong>Text to enter in ${esc(pending.arguments.field === "amount" ? "correction amount" : "correction explanation")}:</strong><br>${esc(pending.arguments.value)}</p>`;
+    }
+    if (pending.name === "ask_staff") $("proposal-copy").innerHTML += `<p><strong>Question:</strong> ${esc(pending.arguments.question)}</p>`;
+    if (pending.name === "search_knowledge") $("proposal-copy").innerHTML += `<p><strong>Search for:</strong> ${esc(pending.arguments.query)}</p>`;
     if (selectedApproval?.id !== pending.id) {
       selectedApproval = pending;
       $("arguments").value = JSON.stringify(pending.arguments, null, 2);
@@ -369,11 +387,19 @@ $("takeover").onclick = () =>
       {},
     ),
   );
+let draftMessage = null;
 $("message-form").onsubmit = (e) => {
   e.preventDefault();
   action(async () => {
-    await api(`/api/jobs/${active}/messages`, { text: $("message").value });
-    $("message").value = "";
+    const text = $("message").value;
+    const replyTo = current?.conversation?.questions.find(q => q.status === "pending")?.question_id || null;
+    if (!draftMessage || draftMessage.text !== text || draftMessage.reply_to !== replyTo || draftMessage.job !== active) {
+      draftMessage = {job: active, text, reply_to: replyTo, message_id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`};
+    }
+    const {job, ...message} = draftMessage;
+    await api(`/api/jobs/${job}/messages`, message);
+    draftMessage = null;
+    if (active === job && $("message").value === text) $("message").value = "";
   });
 };
 function selectView(view) {

@@ -6,6 +6,16 @@ import time
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 from .store import fingerprint
 from .types import Observation, Recovery
+from .contracts import (
+    adapter_contract,
+    Empty,
+    Company,
+    Invoice,
+    AccountingView,
+    FieldValue,
+    SaveInputs,
+    DraftResult,
+)
 
 
 class DesktopAdapter(Protocol):
@@ -40,6 +50,10 @@ class BrowserAdapter:
         self.page.wait_for_function("window.appState !== undefined")
         self.fence = lambda: (_ for _ in ()).throw(PermissionError("No execution authority"))
         self.job = None
+        self.deadline = None
+
+    def timeout_ms(self):
+        return max(1, int(self.deadline.remaining(6) * 1000)) if self.deadline else 6000
 
     def close(self):
         self.browser.close()
@@ -61,7 +75,7 @@ class BrowserAdapter:
         targets = self.page.locator("[data-target]").evaluate_all(
             """els => els.filter(e => e.getBoundingClientRect().width && !e.closest('#app')?.hidden).map(e => {const r=e.getBoundingClientRect();return {target:e.dataset.target,label:e.getAttribute('aria-label')||e.innerText,x:r.x+r.width/2,y:r.y+r.height/2,width:r.width,height:r.height}})"""
         )
-        png = self.page.screenshot()
+        png = self.page.screenshot(timeout=self.timeout_ms())
         self._model_image = base64.b64encode(png).decode("ascii")
         screenshot = self.store.artifact(png) if hasattr(self.store, "artifact") else "test.png"
         shape = {"state": state, "targets": targets, "width": 1200, "height": 800}
@@ -75,7 +89,7 @@ class BrowserAdapter:
 
     def ready(self):
         try:
-            self.page.wait_for_function("window.appReady && !window.busy", timeout=6000)
+            self.page.wait_for_function("window.appReady && !window.busy", timeout=self.timeout_ms())
         except PlaywrightTimeout:
             raise Recovery("temporary", "Accounting view is still loading") from None
         state = self.page.evaluate("window.appState")
@@ -86,14 +100,15 @@ class BrowserAdapter:
 
     def click_target(self, target):
         self.fence()
-        self.page.locator(f'[data-target="{target}"]').click()
-        self.page.wait_for_function("!window.busy")
+        self.page.locator(f'[data-target="{target}"]').click(timeout=self.timeout_ms())
+        self.page.wait_for_function("!window.busy", timeout=self.timeout_ms())
         if self.page.evaluate("window.lastError || null"):
             error = self.page.evaluate("window.lastError")
             self.page.evaluate("window.lastError=null")
             raise Recovery("unfamiliar", error)
         return self.page.evaluate("window.appState")
 
+    @adapter_contract(Company, Company)
     def ensure_company(self, company_id):
         state = self.ready()
         if state["company_id"] != company_id:
@@ -102,6 +117,7 @@ class BrowserAdapter:
             raise PermissionError("Company identity mismatch")
         return {"company_id": company_id}
 
+    @adapter_contract(Invoice, Invoice)
     def ensure_invoice_open(self, invoice_id):
         state = self.ready()
         if state["invoice_id"] != invoice_id or state["view"] != "invoice":
@@ -113,6 +129,7 @@ class BrowserAdapter:
             raise PermissionError("Invoice identity mismatch")
         return {"invoice_id": invoice_id}
 
+    @adapter_contract(Empty, AccountingView)
     def ensure_editable(self):
         state = self.ready()
         if (
@@ -123,13 +140,15 @@ class BrowserAdapter:
             raise Recovery("unfamiliar", "Record identity changed; re-establish the scoped invoice")
         return state
 
+    @adapter_contract(FieldValue, FieldValue)
     def set_field(self, field, value):
         self.ensure_editable()
         self.fence()
         locator = self.page.locator(f'[data-target="{field}"]')
-        locator.fill(str(value))
-        locator.press("Tab")
-        self.page.wait_for_function("!window.busy")
+        locator.fill(value, timeout=self.timeout_ms())
+        self.fence()
+        locator.press("Tab", timeout=self.timeout_ms())
+        self.page.wait_for_function("!window.busy", timeout=self.timeout_ms())
         state = self.page.evaluate("window.appState")
         if state["fields"].get(field) != str(value):
             raise Recovery("unfamiliar", "Field value did not persist in the draft form")
@@ -142,6 +161,7 @@ class BrowserAdapter:
             raise Recovery("ambiguous", "Existing draft does not match expected result")
         return draft
 
+    @adapter_contract(SaveInputs, DraftResult)
     def save_and_verify(self, expected_result):
         existing = self.saved_result(expected_result)
         if existing:

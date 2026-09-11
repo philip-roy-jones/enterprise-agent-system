@@ -13,6 +13,7 @@ import time
 import httpx
 from .config import Settings
 from .store import Store, uid
+from .improvement_analysis import analyze, patch_library, regression_source
 
 
 def git(root, *args):
@@ -21,6 +22,17 @@ def git(root, *args):
 
 def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def regression_failures(path):
+    from xml.etree import ElementTree
+
+    if not Path(path).exists():
+        return None
+    tree = ElementTree.parse(path)
+    return sum(
+        int(suite.get("failures", 0)) + int(suite.get("errors", 0)) for suite in tree.iter("testsuite")
+    )
 
 
 def require_development():
@@ -32,11 +44,14 @@ def require_development():
 
 def propose(episode, root, output, publish=False):
     require_development()
-    if not episode["job"]["accepted"] or episode["job"]["status"] != "completed":
-        raise ValueError("Select a staff-accepted, verified episode")
-    reasons = [e["data"].get("reason", "") for e in episode["events"] if e["kind"] == "recovery_required"]
-    if not any("label" in r.lower() for r in reasons):
-        raise ValueError("This bounded improvement generator supports the recurring amount-label gap only")
+    episodes = episode if isinstance(episode, list) else [episode]
+    # Inspect the committed baseline used by the isolated checkout. Never silently
+    # discard uncommitted implementation while constructing a reviewed candidate.
+    if git(root, "status", "--porcelain", "--untracked-files=no"):
+        raise ValueError("Commit the development baseline before generating a proposal")
+    analysis = analyze(episodes, root)
+    if not analysis["additions"]:
+        raise ValueError(analysis["rationale"])
     proposal_id = uid()[:12]
     folder = Path(output).resolve() / proposal_id
     folder.mkdir(parents=True)
@@ -48,41 +63,15 @@ def propose(episode, root, output, publish=False):
         capture_output=True,
     )
     procedure = checkout / "enterprise" / "procedures.py"
-    source = procedure.read_text()
-    if 'AMOUNT_LABELS = ("Correction amount",)' not in source:
-        raise ValueError("Expected baseline changed; review generator before applying")
-    procedure.write_text(
-        source.replace('GRAPH_VERSION = "v1"', 'GRAPH_VERSION = "v2"').replace(
-            'AMOUNT_LABELS = ("Correction amount",)',
-            'AMOUNT_LABELS = ("Correction amount", "Adjusted total")',
-        )
-    )
-    # Only synthetic, selected evidence is committed; never copy runtime, screenshots or credentials.
-    fixture = {
-        "episode_id": episode["job"]["id"],
-        "task": "invoice_correction",
-        "app_version": episode["app_version"],
-        "graph_version": episode["job"]["graph_version"],
-        "reason": "The correction amount field label changed",
-        "accepted": True,
-        "observed_labels": ["Correction amount", "Adjusted total"],
-        "model_mode": episode["job"]["model_mode"],
-    }
-    fixture_path = checkout / "examples" / "improvement" / "accepted-label-episode.json"
+    patch_library(procedure, analysis)
+    # Export only selected synthetic semantics and evidence hashes, never full
+    # episodes, business values, screenshots, runtime paths or credentials.
+    fixture = analysis
+    fixture_path = checkout / "examples" / "improvement" / f"analysis-{proposal_id}.json"
     fixture_path.parent.mkdir(parents=True, exist_ok=True)
     fixture_path.write_text(json.dumps(fixture, indent=2) + "\n")
-    test = checkout / "tests" / "test_proposed_label.py"
-    test.write_text("""from enterprise.procedures import resolve_amount_label
-import pytest
-
-@pytest.mark.parametrize("labels,expected", [
-    (["Correction amount", "Correction explanation"], "Correction amount"),
-    (["Correction explanation", "Adjusted total"], "Adjusted total"),
-    (["Balance due", "Correction explanation"], None),
-])
-def test_amount_label_variants(labels, expected):
-    assert resolve_amount_label(labels) == expected
-""")
+    test = checkout / "tests" / f"test_learned_{proposal_id}.py"
+    test.write_text(regression_source(analysis["additions"]))
     subprocess.run(
         [sys.executable, "-m", "ruff", "format", str(procedure), str(test)], check=True, capture_output=True
     )
@@ -93,8 +82,8 @@ def test_amount_label_variants(labels, expected):
             str(checkout),
             "add",
             "enterprise/procedures.py",
-            "tests/test_proposed_label.py",
-            "examples/improvement/accepted-label-episode.json",
+            str(test.relative_to(checkout)),
+            str(fixture_path.relative_to(checkout)),
         ],
         check=True,
     )
@@ -124,7 +113,7 @@ def test_amount_label_variants(labels, expected):
     checks_path = folder / "checks.txt"
     with checks_path.open("w") as check_log:
         checks = subprocess.Popen(
-            [sys.executable, "-m", "pytest", "-q", "-x"],
+            [sys.executable, "-m", "pytest", "-q", "--junitxml=" + str(folder / "checks.xml")],
             cwd=checkout,
             env=env,
             stdout=check_log,
@@ -146,30 +135,38 @@ def test_amount_label_variants(labels, expected):
         checkout=str(checkout),
         branch=branch,
         commit=commit,
-        episode_id=fixture["episode_id"],
+        episode_id=episodes[0]["job"]["id"],
+        episode_ids=[e["job"]["id"] for e in episodes],
+        analysis_sha=sha(fixture_path),
+        analysis_file=str(fixture_path.relative_to(checkout)),
         source_sha=sha(procedure),
         patch_sha=sha(folder / "proposal.patch"),
         checks_sha=sha(folder / "checks.txt"),
         checks_passed=checks.returncode == 0,
-        regression_failures=0 if checks.returncode == 0 else None,
+        regression_failures=regression_failures(folder / "checks.xml"),
         review="pending",
         reviewer=None,
         approved_commit=None,
-        version="v2",
-        labels=["Correction amount", "Adjusted total"],
+        version=analysis["version"],
+        labels=analysis["library"]["labels"] + analysis["additions"],
     )
     (folder / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-    summary = f"""# Recognize a reviewed correction amount label
+    summary = f"""# Extend the amount resolver from verified staff demonstrations
 
-The accepted synthetic episode `{fixture["episode_id"]}` encountered an unfamiliar “Adjusted total” field. This proposal adds that label to the existing resolver. It changes no graph topology or business permission, and uses no record-specific coordinates.
+{analysis["rationale"]}
 
-- Base application: mock-1; proposed procedure version: v2.
-- Candidate commit: `{commit}`.
-- Regression checks: {"passed" if checks.returncode == 0 else "failed"}; see checks.txt.
-- Evidence: examples/improvement/accepted-label-episode.json; full episode remains in the access-controlled central store.
-- New-record browser coverage runs against different invoices and reordered/layout variants in an isolated test environment.
+The proposal adds {", ".join(repr(label) for label in analysis["additions"])}. Analysis joins the staff decision, executed field action, bound observation, field result, and final saved result. It inspects the existing graph and operation library before choosing this change.
+
+- Proposed procedure version: {analysis["version"]}; candidate commit: `{commit}`.
+- Selected episodes: {", ".join(e["job"]["id"] for e in episodes)}.
+- Evidence and source hashes: `{fixture_path.relative_to(checkout)}`.
+- Recurring failure groups: {json.dumps(analysis["recurring_gaps"])}.
+- Regression checks: {"passed" if checks.returncode == 0 else "failed"}; see checks.txt and checks.xml.
+- Generated browser regressions use the learned labels on fresh jobs for two records, reordered rows, and different layouts. No coordinates or invoice identifiers enter the reusable library.
 - Developer review: pending. Passing checks do not authorize deployment.
 - Rollback: restore the previous release registry for future jobs; running jobs stay pinned.
+
+{analysis["limits"]}
 """
     (folder / "REVIEW.md").write_text(summary)
     if publish:
@@ -212,6 +209,11 @@ def verify_candidate(folder):
     ]:
         if sha(path) != manifest[field]:
             raise ValueError("Candidate or check evidence changed")
+    if (
+        manifest.get("analysis_file")
+        and sha(checkout / manifest["analysis_file"]) != manifest["analysis_sha"]
+    ):
+        raise ValueError("Analysis evidence changed")
     if not manifest["checks_passed"]:
         raise ValueError("Candidate checks did not pass")
     return manifest
@@ -262,7 +264,7 @@ def deploy(folder, settings, token):
         [
             sys.executable,
             "-c",
-            "import json;from enterprise.procedures import AMOUNT_LABELS,GRAPH_VERSION,resolve_amount_label;assert resolve_amount_label(['Adjusted total']) == 'Adjusted total';print(json.dumps({'labels':list(AMOUNT_LABELS),'version':GRAPH_VERSION}))",
+            "import json;from enterprise.procedures import AMOUNT_LABELS,GRAPH_VERSION,resolve_amount_label;assert AMOUNT_LABELS and all(resolve_amount_label([label]) == label for label in AMOUNT_LABELS);print(json.dumps({'labels':list(AMOUNT_LABELS),'version':GRAPH_VERSION}))",
         ],
         cwd=manifest["checkout"],
         env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "PYTHONPATH": manifest["checkout"]},
@@ -311,7 +313,9 @@ def rollback(settings, token):
 def main(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument("command", choices=["improve", "review", "deploy", "rollback"])
-    parser.add_argument("--episode")
+    parser.add_argument(
+        "--episode", action="append", help="Accepted episode ID; repeat to analyze recurring gaps"
+    )
     parser.add_argument("--proposal")
     parser.add_argument("--decision", choices=["approve", "request_changes", "reject"])
     parser.add_argument("--reviewer", default="")
@@ -325,9 +329,12 @@ def main(argv):
         with httpx.Client(
             base_url=settings.backend_url, headers={"Authorization": f"Bearer {settings.staff_token}"}
         ) as client:
-            response = client.get(f"/api/jobs/{args.episode}/episode")
-            response.raise_for_status()
-        print(propose(response.json(), Path.cwd(), settings.data_dir / "proposals", args.publish))
+            episodes = []
+            for episode_id in args.episode:
+                response = client.get(f"/api/jobs/{episode_id}/episode")
+                response.raise_for_status()
+                episodes.append(response.json())
+        print(propose(episodes, Path.cwd(), settings.data_dir / "proposals", args.publish))
     elif args.command == "review":
         if not args.proposal or not args.decision:
             parser.error("--proposal and --decision are required")

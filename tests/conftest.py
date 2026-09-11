@@ -134,6 +134,7 @@ def browser_server(server):
             "company_id": "ACME",
             "dialog": None,
             "variant": "standard",
+            "amount_label": None,
             "reordered": False,
             "interrupt_save": False,
             "unsaved": False,

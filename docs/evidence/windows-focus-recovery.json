@@ -1,0 +1,27 @@
+{
+  "purpose": "Native mouse/keyboard focus recovery",
+  "staff": "simulated",
+  "model_calls": 0,
+  "fallback_count": 0,
+  "job_id": "a5d7bf3bcab94b37a4e7ed4bfcb364aa",
+  "invoice_id": "INV-1043",
+  "graph_version": "v2",
+  "mutation": "confirmed_succeeded",
+  "elapsed_seconds": 16.17,
+  "input_methods": [
+    "mouse_input",
+    "mouse_input",
+    "keyboard_input",
+    "keyboard_input",
+    "mouse_input"
+  ],
+  "application_api_enabled": false,
+  "diagnosis": {
+    "samples": 6,
+    "immediate_previous_field_reports": 5,
+    "correct_field_after_50ms": 6
+  },
+  "fix": "Wait up to 500ms for both exact focused element and HasKeyboardFocus; abort immediately if assigned application loses foreground; recheck before SendInput.",
+  "controller_source_sha256": "ec36c2ab757be966f39f7fb19fd96afbf7d458beb4d3367518dc9233c9684af9",
+  "limitations": "Foreground validation does not isolate the desktop from other processes or a concurrent physical user. This run used zero LLM calls; it is native deterministic validation."
+}

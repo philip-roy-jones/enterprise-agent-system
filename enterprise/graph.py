@@ -197,13 +197,11 @@ class RoleGraph:
         if name == "save":
             self.store.update_job(job["id"], {"mutation": "attempted_uncertain"})
             result = adapter.save_and_verify(job["expected"])
-            self.store.update_job(job["id"], {"mutation": "confirmed_succeeded"})
             return result
         if name == "verify":
             result = adapter.saved_result(job["expected"])
             if not result:
                 raise Recovery("ambiguous", "Saved correction is not visible; reconciliation required")
-            self.store.update_job(job["id"], {"mutation": "confirmed_succeeded"})
             return result
         if name == "recover":
             if "info" in state["reason"]:

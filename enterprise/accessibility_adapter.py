@@ -13,6 +13,7 @@ import time
 
 from .types import Observation, Recovery, Stale
 from .windows_adapter import WindowsAdapter, WindowsBridge
+from .contracts import adapter_contract, SaveInputs, DraftResult
 
 
 def cents(text):
@@ -267,6 +268,7 @@ class AccessibilityAdapter(WindowsAdapter):
             verification="visible saved draft and unique explanation reference",
         )
 
+    @adapter_contract(SaveInputs, DraftResult)
     def save_and_verify(self, expected_result):
         saved = self.saved_result(expected_result)
         if saved:

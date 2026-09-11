@@ -19,6 +19,8 @@ WORKER_METHODS = {
     "result",
     "relevant_episodes",
     "search_knowledge",
+    "conversation",
+    "ask_staff",
 }
 
 

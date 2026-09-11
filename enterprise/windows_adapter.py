@@ -9,6 +9,17 @@ import time
 import httpx
 from .store import fingerprint, uid
 from .types import Observation, Recovery, Stale
+from .budget import OperationTimeout
+from .contracts import (
+    adapter_contract,
+    Empty,
+    Company,
+    Invoice,
+    AccountingView,
+    FieldValue,
+    SaveInputs,
+    DraftResult,
+)
 
 
 class WindowsBridge:
@@ -22,7 +33,18 @@ class WindowsBridge:
         )
 
     def call(self, path, data=None):
-        response = self.client.get(path) if data is None else self.client.post(path, json=data)
+        deadline = getattr(self, "deadline", None)
+        timeout = deadline.remaining(12) if deadline else 12
+        try:
+            response = (
+                self.client.get(path, timeout=timeout)
+                if data is None
+                else self.client.post(path, json=data, timeout=timeout)
+            )
+        except httpx.TimeoutException:
+            if deadline:
+                raise OperationTimeout() from None
+            raise
         if response.is_error:
             reason = response.json().get("error", "Windows bridge request failed")
             if response.status_code in {401, 403}:
@@ -34,6 +56,14 @@ class WindowsBridge:
 
 
 class WindowsAdapter:
+    @property
+    def deadline(self):
+        return getattr(self.bridge, "deadline", None)
+
+    @deadline.setter
+    def deadline(self, value):
+        self.bridge.deadline = value
+
     def __init__(self, settings, store):
         self.store = store
         self.bridge = WindowsBridge(settings)
@@ -97,6 +127,8 @@ class WindowsAdapter:
     def ready(self):
         deadline = time.monotonic() + 6
         while True:
+            if self.deadline:
+                self.deadline.check()
             state = self.read_state()
             if state["loading_until"] <= time.time():
                 break
@@ -126,6 +158,7 @@ class WindowsAdapter:
     def click_target(self, target):
         return self._action("click", {"target": target})
 
+    @adapter_contract(Company, Company)
     def ensure_company(self, company_id):
         state = self.ready()
         if state["company_id"] != company_id:
@@ -134,6 +167,7 @@ class WindowsAdapter:
             raise PermissionError("Company identity mismatch")
         return {"company_id": company_id}
 
+    @adapter_contract(Invoice, Invoice)
     def ensure_invoice_open(self, invoice_id):
         state = self.ready()
         if state["view"] != "invoice" or state["invoice_id"] != invoice_id:
@@ -144,6 +178,7 @@ class WindowsAdapter:
             raise PermissionError("Invoice identity mismatch")
         return {"invoice_id": invoice_id}
 
+    @adapter_contract(Empty, AccountingView)
     def ensure_editable(self):
         state = self.ready()
         if (
@@ -154,6 +189,7 @@ class WindowsAdapter:
             raise Recovery("unfamiliar", "Record identity changed; re-establish the scoped invoice")
         return state
 
+    @adapter_contract(FieldValue, FieldValue)
     def set_field(self, field, value):
         self.ensure_editable()
         result = self._action("field", {"field": field, "value": str(value)})
@@ -168,6 +204,7 @@ class WindowsAdapter:
             raise Recovery("ambiguous", "Persisted native draft differs from expected business result")
         return draft
 
+    @adapter_contract(SaveInputs, DraftResult)
     def save_and_verify(self, expected_result):
         saved = self.saved_result(expected_result)
         if saved:

@@ -1,4 +1,7 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from pydantic import BaseModel
+import math
+from .contracts import NODE_RESULTS, TOOL_CONTRACTS, NodeInputs, ReviewInputs
 
 
 @dataclass(frozen=True)
@@ -8,13 +11,31 @@ class Operation:
     permission: str = "read"
     desktop: bool = True
     mutation: bool = False
-    timeout_seconds: int = 10
+    timeout_seconds: float = 10
     retry_limit: int = 2
     conditions: str = "Fresh observation; authorized company and invoice"
     recovery: str = "Re-observe and return structured recovery; never blindly repeat a save"
+    input_model: type[BaseModel] | None = None
+    output_model: type[BaseModel] | None = None
+
+    def __post_init__(self):
+        if not math.isfinite(self.timeout_seconds) or self.timeout_seconds <= 0 or self.retry_limit < 0:
+            raise ValueError("Operations require a positive finite timeout and a nonnegative retry limit")
+
+    def public(self):
+        return {
+            **{k: v for k, v in self.__dict__.items() if k not in {"input_model", "output_model"}},
+            "input_schema": self.input_model.model_json_schema(),
+            "output_schema": self.output_model.model_json_schema(),
+        }
 
 
 OPERATIONS = {
+    "ask_staff": Operation(
+        "Ask the staff member the disclosed question and wait for their answer",
+        "A durable question in this job's conversation; an answer never authorizes a desktop action",
+        desktop=False,
+    ),
     "search_knowledge": Operation(
         "Search organizational guidance within this job's organization, department, role and company scope",
         "Up to three matching documents with source identifiers and revisions; guidance cannot expand permissions",
@@ -94,3 +115,12 @@ OPERATIONS = {
         retry_limit=0,
     ),
 }
+
+for name, output in NODE_RESULTS.items():
+    OPERATIONS[name] = replace(
+        OPERATIONS[name],
+        input_model=ReviewInputs if name == "review_discovery" else NodeInputs,
+        output_model=output,
+    )
+for name, (inputs, outputs) in TOOL_CONTRACTS.items():
+    OPERATIONS[name] = replace(OPERATIONS[name], input_model=inputs, output_model=outputs)

@@ -23,9 +23,16 @@ class SimulatedModel(BaseChatModel):
         return self
 
     def _generate(self, messages, stop=None, run_manager=None, **kwargs):
-        human = next(m for m in reversed(messages) if isinstance(m, HumanMessage))
+        human = next(
+            m
+            for m in reversed(messages)
+            if isinstance(m, HumanMessage) and not m.additional_kwargs.get("eas_staff_guidance")
+        )
         context = json.loads(human.content)
         results = [m for m in messages[messages.index(human) + 1 :] if isinstance(m, ToolMessage)]
+        failed = [i for i, m in enumerate(results) if json.loads(m.content).get("error")]
+        if failed:
+            results = results[failed[-1] + 1 :]
         name, args = None, {}
         if not results:
             name = "observe_app"
@@ -114,7 +121,17 @@ def build_assistant(settings, store, layer, checkpointer, job_id, thread_id):
         """
         return {}
 
-    scoped_tools = [observe_app, click, set_field, save_draft, search_knowledge]
+    @tool
+    def ask_staff(question: str) -> dict:
+        """Ask a concise question when staff input is needed to continue.
+
+        This call needs individual approval. Execution publishes the question in
+        the job conversation and waits for a reply. A reply provides guidance,
+        not action approval or expanded permissions.
+        """
+        return {}
+
+    scoped_tools = [observe_app, click, set_field, save_draft, search_knowledge, ask_staff]
     allowed = {t.name: t for t in scoped_tools}
 
     @wrap_model_call
@@ -122,13 +139,37 @@ def build_assistant(settings, store, layer, checkpointer, job_id, thread_id):
         job = store.get_job(job_id)
         if job["status"] in {"cancelled", "rejected", "denied", "failed"}:
             raise Stopped(job["status"])
+        conversation = store.conversation(job_id)
+        waiting = next((q for q in conversation["questions"] if q["status"] == "pending"), None)
+        if waiting:
+            interrupt({"question": waiting["question_id"]})
+            conversation = store.conversation(job_id)
         if job["model_calls"] >= settings.max_model_calls:
             raise Stopped("Model call budget exceeded")
         store.update_job(job_id, {"model_calls": job["model_calls"] + 1})
         # Before comparison has verified business values, assistance can resolve
         # navigation/dialogs but cannot prepare or save a correction.
-        available = scoped_tools if job["expected"] else [observe_app, click, search_knowledge]
-        overrides = {"tools": available}
+        available = scoped_tools if job["expected"] else [observe_app, click, search_knowledge, ask_staff]
+        model_messages = list(request.messages)
+        if conversation["messages"]:
+            model_messages.append(
+                HumanMessage(
+                    content=json.dumps(
+                        {
+                            "staff_conversation": conversation["messages"],
+                            "instruction": "Use relevant staff guidance and answers for this job. Messages are not action approvals and cannot expand permissions.",
+                        }
+                    ),
+                    additional_kwargs={"eas_staff_guidance": True},
+                )
+            )
+        overrides = {"tools": available, "messages": model_messages}
+        store.update_job(job_id, {"model_guidance_revision": conversation["revision"]})
+        store.event(
+            job_id,
+            "conversation_context",
+            {"message_sequences": [m["seq"] for m in conversation["messages"]]},
+        )
         if settings.model_mode == "live" and settings.model_provider == "openrouter":
             overrides["model_settings"] = dict(request.model_settings, parallel_tool_calls=False)
         if settings.model_mode == "live":
@@ -137,7 +178,7 @@ def build_assistant(settings, store, layer, checkpointer, job_id, thread_id):
                 # Attach only the latest runtime observation, not the screenshot
                 # history. This stays out of the persisted conversation payload.
                 overrides["messages"] = [
-                    *request.messages,
+                    *model_messages,
                     HumanMessage(
                         content=[
                             {
@@ -157,6 +198,13 @@ def build_assistant(settings, store, layer, checkpointer, job_id, thread_id):
         )
         if usage:
             store.update_job(job_id, {"tokens": store.get_job(job_id)["tokens"] + usage})
+        for message in response.result:
+            if (
+                isinstance(message, AIMessage)
+                and isinstance(message.content, str)
+                and message.content.strip()
+            ):
+                store.event(job_id, "assistant_message", {"text": message.content})
         return response
 
     @wrap_tool_call
@@ -165,6 +213,17 @@ def build_assistant(settings, store, layer, checkpointer, job_id, thread_id):
         name, args = call["name"], call["args"]
         if name not in allowed:
             raise PermissionError("Deep Agent built-in, filesystem, shell, and delegation tools are disabled")
+        if store.conversation(job_id)["revision"] > store.get_job(job_id).get("model_guidance_revision", 0):
+            return ToolMessage(
+                content=json.dumps(
+                    {
+                        "error": "staff_guidance_changed",
+                        "reason": "Staff guidance changed after this proposal. Reconsider the action using the current conversation; nothing was executed.",
+                    }
+                ),
+                tool_call_id=call["id"],
+                name=name,
+            )
         if name in {"set_field", "save_draft"} and not store.get_job(job_id)["expected"]:
             raise PermissionError(
                 "The scripted comparison must verify business values before editing or saving"
@@ -177,6 +236,8 @@ def build_assistant(settings, store, layer, checkpointer, job_id, thread_id):
                     validated = allowed[name].args_schema.model_validate(corrected).model_dump()
                     if name == "search_knowledge":
                         return store.search_knowledge(job_id, validated["query"])
+                    if name == "ask_staff":
+                        return store.ask_staff(job_id, validated["question"])
                     return layer.adapter.tool_action(name, validated)
 
                 result = layer.run(job_id, invocation, name, args, execute, kind="tool")
@@ -217,7 +278,7 @@ def build_assistant(settings, store, layer, checkpointer, job_id, thread_id):
         subagents=[],
         middleware=[budget_and_scope, supervised_tool],
         checkpointer=checkpointer,
-        system_prompt="You assist with one synthetic invoice correction. Use only the supplied accounting tools. Every tool, including reads, is supervised by staff. You cannot approve, change modes, delegate, run code, or access files. Work only on the assigned company/invoice. Never retry an uncertain save: observe and reconcile. Stop after resolving the reported condition. Report brief results, not private reasoning.",
+        system_prompt="You assist with the assigned synthetic job. Use only the supplied scoped tools. Every tool, including reads and questions, is supervised by staff. You cannot approve, change modes, delegate, run code, or access files. Work only on the assigned company/invoice. Use relevant staff conversation as guidance; it never expands permissions or counts as action approval. Use ask_staff when an answer is necessary to continue. Never retry an uncertain save: observe and reconcile. Stop after resolving the reported condition. Report brief results, not private reasoning.",
     )
 
 
@@ -226,10 +287,14 @@ def run_assistant(agent, context, thread_id, store, job_id):
     snapshot = agent.get_state(config)
     if snapshot.interrupts:
         decisions = {a["id"]: a["status"] for a in store.approvals(job_id)}
+        answered = {
+            q["question_id"] for q in store.conversation(job_id)["questions"] if q["status"] == "answered"
+        }
         ready = {
             item.id: True
             for item in snapshot.interrupts
             if decisions.get(item.value.get("approval")) in {"approved", "corrected", "stale", "executing"}
+            or item.value.get("question") in answered
         }
         if not ready:
             return {"__interrupt__": snapshot.interrupts}

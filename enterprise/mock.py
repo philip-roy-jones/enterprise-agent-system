@@ -26,6 +26,7 @@ def initial_state():
         unsaved=False,
         fields={"amount": "", "note": ""},
         variant="standard",
+        amount_label=None,
         reordered=False,
         interrupt_save=False,
         invoices=invoices,
@@ -59,6 +60,7 @@ class MockAccounting:
                 "invoice_id",
                 "dialog",
                 "variant",
+                "amount_label",
                 "reordered",
                 "interrupt_save",
                 "company_id",
@@ -73,6 +75,11 @@ class MockAccounting:
                 raise ValueError("Invalid dialog")
             if config.get("variant", "standard") not in {"standard", "renamed", "layout"}:
                 raise ValueError("Invalid UI variant")
+            label = config.get("amount_label")
+            if label is not None and (
+                not isinstance(label, str) or not 1 <= len(label) <= 100 or not label.isprintable()
+            ):
+                raise ValueError("Invalid synthetic amount label")
             config = dict(config)
             delay = min(max(float(config.pop("delay_seconds", 0)), 0), 15)
             s.update(config, loading_until=time.time() + delay, revision=s["revision"] + 1)

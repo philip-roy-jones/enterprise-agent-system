@@ -140,18 +140,18 @@ Read [the architecture and trust boundaries](docs/architecture.md) for state tra
 
 ## Teach a reusable improvement
 
-The initial library recognizes **Correction amount**. An unfamiliar **Adjusted total** label triggers assistance. The bounded development command proposes adding that label to the existing resolver, with regression tests and selected synthetic evidence. It does not add a node for one invoice or memorize coordinates.
+The development command reads accepted episodes, joins staff-approved or corrected field actions with their observations and verified saved results, and inspects the graph and operation library. It groups recurring failures and proposes a resolver extension when the evidence establishes a missing amount label. Its generated tests exercise that label on different invoices and layouts. Labels and versions come from the evidence and source, rather than a predetermined patch.
 
-Current `main` includes that reviewed example improvement. To repeat proposal generation from its original state, use a separate teaching checkout at commit `12fc5e96c7cde98f317082b19a5addf5e2ed931c`, then follow setup and the steps below. Keep its runtime separate from a running deployment. The generator deliberately refuses to propose the same label addition when it is already present in the source; pulling merged code alone does not activate a release registry.
+Current `main` includes the reviewed **Adjusted total** example. To teach another label, use the optional browser fixture and choose **New amount label for teaching**, which displays **Revised draft amount**. The generator refuses redundant changes and insufficient or conflicting evidence. This deterministic analyzer supports one bounded change family; unsupported gap families still require developer implementation. Pulling merged code alone does not activate a release registry.
 
-1. Complete and accept a job using **Changed amount field label**, or run the automated demonstration and copy its improvement episode ID.
+1. Complete and accept a job using **New amount label for teaching**, approving or correcting the field action during assistance. Copy its episode ID. Commit your development baseline before generating a proposal.
 2. Generate the isolated proposal:
 
    ```bash
    EAS_DEV_PERMISSIONS=local-improvement enterprise improve --episode EPISODE_ID
    ```
 
-   Add `--publish` to push the improvement branch and open a **draft pull request** using an authenticated `gh` installation. The repository must have a committed baseline and an `origin` remote.
+   Repeat `--episode ANOTHER_ID` to analyze related accepted episodes together. Add `--publish` to push the improvement branch and open a **draft pull request** using an authenticated `gh` installation. The repository must have a committed baseline and an `origin` remote.
 
 3. Inspect the returned proposal directory:
 
@@ -159,7 +159,7 @@ Current `main` includes that reviewed example improvement. To repeat proposal ge
    runtime/proposals/PROPOSAL_ID/
    ├── checkout/          # Separate Git worktree; no live runtime copied
    ├── proposal.patch    # Reusable library change + tests + selected fixture
-   ├── checks.txt        # Full isolated test result
+   ├── checks.txt        # Full isolated test result; checks.xml contains counts
    ├── manifest.json     # Candidate commit, evidence hashes, review state
    └── REVIEW.md         # Reviewer-facing explanation
    ```
@@ -181,7 +181,7 @@ Current `main` includes that reviewed example improvement. To repeat proposal ge
      --developer-token local-developer-demo
    ```
 
-6. Create a new Auto job for a **different invoice** using the changed label. The new job pins `v2` and handles the label without fallback. Existing jobs retain their original version.
+6. Create a new Auto job for a **different invoice** using the changed label. The new job pins the approved version and handles the label without fallback. Existing jobs retain their original version.
 
    ```bash
    enterprise rollback --developer-token local-developer-demo

@@ -223,12 +223,26 @@ sealed class Desktop(string processName)
             }
             if (known.type != "Edit") throw new UnauthorizedAccessException("Keyboard entry requires a visible edit control");
             element.SetFocus();
-            if (GetForegroundWindow() != window || Id(AutomationElement.FocusedElement) != id) throw new InvalidOperationException("Input focus changed before typing");
+            // UI Automation can report the previous focused element briefly after
+            // SetFocus returns. Wait for the exact target, while retaining the
+            // foreground guard; never type merely because SetFocus succeeded.
+            var focusWait = Stopwatch.StartNew();
+            while (!HasInputFocus(window, element, id))
+            {
+                if (focusWait.ElapsedMilliseconds >= 500) throw new InvalidOperationException("Input focus did not reach the approved field before the deadline");
+                Thread.Sleep(10);
+            }
             var input = new List<Input> { Key(0x11), Key(0x41), Key(0x41, 2), Key(0x11, 2) };
             foreach (char c in text) { input.Add(Key(0, 4, c)); input.Add(Key(0, 6, c)); }
+            if (!HasInputFocus(window, element, id)) throw new InvalidOperationException("Input focus changed before typing");
             Send(input.ToArray()); return new { executed = true, method = "keyboard_input" };
         }
         throw new UnauthorizedAccessException("Unsupported desktop operation");
+    }
+    static bool HasInputFocus(IntPtr window, AutomationElement element, string id)
+    {
+        if (GetForegroundWindow() != window) throw new InvalidOperationException("Assigned application lost foreground before typing");
+        return element.Current.HasKeyboardFocus && Id(AutomationElement.FocusedElement) == id;
     }
     static Input Key(ushort key, uint flags = 0, ushort scan = 0) => new() { type = 1, data = new() { key = new() { key = key, scan = scan, flags = flags } } };
     static void Send(Input[] inputs)

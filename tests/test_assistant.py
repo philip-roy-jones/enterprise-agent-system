@@ -46,7 +46,7 @@ class ReadAdapter:
 
     def tool_action(self, name, args):
         self.executed.append(name)
-        return {"state": {}, "read": len(self.executed)}
+        return self.observe().model_dump()
 
 
 def test_batched_model_tools_each_require_their_own_approval(store, job, monkeypatch):

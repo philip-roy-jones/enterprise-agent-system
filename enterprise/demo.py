@@ -82,6 +82,7 @@ def main(argv):
                 dialog=None,
                 unsaved=False,
                 variant="standard",
+                amount_label=None,
                 reordered=False,
                 interrupt_save=False,
                 **{},

@@ -55,6 +55,28 @@ def test_unmatched_request_enters_fallback_without_a_create_workflow_step(browse
     assert not any(d["operation_id"] == job for d in c.get("/api/mock/state").json()["drafts"])
 
 
+def test_staff_conversation_replans_pending_assistance_without_releasing_old_tool(browser_server):
+    c = browser_server["client"]
+    c.post("/api/mock/scenario", json={"variant": "renamed"}).raise_for_status()
+    job = create(c)
+    first = pending(c, job)
+    assert first["name"] == "observe_app"
+    c.post(
+        f"/api/jobs/{job}/messages",
+        json={
+            "text": "Check the current label before entering the correction.",
+            "message_id": "browser-guidance",
+        },
+    ).raise_for_status()
+    result = drive(c, job)
+    old = next(a for a in result["approvals"] if a["id"] == first["id"])
+    assert old["status"] == "stale" and old["executed_action"] is None
+    assert any(
+        e["kind"] == "conversation_context" and e["data"]["message_sequences"] for e in result["events"]
+    )
+    assert result["job"]["mutation"] == "confirmed_succeeded"
+
+
 @pytest.mark.parametrize(
     "scenario",
     [

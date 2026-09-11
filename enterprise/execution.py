@@ -4,6 +4,8 @@ from .operations import OPERATIONS
 from .store import fingerprint
 from .types import Paused, Recovery, Stale, Stopped
 from threading import RLock
+from .budget import Deadline, OperationTimeout
+from pydantic import ValidationError
 
 
 class ExecutionLayer:
@@ -31,6 +33,17 @@ class ExecutionLayer:
         operation = self.operations.get(name)
         if not operation or operation.permission not in job["permissions"]:
             raise PermissionError(f"Missing permission for {name}")
+        if operation.input_model is None or operation.output_model is None:
+            raise PermissionError(f"Operation {name} has no executable input/output contract")
+        try:
+            arguments = operation.input_model.model_validate(arguments).model_dump(exclude_unset=True)
+        except ValidationError as error:
+            if kind == "tool":
+                raise PermissionError(f"Tool arguments are outside the {name} contract") from error
+            raise
+        for field in ("company_id", "invoice_id"):
+            if field in arguments and arguments[field] != job.get(field):
+                raise PermissionError(f"Operation {field} differs from the authorized job")
         self.adapter.job = job
         prepare = getattr(self.adapter, "prepare_observation", None)
         if prepare:
@@ -57,7 +70,7 @@ class ExecutionLayer:
             application=job.get("application", "Ledger (synthetic)"),
             observation=observation.model_dump(),
             epoch=lease["epoch"],
-            operation_spec=operation.__dict__,
+            operation_spec=operation.public(),
             signature=fingerprint([name, arguments, observation.revision, lease["epoch"]]),
         )
         approvals = self.store.approvals(job_id)
@@ -91,22 +104,79 @@ class ExecutionLayer:
                 raise Paused("Observation changed; a fresh approval is required")
             approval_id = approval["id"]
             arguments = approval.get("corrected_arguments", arguments)
+            # Corrected arguments have the same executable schema as model proposals.
+            try:
+                operation.input_model.model_validate(arguments)
+            except ValidationError as error:
+                raise PermissionError(f"Corrected arguments are outside the {name} contract") from error
         action = dict(name=name, arguments=arguments, observation_revision=observation.revision)
         self.store.begin_action(job_id, owner, lease["epoch"], invocation, action, approval_id)
         self.adapter.approved_observation = observation if kind == "tool" else None
-        self.adapter.fence = lambda: self.store.check(job_id, owner, lease["epoch"])
+        deadline = Deadline(operation.timeout_seconds)
+
+        def fence():
+            self.store.check(job_id, owner, lease["epoch"])
+            deadline.check()
+
+        self.adapter.fence = fence
+        self.adapter.deadline = deadline
         try:
             self.adapter.fence()
             if name == "save_draft":
                 self.store.update_job(job_id, {"mutation": "attempted_uncertain"})
             result = execute(arguments)
-            if name == "save_draft":
+            result = operation.output_model.model_validate(result).model_dump(exclude_unset=True)
+            if name in {"save", "save_draft", "verify"}:
+                expected = self.store.get_job(job_id)["expected"]
+                if (
+                    not expected
+                    or any(
+                        result.get(k) != expected[k] for k in ("company_id", "invoice_id", "amount", "note")
+                    )
+                    or result.get("operation_id") != job_id
+                ):
+                    raise Recovery(
+                        "ambiguous",
+                        "Saved result does not match the assigned record, values and operation ID",
+                    )
+            self.adapter.fence()
+            if name in {"save", "save_draft", "verify"}:
                 self.store.update_job(job_id, {"mutation": "confirmed_succeeded"})
             after = self.adapter.observe().model_dump()
+            failures = self.store.get_job(job_id).get("operation_failures", {})
+            if name in failures:
+                failures.pop(name)
+                self.store.update_job(job_id, {"operation_failures": failures})
             result = {"value": result, "after": after}
             self.store.finish_action(job_id, invocation, result, approval_id)
             return result
         except (Recovery, PermissionError, Stale, Stopped) as error:
+            if isinstance(error, OperationTimeout):
+                mutation = self.store.get_job(job_id)["mutation"]
+                error = Recovery(
+                    "ambiguous"
+                    if mutation == "attempted_uncertain"
+                    else "unfamiliar"
+                    if operation.mutation
+                    else "temporary",
+                    f"{name} exceeded its {operation.timeout_seconds:g}-second action deadline; re-observe before continuing",
+                )
+            if isinstance(error, Recovery) and error.kind == "temporary":
+                failures = self.store.get_job(job_id).get("operation_failures", {})
+                failures[name] = failures.get(name, 0) + 1
+                self.store.update_job(job_id, {"operation_failures": failures})
+                self.store.event(
+                    job_id,
+                    "operation_retry",
+                    {
+                        "operation": name,
+                        "failures": failures[name],
+                        "retry_limit": operation.retry_limit,
+                        "requires_fresh_invocation": True,
+                    },
+                )
+                if failures[name] > operation.retry_limit:
+                    error = Recovery("unfamiliar", f"{name} exhausted its retry allowance: {error}")
             self.store.finish_action(
                 job_id,
                 invocation,
@@ -114,7 +184,7 @@ class ExecutionLayer:
                 approval_id,
                 cache=False,
             )
-            raise
+            raise error
         except Exception as error:
             self.store.finish_action(job_id, invocation, {"error": str(error)}, approval_id, cache=False)
             # Only failures inside an authorized operation become procedure
@@ -136,4 +206,5 @@ class ExecutionLayer:
             ) from error
         finally:
             self.adapter.approved_observation = None
+            self.adapter.deadline = None
             self.adapter.fence = lambda: (_ for _ in ()).throw(PermissionError("No active operation"))

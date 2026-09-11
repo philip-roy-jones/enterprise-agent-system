@@ -139,6 +139,8 @@ class Store:
             "elapsed_seconds",
             "assistance_thread",
             "assistant_report",
+            "operation_failures",
+            "model_guidance_revision",
         }
         if set(updates) - allowed:
             raise ValueError("Worker cannot change authorization or pinned version")
@@ -155,6 +157,16 @@ class Store:
     def event(self, job_id, kind, data):
         with self.db() as db:
             self._event(db, job_id, kind, data)
+
+    def conversation(self, job_id):
+        from .conversation import Conversation
+
+        return Conversation(self).read(job_id)
+
+    def ask_staff(self, job_id, question):
+        from .conversation import Conversation
+
+        return Conversation(self).ask(job_id, question)
 
     def events(self, job_id, after=0):
         with self.db() as db:

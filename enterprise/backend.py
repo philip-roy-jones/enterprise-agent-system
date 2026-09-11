@@ -11,6 +11,7 @@ from .store import Store, uid
 from .mock import MockAccounting
 from .types import JobInput, Decision, KnowledgeDocument, Stale, Stopped
 from .remote import WORKER_METHODS
+from .conversation import Conversation, StaffMessage
 
 
 def create_app(settings=None):
@@ -119,6 +120,7 @@ def create_app(settings=None):
             "approvals": store.approvals(job_id),
             "events": store.events(job_id),
             "lease": store.lease(),
+            "conversation": Conversation(store).read(job_id, require_read=False),
         }
 
     @app.get("/api/jobs/{job_id}/stream", dependencies=[Depends(staff)])
@@ -170,11 +172,8 @@ def create_app(settings=None):
         return store.accept(job_id)
 
     @app.post("/api/jobs/{job_id}/messages", dependencies=[Depends(staff)])
-    async def message(job_id: str, request: Request):
-        text = str((await request.json()).get("text", ""))[:4000]
-        store.get_job(job_id)
-        store.event(job_id, "staff_message", {"text": text})
-        return {"ok": True}
+    def message(job_id: str, body: StaffMessage):
+        return Conversation(store).message(job_id, body.model_dump())
 
     @app.get("/api/jobs/{job_id}/episode", dependencies=[Depends(staff)])
     def episode(job_id: str):
@@ -240,10 +239,10 @@ def create_app(settings=None):
                 args[0],
                 {"organization_id": settings.worker_organization_id, "role_ids": settings.worker_role_ids},
             )
-        if method == "search_knowledge":
+        if method in {"search_knowledge", "conversation", "ask_staff"}:
             args, kwargs = body.get("args", []), body.get("kwargs", {})
-            if len(args) != 2 or kwargs:
-                raise ValueError("Knowledge search accepts only job identifier and query")
+            if len(args) != (1 if method == "conversation" else 2) or kwargs:
+                raise ValueError("Expected job identifier and only the declared tool arguments")
             job = store.get_job(args[0])
             if (
                 job["organization_id"] != settings.worker_organization_id
