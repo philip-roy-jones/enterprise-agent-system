@@ -47,7 +47,11 @@ class ClickInputs(Contract):
 
     @model_validator(mode="after")
     def target_or_point(self):
-        if (self.x is None) != (self.y is None) or (not self.target and self.x is None):
+        if (
+            (self.x is None) != (self.y is None)
+            or (not self.target and self.x is None)
+            or (self.target and self.x is not None)
+        ):
             raise ValueError("Specify a target or both screen coordinates")
         return self
 

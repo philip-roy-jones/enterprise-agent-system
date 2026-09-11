@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from .config import Settings
+from .evaluation import ActionAssessment, assess_action, assessment_metrics
 from .store import Store, uid
 from .mock import MockAccounting
 from .types import JobInput, Decision, KnowledgeDocument, Stale, Stopped
@@ -175,6 +176,10 @@ def create_app(settings=None):
     def message(job_id: str, body: StaffMessage):
         return Conversation(store).message(job_id, body.model_dump())
 
+    @app.post("/api/jobs/{job_id}/assessments", dependencies=[Depends(staff)])
+    def action_assessment(job_id: str, body: ActionAssessment):
+        return assess_action(store, job_id, body.model_dump())
+
     @app.get("/api/jobs/{job_id}/episode", dependencies=[Depends(staff)])
     def episode(job_id: str):
         return {
@@ -191,6 +196,7 @@ def create_app(settings=None):
         for mode in ["simulated", "live"]:
             selected = [j for j in jobs if j["model_mode"] == mode]
             approvals = [a for j in selected for a in store.approvals(j["id"])]
+            assessments = [assessment_metrics(store.events(j["id"])) for j in selected]
             results[mode] = {
                 "jobs": len(selected),
                 "verified_completions": sum(j["status"] == "completed" for j in selected),
@@ -205,9 +211,10 @@ def create_app(settings=None):
                 "model_calls": sum(j["model_calls"] for j in selected),
                 "tokens": sum(j["tokens"] for j in selected),
                 "execution_seconds": sum(j["elapsed_seconds"] for j in selected),
-                "incorrect_actions": sum(
-                    e["kind"] == "incorrect_action" for j in selected for e in store.events(j["id"])
-                ),
+                **{
+                    key: sum(a[key] for a in assessments)
+                    for key in ("incorrect_actions_reported", "assessed_actions", "unassessed_actions")
+                },
             }
         return results
 

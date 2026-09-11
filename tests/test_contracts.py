@@ -102,3 +102,24 @@ def test_unverified_save_output_never_becomes_confirmed_success(store, job):
         layer.run(job["id"], "save", "save_draft", {}, lambda args: {"ok": True})
     assert store.get_job(job["id"])["mutation"] == "attempted_uncertain"
     assert store.result("save") is None
+
+
+def test_rejection_for_another_operation_does_not_clear_save_uncertainty(store, job):
+    from enterprise.types import MutationRejected
+
+    layer = layer_for(store, job, name="save_draft")
+
+    def rejected(args):
+        raise MutationRejected("other-job", "Application rejected another request")
+
+    with pytest.raises(Recovery, match="does not identify"):
+        layer.run(job["id"], "save", "save_draft", {}, rejected)
+    assert store.get_job(job["id"])["mutation"] == "attempted_uncertain"
+
+
+def test_click_contract_rejects_conflicting_target_and_coordinates():
+    from enterprise.contracts import ClickInputs
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        ClickInputs(target="invoices", x=50, y=60)

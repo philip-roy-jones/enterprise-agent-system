@@ -137,6 +137,7 @@ def browser_server(server):
             "amount_label": None,
             "reordered": False,
             "interrupt_save": False,
+            "reject_save": False,
             "unsaved": False,
             "delay_seconds": 0,
         },

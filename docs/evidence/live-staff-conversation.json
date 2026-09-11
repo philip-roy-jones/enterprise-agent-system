@@ -1,0 +1,60 @@
+{
+  "job_id": "b807abfc57a54dfba630498ce8f4175b",
+  "model_mode": "live",
+  "staff": "simulated",
+  "desktop": "Windows edge harness with DemoBooks application API disabled",
+  "status": "completed",
+  "mutation": "not_attempted",
+  "model_calls": 6,
+  "tokens": 24567,
+  "elapsed_seconds": 34.83,
+  "questions": [
+    {
+      "answer": "Please report the purchase order total only. Do not save or change the invoice.",
+      "created_at": 1789096583.9640496,
+      "message_id": "live-conversation-validation-answer",
+      "question": "For invoice INV-1044, should I report the invoice total or the purchase order total?",
+      "question_id": "f6a1bf16f4474c7c8daac67e2204c1be",
+      "status": "answered"
+    }
+  ],
+  "report": "Purchase order total for **PO-1044**: **$900.00**.\n\nInvoice **INV-1044** was inspected, and nothing was changed or saved.",
+  "approved_tools": [
+    "ask_staff",
+    "click",
+    "observe_app",
+    "click",
+    "observe_app"
+  ],
+  "guidance_revisions": [
+    {
+      "message_sequences": []
+    },
+    {
+      "message_sequences": [
+        2065
+      ]
+    },
+    {
+      "message_sequences": [
+        2065
+      ]
+    },
+    {
+      "message_sequences": [
+        2065
+      ]
+    },
+    {
+      "message_sequences": [
+        2065
+      ]
+    },
+    {
+      "message_sequences": [
+        2065
+      ]
+    }
+  ],
+  "source_commit": "b3adef3073e33fcd7ac681d7eb6276ee6d0f231e"
+}

@@ -40,7 +40,11 @@ class SimulatedModel(BaseChatModel):
             observed = next((json.loads(m.content) for m in results if m.name == "observe_app"), {})
             state = observed.get("state", context["observation"]["state"])
             dialog = state.get("dialog")
-            if dialog and not any(m.name == "click" for m in results):
+            if context.get("mutation") == "confirmed_failed" and not any(
+                m.name == "save_draft" for m in results
+            ):
+                name, args = "save_draft", {}
+            elif dialog and not any(m.name == "click" for m in results):
                 name, args = (
                     "click",
                     {

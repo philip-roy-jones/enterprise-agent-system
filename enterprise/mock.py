@@ -29,6 +29,8 @@ def initial_state():
         amount_label=None,
         reordered=False,
         interrupt_save=False,
+        reject_save=False,
+        save_outcomes={},
         invoices=invoices,
         drafts=[],
         save_requests=0,
@@ -63,6 +65,7 @@ class MockAccounting:
                 "amount_label",
                 "reordered",
                 "interrupt_save",
+                "reject_save",
                 "company_id",
                 "unsaved",
                 "delay_seconds",
@@ -154,6 +157,15 @@ class MockAccounting:
                         raise ValueError("Operation ID required")
                     existing = next((d for d in s["drafts"] if d["operation_id"] == operation_id), None)
                     if not existing:
+                        if s.get("reject_save"):
+                            s.update(reject_save=False, revision=s["revision"] + 1)
+                            s.setdefault("save_outcomes", {})[operation_id] = {
+                                "status": "confirmed_failed",
+                                "operation_id": operation_id,
+                                "reason": "Application rejected Save; no correction draft was committed",
+                            }
+                            db.execute("UPDATE kv SET data=? WHERE key='mock'", (canonical(s),))
+                            return s
                         from decimal import Decimal, InvalidOperation
 
                         try:
@@ -178,6 +190,7 @@ class MockAccounting:
                             )
                         )
                         s["save_requests"] += 1
+                        s.setdefault("save_outcomes", {}).pop(operation_id, None)
                     s["unsaved"] = False
                     if s["interrupt_save"]:
                         s.update(dialog="unfamiliar", interrupt_save=False)

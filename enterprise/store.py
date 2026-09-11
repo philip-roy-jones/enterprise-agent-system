@@ -516,6 +516,14 @@ class Store:
             job = self._job(db, job_id)
             if job["status"] != "completed":
                 raise ValueError("Only verified completed jobs can be accepted")
+            assessments = {}
+            for row in db.execute(
+                "SELECT data FROM events WHERE job_id=? AND kind='action_assessment' ORDER BY seq", (job_id,)
+            ):
+                assessment = json.loads(row[0])
+                assessments[assessment["invocation"]] = assessment["outcome"]
+            if "incorrect" in assessments.values():
+                raise ValueError("Resolve reported incorrect operations before accepting this episode")
             job["accepted"] = True
             self._put(db, job)
             self._event(db, job_id, "staff_accepted", {})

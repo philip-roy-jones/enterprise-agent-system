@@ -3,9 +3,9 @@
 from typing import Protocol
 import base64
 import time
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout, Error as PlaywrightError
 from .store import fingerprint
-from .types import Observation, Recovery
+from .types import Observation, Recovery, MutationRejected
 from .contracts import (
     adapter_contract,
     Empty,
@@ -70,7 +70,12 @@ class BrowserAdapter:
         return None
 
     def observe(self):
-        self.page.evaluate("sync()")
+        try:
+            self.page.evaluate("timeout => sync(timeout, true)", self.timeout_ms())
+        except PlaywrightError as error:
+            raise Recovery(
+                "temporary", "A fresh accounting observation is unavailable; wait and re-observe"
+            ) from error
         state = self.page.evaluate("window.appState")
         targets = self.page.locator("[data-target]").evaluate_all(
             """els => els.filter(e => e.getBoundingClientRect().width && !e.closest('#app')?.hidden).map(e => {const r=e.getBoundingClientRect();return {target:e.dataset.target,label:e.getAttribute('aria-label')||e.innerText,x:r.x+r.width/2,y:r.y+r.height/2,width:r.width,height:r.height}})"""
@@ -182,6 +187,15 @@ class BrowserAdapter:
             raise Recovery(
                 "ambiguous", "Save confirmation interrupted; inspect persisted draft before another save"
             )
+        outcome = self.page.evaluate("window.appState.save_outcomes || {}").get(self.job["id"])
+        if (
+            outcome
+            and outcome.get("status") == "confirmed_failed"
+            and outcome.get("operation_id") == self.job["id"]
+        ):
+            if self.saved_result(expected_result):
+                raise Recovery("ambiguous", "Application rejection conflicts with a persisted draft")
+            raise MutationRejected(self.job["id"], outcome["reason"])
         result = self.saved_result(expected_result)
         if not result:
             raise Recovery("ambiguous", "No persisted result found after Save")

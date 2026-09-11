@@ -16,6 +16,27 @@ def create(client, mode="auto", invoice="INV-1042", **extra):
     return r.json()["id"]
 
 
+def test_explicit_save_rejection_requires_approved_retry(browser_server):
+    c = browser_server["client"]
+    c.post("/api/mock/scenario", json={"reject_save": True}).raise_for_status()
+    job = create(c)
+    approval = pending(c, job)
+    assert approval["name"] == "observe_app"
+    data = c.get(f"/api/jobs/{job}").json()
+    assert data["job"]["mutation"] == "confirmed_failed"
+    assert not any(d["operation_id"] == job for d in c.get("/api/mock/state").json()["drafts"])
+    c.post(f"/api/approvals/{approval['id']}", json={"decision": "approve"}).raise_for_status()
+    approval = pending(c, job)
+    assert approval["name"] == "save_draft"
+    time.sleep(0.3)
+    assert c.get(f"/api/jobs/{job}").json()["job"]["mutation"] == "confirmed_failed"
+    result = drive(c, job)
+    assert result["job"]["mutation"] == "confirmed_succeeded"
+    assert result["job"]["effective_mode"] == "auto"
+    assert len([d for d in c.get("/api/mock/state").json()["drafts"] if d["operation_id"] == job]) == 1
+    assert sum(e["kind"] == "mutation_failed" for e in result["events"]) == 1
+
+
 def test_strict_gates_every_executable_node(browser_server):
     c = browser_server["client"]
     job = create(c, "strict")

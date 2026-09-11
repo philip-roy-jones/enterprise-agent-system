@@ -21,6 +21,7 @@ window.act = async (name, args) => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, args }),
+      signal: AbortSignal.timeout(5000),
     });
     if (!r.ok) throw Error(JSON.stringify(await r.json()));
     state = await r.json();
@@ -104,19 +105,24 @@ function render() {
     ? `<div class="modal-backdrop"><section role="dialog" aria-label="${d[0]}" class="panel modal"><span class="eyebrow">LEDGER NOTICE</span><h2>${d[0]}</h2><p>${d[1]}</p><div class="actions">${d[2].map(([id, label]) => `<button data-target="dialog-${id}" onclick="act('dialog',{response:'${id}'})">${label}</button>`).join("")}</div></section></div>`
     : "";
 }
-async function sync() {
-  if (busy) return;
+async function sync(timeoutMs = 5000, requireFresh = false) {
+  if (busy) {
+    if (requireFresh) throw Error("Application action is still in flight");
+    return;
+  }
   try {
-    const r = await fetch("/api/mock/state");
+    const r = await fetch("/api/mock/state", {signal: AbortSignal.timeout(timeoutMs)});
     if (r.ok) {
       const observed = await r.json();
       // An earlier poll must never overwrite a newer action response.
       if (!busy && (!state || observed.revision >= state.revision)) {
         state = observed;
         render();
-      }
-    }
-  } catch {}
+      } else if (requireFresh) throw Error("Application changed during observation");
+    } else if (requireFresh) throw Error("Application observation request failed");
+  } catch (error) {
+    if (requireFresh) throw error;
+  }
 }
 setInterval(sync, 350);
 sync();

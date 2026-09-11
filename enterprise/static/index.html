@@ -164,6 +164,16 @@
                       required
                     /><button type="submit">Send</button>
                   </form>
+                  <details>
+                    <summary>Assess an executed operation</summary>
+                    <p class="hint">Record an observed result for evaluation. Unassessed operations are counted separately. This does not approve or retry an action.</p>
+                    <form id="assessment-form">
+                      <label>Operation<select id="assessment-operation" required></select></label>
+                      <label>Observed result<select id="assessment-outcome"><option value="correct">Correct</option><option value="incorrect">Incorrect</option></select></label>
+                      <label>Explanation<input id="assessment-explanation" required maxlength="2000" /></label>
+                      <button type="submit">Record assessment</button>
+                    </form>
+                  </details>
                 </section>
               </div>
             </section>
@@ -215,6 +225,7 @@
             <option value="new_label">New amount label for teaching</option>
             <option value="layout">Changed field layout</option>
             <option value="ambiguous">Save confirmation interrupted</option>
+            <option value="rejected_save">Application rejects Save</option>
           </select></label
         >
         <p class="hint">

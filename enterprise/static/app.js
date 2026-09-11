@@ -74,6 +74,7 @@ const scenarios = {
     amount_label: null,
     reordered: false,
     interrupt_save: false,
+    reject_save: false,
     unsaved: false,
   },
   wrong: { view: "invoice", invoice_id: "INV-1044" },
@@ -91,6 +92,7 @@ const scenarios = {
   new_label: { amount_label: "Revised draft amount" },
   layout: { variant: "layout" },
   ambiguous: { interrupt_save: true },
+  rejected_save: { reject_save: true },
 };
 $("job-form").onsubmit = (e) => {
   e.preventDefault();
@@ -309,6 +311,12 @@ function renderDetail(d) {
     $("proposal-copy").innerHTML = "";
     $("target-circle").hidden = true;
   }
+  const finishedInvocations = new Set(d.events.filter(e => e.kind === "action_result").map(e => e.data.invocation));
+  const oldAssessment = $("assessment-operation").value;
+  const finishedActions = [...new Map(d.events.filter(e => e.kind === "action_started" && finishedInvocations.has(e.data.invocation)).map(e => [e.data.invocation, e])).values()];
+  $("assessment-operation").innerHTML = finishedActions.map(e => `<option value="${esc(e.data.invocation)}">${esc(readable[e.data.action.name] || e.data.action.name)} · ${new Date(e.at * 1000).toLocaleTimeString()}</option>`).join("");
+  if (finishedActions.some(e => e.data.invocation === oldAssessment)) $("assessment-operation").value = oldAssessment;
+  $("assessment-form").querySelector("button").disabled = !finishedActions.length;
   const visible = d.events.filter(
     (e) => !["observation", "action_started", "action_result"].includes(e.kind),
   );
@@ -326,6 +334,7 @@ function renderDetail(d) {
       if (e.kind === "approval_requested") text = e.data.description;
       if (e.kind === "staff_decision")
         text = `${e.data.decision.decision}: ${e.data.name}${e.data.decision.explanation ? " — " + e.data.decision.explanation : ""}`;
+      if (e.kind === "action_assessment") text = `${e.data.outcome}: ${e.data.explanation}`;
       return `<div class="timeline-item"><span class="timeline-mark"></span><div><strong>${esc(e.kind.replaceAll("_", " "))}</strong><p>${esc(text)}</p></div><time>${new Date(e.at * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time></div>`;
     })
     .join("");
@@ -388,6 +397,15 @@ $("takeover").onclick = () =>
     ),
   );
 let draftMessage = null;
+$("assessment-form").onsubmit = (e) => {
+  e.preventDefault();
+  action(async () => {
+    const job = active;
+    const explanation = $("assessment-explanation").value;
+    await api(`/api/jobs/${job}/assessments`, {invocation: $("assessment-operation").value, outcome: $("assessment-outcome").value, explanation});
+    if (job === active && $("assessment-explanation").value === explanation) $("assessment-explanation").value = "";
+  });
+};
 $("message-form").onsubmit = (e) => {
   e.preventDefault();
   action(async () => {

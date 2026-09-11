@@ -2,7 +2,7 @@
 
 from .operations import OPERATIONS
 from .store import fingerprint
-from .types import Paused, Recovery, Stale, Stopped
+from .types import Paused, Recovery, Stale, Stopped, MutationRejected
 from threading import RLock
 from .budget import Deadline, OperationTimeout
 from pydantic import ValidationError
@@ -151,6 +151,21 @@ class ExecutionLayer:
             self.store.finish_action(job_id, invocation, result, approval_id)
             return result
         except (Recovery, PermissionError, Stale, Stopped) as error:
+            if isinstance(error, MutationRejected):
+                if name not in {"save", "save_draft"} or error.operation_id != job_id:
+                    error = Recovery("ambiguous", "Application rejection does not identify this Save")
+                else:
+                    self.store.update_job(job_id, {"mutation": "confirmed_failed"})
+                    self.store.event(
+                        job_id,
+                        "mutation_failed",
+                        {
+                            "operation_id": job_id,
+                            "invocation": invocation,
+                            "reason": str(error),
+                            "evidence": "explicit application rejection without commit",
+                        },
+                    )
             if isinstance(error, OperationTimeout):
                 mutation = self.store.get_job(job_id)["mutation"]
                 error = Recovery(

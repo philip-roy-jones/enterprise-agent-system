@@ -222,6 +222,11 @@ class RoleGraph:
                     raise Recovery(
                         "unfamiliar", "Uncertain save has no verified result; staff must reconcile"
                     )
+                if job["mutation"] == "confirmed_failed":
+                    raise Recovery(
+                        "unfamiliar",
+                        "Application rejected Save; retry requires an individually approved save_draft tool call",
+                    )
                 fields = obs.state["fields"]
                 if (
                     obs.state["company_id"] == job["company_id"]
@@ -298,6 +303,7 @@ class RoleGraph:
             else None,
             "amount_units": "Stored amounts are integer cents; the amount form takes decimal dollars.",
             "verified_progress": job["completed"],
+            "mutation": job["mutation"],
             "reason": reason,
             "observation": self.layer.adapter.observe().model_dump(),
             "past_episodes": self.store.relevant_episodes(job_id, reason),
