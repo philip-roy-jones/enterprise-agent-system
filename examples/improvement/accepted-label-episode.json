@@ -1,0 +1,13 @@
+{
+  "episode_id": "7b64596c3bdf447eb34836a09f2d156e",
+  "task": "invoice_correction",
+  "app_version": "mock-1",
+  "graph_version": "v1",
+  "reason": "The correction amount field label changed",
+  "accepted": true,
+  "observed_labels": [
+    "Correction amount",
+    "Adjusted total"
+  ],
+  "model_mode": "simulated"
+}
