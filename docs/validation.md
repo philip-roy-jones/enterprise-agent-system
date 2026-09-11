@@ -84,7 +84,7 @@ The native controller now waits up to 500ms for the exact approved edit control 
 
 ## Completed acceptance checks
 
-The main implementation passed **134 tests** in [CI](https://github.com/philip-roy-jones/enterprise-agent-system/actions/runs/34558630698), with successful native accounting smoke checks and both Windows builds. A subsequent fix for terminal timing passed 27 focused checks; final CI runs the complete suite again. The [requirement audit](original-prompt-audit.md) maps all 17 sections.
+The final acceptance implementation passed **139 tests** in [CI](https://github.com/philip-roy-jones/enterprise-agent-system/actions/runs/34559108561), with successful native accounting smoke checks and both Windows builds. The backend shutdown bound was then verified separately with a deliberately open event stream: it exited after cleanup in 5.19 seconds. The [requirement audit](original-prompt-audit.md) maps all 17 sections.
 
 The evidence-derived v3 proposal passed **127 isolated tests** and GitHub checks. It learned its label from an actual recorded browser correction and generated new-record/layout regressions. The proposal is a draft, with no developer approval or deployment. This is separate from the previously human-approved v2 release. [Proposal evidence](evidence/derived-improvement.json).
 

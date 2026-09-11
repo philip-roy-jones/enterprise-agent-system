@@ -23,5 +23,13 @@
     "mouse_input"
   ],
   "staff": "simulated",
-  "frontend_validation": "Assessment submitted through Chromium; live assessed-actions count incremented; both sidebar tabs selected correctly; no JavaScript errors"
+  "frontend_validation": "Assessment submitted through Chromium; live assessed-actions count incremented; both sidebar tabs selected correctly; no JavaScript errors",
+  "acceptance_ci": "https://github.com/philip-roy-jones/enterprise-agent-system/actions/runs/34559108561",
+  "acceptance_tests_passed": 139,
+  "isolated_backend_shutdown": {
+    "isolated": true,
+    "active_sse": true,
+    "shutdown_seconds": 5.19,
+    "exit_code": -15
+  }
 }

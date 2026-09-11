@@ -25,6 +25,7 @@ def main():
             host=settings.bind_host,
             port=settings.bind_port,
             access_log=False,
+            timeout_graceful_shutdown=5,
         )
     elif options.command == "worker":
         from .worker import run_worker
