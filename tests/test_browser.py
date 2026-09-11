@@ -2,9 +2,9 @@ import subprocess
 import sys
 import time
 import pytest
-from enterprise.demo import drive
-from enterprise.store import canonical
-from enterprise.procedures import AMOUNT_LABELS
+from enterprise.development.demo import drive
+from enterprise.shared.identity import canonical
+from enterprise.workflows.finance.procedures import AMOUNT_LABELS
 from conftest import pending, wait_for
 
 pytestmark = pytest.mark.browser
@@ -271,7 +271,7 @@ def test_improved_library_on_new_record(browser_server, invoice, variant):
 
 
 def test_review_release_new_instance_and_rollback_in_isolated_demo(browser_server, candidate):
-    from enterprise.improve import deploy, review, rollback
+    from enterprise.development.improve import deploy, review, rollback
 
     c, settings = browser_server["client"], browser_server["settings"]
     c.post("/api/mock/scenario", json={"variant": "renamed"}).raise_for_status()

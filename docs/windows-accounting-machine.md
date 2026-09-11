@@ -9,11 +9,11 @@ The native application is the source of truth for accounting records. The develo
 With the .NET 10 SDK on Linux or Windows:
 
 ```bash
-dotnet publish windows/DemoBooks/DemoBooks.csproj \
-  -c Release -r win-x64 --self-contained true -o windows/publish
+dotnet publish src/demobooks/DemoBooks/DemoBooks.csproj \
+  -c Release -r win-x64 --self-contained true -o src/demobooks/publish
 ```
 
-This produces a Windows x64 application including its runtime. Running the application needs no SDK. The Python worker running beside it requires Python. Copy `windows/publish` and `windows/install.ps1` into the same folder on the VM, then run the installer from an elevated PowerShell session as the intended desktop user:
+This produces a Windows x64 application including its runtime. Running the application needs no SDK. The Python worker running beside it requires Python. Copy `src/demobooks/publish` and `src/demobooks/install.ps1` into the same folder on the VM, then run the installer from an elevated PowerShell session as the intended desktop user:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\install.ps1
@@ -43,10 +43,10 @@ Use **Take control** before editing in the VM, and **Release control** to resume
 
 The bridge refuses unknown accounting operations, wrong scoped invoices, invalid fields, wrong popup responses, stale revisions, and saves that do not match the purchase order. Save uses the job's operation ID as an application-supported idempotency key. Interrupted confirmations and app restarts preserve the persisted draft for reconciliation.
 
-`windows/AccountingSmoke` exercises the shared native accounting model independently of the GUI:
+`src/demobooks/AccountingSmoke` exercises the shared native accounting model independently of the GUI:
 
 ```bash
-dotnet run --project windows/AccountingSmoke/AccountingSmoke.csproj -c Release
+dotnet run --project src/demobooks/AccountingSmoke/AccountingSmoke.csproj -c Release
 ```
 
 Compilation and accounting-model tests can run on Linux. Native GUI and screenshot validation must run on the actual Windows VM; those results are reported separately from browser tests.

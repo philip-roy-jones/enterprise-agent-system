@@ -8,11 +8,11 @@ from langchain_core.messages import AIMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.sqlite import SqliteSaver
-from enterprise.assistance import build_assistant, run_assistant
-from enterprise.config import Settings
-from enterprise.execution import ExecutionLayer
-from enterprise.store import Store
-from enterprise.types import JobInput, Observation
+from enterprise.harness.assistance import build_assistant, run_assistant
+from enterprise.shared.config import Settings
+from enterprise.harness.execution import ExecutionLayer
+from enterprise.server.store import Store
+from enterprise.shared.types import JobInput, Observation
 
 
 class BatchModel(BaseChatModel):
@@ -50,7 +50,7 @@ class ReadAdapter:
 
 
 def test_batched_model_tools_each_require_their_own_approval(store, job, monkeypatch):
-    monkeypatch.setattr("enterprise.assistance.SimulatedModel", BatchModel)
+    monkeypatch.setattr("enterprise.harness.assistance.SimulatedModel", BatchModel)
     store.mode(job["id"], "auto")
     store.boundary(job["id"])
     store.transfer(job["id"], "assistant")
@@ -81,7 +81,7 @@ class SlowSqliteSaver(SqliteSaver):
 
 
 def exercise_slow_checkpoints(data_dir):
-    import enterprise.assistance as assistance
+    import enterprise.harness.assistance as assistance
 
     assistance.SimulatedModel = BatchModel
     store = Store(data_dir)
@@ -135,7 +135,7 @@ class PrematureSaveModel(BatchModel):
 
 
 def test_model_cannot_save_before_comparison_even_if_it_requests_unavailable_tool(store, job, monkeypatch):
-    monkeypatch.setattr("enterprise.assistance.SimulatedModel", PrematureSaveModel)
+    monkeypatch.setattr("enterprise.harness.assistance.SimulatedModel", PrematureSaveModel)
     store.transfer(job["id"], "assistant")
     adapter = ReadAdapter()
     agent = build_assistant(

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ledger · Synthetic accounting</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body class="ledger">
+    <header class="ledger-header">
+      <strong>▥ &nbsp; Ledger</strong><span>Synthetic accounting workspace</span
+      ><button
+        data-target="company"
+        onclick="act('company',{company_id:'ACME'})"
+      >
+        Acme Manufacturing ▾
+      </button>
+    </header>
+    <div class="ledger-layout">
+      <nav>
+        <p>WORKSPACE</p>
+        <button
+          data-target="dashboard"
+          onclick="act('navigate',{view:'dashboard'})"
+        >
+          Overview</button
+        ><button
+          data-target="invoices"
+          onclick="act('navigate',{view:'invoices'})"
+        >
+          Invoices</button
+        ><button
+          data-target="purchase_orders"
+          onclick="act('navigate',{view:'purchase_orders'})"
+        >
+          Purchase orders
+        </button>
+        <div class="synthetic">
+          DEMO ENVIRONMENT<br /><small>No real financial records</small>
+        </div>
+      </nav>
+      <main id="app"></main>
+    </div>
+    <div id="modal"></div>
+    <script src="/fixture-static/mock.js"></script>
+  </body>
+</html>

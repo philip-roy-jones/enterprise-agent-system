@@ -1,8 +1,13 @@
 from copy import deepcopy
 from pathlib import Path
 import pytest
-from enterprise.improvement_analysis import analyze, patch_library, inspect_library, regression_source
-from enterprise.improve import regression_failures
+from enterprise.development.improvement_analysis import (
+    analyze,
+    patch_library,
+    inspect_library,
+    regression_source,
+)
+from enterprise.development.improve import regression_failures
 
 ROOT = Path(__file__).resolve().parents[1]
 LABEL = next(
@@ -72,7 +77,7 @@ def test_infers_actual_correction_without_label_keyword_or_canned_replacement(ep
     assert result["additions"] == [LABEL]
     assert result["library"]["nodes"] and result["evidence"][0]["decision"] == "correct"
     target = tmp_path / "procedures.py"
-    target.write_text((ROOT / "enterprise/procedures.py").read_text())
+    target.write_text((ROOT / "src/enterprise/workflows/finance/procedures.py").read_text())
     patch_library(target, result)
     namespace = {}
     exec(compile(target.read_text(), str(target), "exec"), namespace)
@@ -122,10 +127,14 @@ def test_label_reason_alone_does_not_justify_a_change(episode):
 
 
 def test_analysis_refuses_changed_graph_consumer(episode, tmp_path):
-    (tmp_path / "enterprise").mkdir()
-    (tmp_path / "enterprise/procedures.py").write_text((ROOT / "enterprise/procedures.py").read_text())
-    (tmp_path / "enterprise/graph.py").write_text(
-        (ROOT / "enterprise/graph.py").read_text().replace('job["amount_labels"]', 'job["unrelated_labels"]')
+    (tmp_path / "src/enterprise/workflows/finance").mkdir(parents=True)
+    (tmp_path / "src/enterprise/workflows/finance/procedures.py").write_text(
+        (ROOT / "src/enterprise/workflows/finance/procedures.py").read_text()
+    )
+    (tmp_path / "src/enterprise/workflows/finance/graph.py").write_text(
+        (ROOT / "src/enterprise/workflows/finance/graph.py")
+        .read_text()
+        .replace('job["amount_labels"]', 'job["unrelated_labels"]')
     )
     with pytest.raises(ValueError, match="no longer consumes"):
         analyze([episode], tmp_path)
@@ -142,7 +151,7 @@ def test_regression_count_uses_reported_failures_and_errors(tmp_path):
 
 @pytest.mark.browser
 def test_analysis_uses_real_recorded_browser_correction(browser_server):
-    from enterprise.demo import drive
+    from enterprise.development.demo import drive
 
     c = browser_server["client"]
     c.post("/api/mock/scenario", json={"amount_label": LABEL}).raise_for_status()

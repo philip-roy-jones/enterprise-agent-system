@@ -142,7 +142,7 @@ Staff can add guidance in the same job conversation. During assistance, the agen
 
 ## Teach a reusable improvement
 
-Here, **learning means turning demonstrated behavior into reviewed procedure code**. For example, [proposal #2](https://github.com/philip-roy-jones/enterprise-agent-system/pull/2) adds `Reviewed adjustment 0` to the amount-label tuple in `enterprise/procedures.py`, advances the procedure version, and adds evidence and tests. Before that rule is installed, the unfamiliar label requires assistance; afterward, the existing node can handle it without a model call. This particular teaching run used simulated staff and a simulated model. It demonstrates a small procedure improvement, not model training or automatic generation of arbitrary workflows.
+Here, **learning means turning demonstrated behavior into reviewed procedure code**. For example, [proposal #2](https://github.com/philip-roy-jones/enterprise-agent-system/pull/2) adds `Reviewed adjustment 0` to the amount-label tuple in the then-current `enterprise/procedures.py` (now `src/enterprise/workflows/finance/procedures.py`), advances the procedure version, and adds evidence and tests. Before that rule is installed, the unfamiliar label requires assistance; afterward, the existing node can handle it without a model call. This particular teaching run used simulated staff and a simulated model. It demonstrates a small procedure improvement, not model training or automatic generation of arbitrary workflows.
 
 The development command reads accepted episodes, joins staff-approved or corrected field actions with their observations and verified saved results, and inspects the graph and operation library. It groups recurring failures and proposes a resolver extension when the evidence establishes a missing amount label. Its generated tests exercise that label on different invoices and layouts. Labels and versions come from the evidence and source, rather than a predetermined patch.
 
@@ -221,8 +221,8 @@ Use separate tokens and a trusted local environment. This prototype binds to loc
 ```bash
 pytest -q                       # Includes real Chromium integration tests
 pytest -q -m 'not browser'       # Authority, persistence, API and release checks
-ruff check enterprise tests
-ruff format --check enterprise tests
+ruff check src tests
+ruff format --check src tests
 ```
 
 Browser tests start their own backend and worker using temporary databases and a separate port. They cover per-node/per-tool approval, mode transitions, stale and duplicate decisions, permissions, navigation and UI variants, known/unfamiliar/unsaved dialogs, screenshot corrections, takeover, exclusive control, and worker restart after an ambiguous save. Candidate-only tests run the improved resolver on new invoices and layouts in the improvement checkout.
@@ -232,27 +232,31 @@ See the [original requirement audit](docs/original-prompt-audit.md) and [validat
 ## Project map
 
 ```text
-enterprise/
-├── backend.py          Central API, staff auth, streams and artifacts
-├── worker.py           Worker loop, claim/lease and durable checkpoints
-├── graph.py            Cyclic role workflow and recovery routing
-├── assistance.py       Deep Agents harness and simulated/live model selection
-├── execution.py        Shared approval, permission and execution boundary
-├── roles.py            Department workflow registry and input schemas
-├── adapter.py          Browser fixture adapter
-├── windows_adapter.py  Native DemoBooks bridge adapter
-├── store.py            Durable jobs, decisions, leases and audit events
-├── mock.py             Persistent synthetic accounting application
-├── operations.py       Operation descriptions and execution contracts
-├── procedures.py       Versioned reusable target library
-├── improve.py          Isolated proposal, review, release and rollback
-├── demo.py             Explicit synthetic staff demonstration driver
-└── static/             Staff console and mock accounting interface
-windows/                Native DemoBooks app, installer, accounting model tests
-tests/                  Focused authority and browser regression tests
-docs/                   Architecture and API verification notes
-original-prompt.txt     Original project specification
+src/
+├── enterprise/                  Python namespace; enterprise CLI entry point
+│   ├── server/                  Backend, persistence, approvals and audit
+│   │   └── frontend/            Staff console HTML, JavaScript and styles
+│   ├── harness/                 Edge worker, Deep Agent and execution authority
+│   │   ├── adapters/            Browser, application API and UI Automation adapters
+│   │   └── windows/             Native desktop controller and worker installers
+│   ├── workflows/               Workflow registry and department packages
+│   │   └── finance/             LangGraph, operation definitions and learned rules
+│   ├── shared/                  Configuration, data contracts and RPC declarations
+│   ├── development/             Learning proposals, review, release and demo driver
+│   └── fixtures/                Optional synthetic browser accounting application
+└── demobooks/                   Independent Windows desktop application
+    ├── DemoBooks/               Native application and accounting model
+    ├── AccountingSmoke/         Native accounting invariant checks
+    └── install.ps1              Application installer
+tests/                           Authority, workflow and browser regression tests
+docs/                            Architecture, setup and validation records
+original-prompt.txt               Original project specification
 ```
+
+These are real source packages within one repository. The server runs on the developer/backend machine; the harness loads workflow packages on the Windows edge machine; DemoBooks runs independently beside it. `shared/` contains common definitions, and `development/` owns the reviewed learning loop. Moving files does not add a new service or security boundary. The existing `enterprise serve`, `enterprise worker`, and development commands remain the entry points.
+
+After updating an existing checkout, reinstall the editable package with `python -m pip install -e . --no-deps` and restart its processes. For Windows, stop the idle worker **before** updating, then rerun the installer at `src/enterprise/harness/windows/install-worker.ps1` to update its scheduled-task launcher. Existing runtime databases and checkpoint paths stay under `runtime/`.
+
 
 ## Implemented, simulated, and deferred
 

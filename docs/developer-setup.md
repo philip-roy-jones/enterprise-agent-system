@@ -73,14 +73,14 @@ Copy the controller token from `%LOCALAPPDATA%\EnterpriseAgentSystem\DesktopAgen
 From PowerShell in the Windows checkout:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\windows\install-worker.ps1 -Python 'C:\path\to\python.exe'
+powershell -NoProfile -ExecutionPolicy Bypass -File .\src\enterprise\harness\windows\install-worker.ps1 -Python 'C:\path\to\python.exe'
 Start-ScheduledTask EAS-Worker
 Get-Content .\runtime\worker.log -Tail 20
 ```
 
 The installer creates a virtual environment and registers a manual `EAS-Worker` task in the desktop user's session. It installs no recurring schedule. Alternatively, install the requirements and editable package manually, then run `.\.venv\Scripts\enterprise.exe worker` in that session.
 
-Keep exactly one worker running for this prototype's single desktop lease. **Do not run `enterprise dev` on the backend in this setup:** it starts another worker there. After jobs finish, run `powershell -ExecutionPolicy Bypass -File .\windows\stop-worker.ps1` before upgrading its checkout. This stops the task and its Python process tree. Preserve `runtime/worker-checkpoints.sqlite` and `runtime/assistant-checkpoints.sqlite` on Windows across restarts; central job/evidence data stays on the backend.
+Keep exactly one worker running for this prototype's single desktop lease. **Do not run `enterprise dev` on the backend in this setup:** it starts another worker there. After jobs finish, run `powershell -ExecutionPolicy Bypass -File .\src\enterprise\harness\windows\stop-worker.ps1` before upgrading its checkout. This stops the task and its Python process tree. Preserve `runtime/worker-checkpoints.sqlite` and `runtime/assistant-checkpoints.sqlite` on Windows across restarts; central job/evidence data stays on the backend.
 
 ## 3. Use the staff console
 

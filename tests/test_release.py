@@ -1,10 +1,10 @@
 import json
 import subprocess
 import pytest
-from enterprise.config import Settings
-from enterprise.improve import deploy, review, verify_candidate, require_development
-from enterprise.store import Store
-from enterprise.types import JobInput
+from enterprise.shared.config import Settings
+from enterprise.development.improve import deploy, review, verify_candidate, require_development
+from enterprise.server.store import Store
+from enterprise.shared.types import JobInput
 
 
 def test_proposal_generation_requires_explicit_development_scope(monkeypatch):
@@ -47,11 +47,13 @@ def test_rejected_or_changes_requested_candidate_cannot_deploy(candidate, tmp_pa
         deploy(candidate, settings, settings.developer_token)
 
 
-@pytest.mark.parametrize("artifact", ["checks.txt", "proposal.patch", "checkout/enterprise/procedures.py"])
+@pytest.mark.parametrize("artifact", ["checks.txt", "proposal.patch", "source"])
 def test_changed_candidate_or_evidence_invalidates_review(candidate, tmp_path, artifact):
     settings = Settings(data_dir=tmp_path / "live")
     review(candidate, "approve", "Test developer", settings.developer_token, settings)
-    path = candidate / artifact
+    from enterprise.development.improve import candidate_library
+
+    path = candidate_library(candidate / "checkout")[0] if artifact == "source" else candidate / artifact
     path.write_text(path.read_text() + "\nchanged")
     with pytest.raises(ValueError):
         verify_candidate(candidate)

@@ -9,8 +9,8 @@ The execution preference is an authorized application API when available, then a
 Publish both Windows executables:
 
 ```bash
-dotnet publish windows/DemoBooks/DemoBooks.csproj -c Release -r win-x64 --self-contained true -o windows/publish
-dotnet publish windows/DesktopAgent/DesktopAgent.csproj -c Release -r win-x64 --self-contained true -o windows/desktop-publish
+dotnet publish src/demobooks/DemoBooks/DemoBooks.csproj -c Release -r win-x64 --self-contained true -o src/demobooks/publish
+dotnet publish src/enterprise/harness/windows/DesktopAgent/DesktopAgent.csproj -c Release -r win-x64 --self-contained true -o src/enterprise/harness/windows/desktop-publish
 ```
 
 Copy both published directories and the installers to the Windows machine. In PowerShell, install DemoBooks with its application API disabled and install the independent controller:

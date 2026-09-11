@@ -3,11 +3,11 @@ from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langgraph.checkpoint.memory import InMemorySaver
-from enterprise.assistance import build_assistant, run_assistant
-from enterprise.backend import create_app
-from enterprise.config import Settings
-from enterprise.execution import ExecutionLayer
-from enterprise.types import JobInput, Paused
+from enterprise.harness.assistance import build_assistant, run_assistant
+from enterprise.server.backend import create_app
+from enterprise.shared.config import Settings
+from enterprise.harness.execution import ExecutionLayer
+from enterprise.shared.types import JobInput, Paused
 from test_assistant import BatchModel, ReadAdapter
 
 
@@ -48,7 +48,7 @@ def approved_search(store, job, query="invoice"):
 
 def test_knowledge_filters_every_scope_before_search(store, job, monkeypatch):
     from dataclasses import replace
-    from enterprise.roles import ROLES
+    from enterprise.workflows.roles import ROLES
 
     monkeypatch.setitem(
         ROLES, "other_finance_role", replace(ROLES["invoice_correction"], id="other_finance_role")
@@ -132,7 +132,7 @@ class KnowledgeModel(BatchModel):
 
 
 def test_assistant_knowledge_read_waits_for_staff_even_in_auto(store, job, monkeypatch):
-    monkeypatch.setattr("enterprise.assistance.SimulatedModel", KnowledgeModel)
+    monkeypatch.setattr("enterprise.harness.assistance.SimulatedModel", KnowledgeModel)
     doc = store.add_knowledge(document())
     store.mode(job["id"], "auto")
     store.boundary(job["id"])

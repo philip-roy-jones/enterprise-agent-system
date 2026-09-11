@@ -6,9 +6,9 @@ import sys
 import time
 import httpx
 import pytest
-from enterprise.config import Settings
-from enterprise.store import Store
-from enterprise.types import JobInput
+from enterprise.shared.config import Settings
+from enterprise.server.store import Store
+from enterprise.shared.types import JobInput
 
 
 @pytest.fixture
@@ -50,7 +50,7 @@ def server(tmp_path_factory):
             sys.executable,
             "-m",
             "uvicorn",
-            "enterprise.backend:create_app",
+            "enterprise.server.backend:create_app",
             "--factory",
             "--host",
             "127.0.0.1",
@@ -164,16 +164,20 @@ def pending(client, job_id):
     return next(a for a in data["approvals"] if a["status"] == "pending")
 
 
-@pytest.fixture
-def candidate(tmp_path):
+@pytest.fixture(params=["src", "legacy"])
+def candidate(tmp_path, request):
     import json
-    from enterprise.improve import sha
+    from enterprise.development.improve import sha
 
     folder = tmp_path / "proposal"
     checkout = folder / "checkout"
-    (checkout / "enterprise").mkdir(parents=True)
-    (checkout / "enterprise" / "__init__.py").write_text("")
-    source = checkout / "enterprise" / "procedures.py"
+    package = checkout / ("src/enterprise/workflows/finance" if request.param == "src" else "enterprise")
+    package.mkdir(parents=True)
+    for parent in [package, *package.parents]:
+        if parent in {checkout, checkout / "src"}:
+            break
+        (parent / "__init__.py").write_text("")
+    source = package / "procedures.py"
     source.write_text(
         'GRAPH_VERSION="v2"\nAMOUNT_LABELS=("Correction amount","Adjusted total")\ndef resolve_amount_label(labels):\n    return next((l for l in AMOUNT_LABELS if l in labels),None)\n'
     )

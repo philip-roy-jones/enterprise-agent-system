@@ -1,9 +1,9 @@
 from dataclasses import replace
 import pytest
-from enterprise.config import Settings
-from enterprise.roles import ROLES
-from enterprise.types import JobInput
-from enterprise.worker import validate_assignment, run_worker
+from enterprise.shared.config import Settings
+from enterprise.workflows.roles import ROLES
+from enterprise.shared.types import JobInput
+from enterprise.harness.worker import validate_assignment, run_worker
 
 
 @pytest.mark.parametrize(
@@ -25,7 +25,7 @@ def test_receiver_rejects_inconsistent_or_unauthorized_assignment(store, updates
 def test_misrouted_job_never_initializes_desktop_or_graph(store, monkeypatch, tmp_path):
     job = store.create_job(JobInput(organization_id="other", invoice_id="INV-1042").model_dump())
     store.claim("dispatcher")
-    monkeypatch.setattr("enterprise.worker.RemoteStore", lambda *args: store)
+    monkeypatch.setattr("enterprise.harness.worker.RemoteStore", lambda *args: store)
     monkeypatch.setattr(store, "claim", lambda *args: job)
 
     def forbidden(*args):

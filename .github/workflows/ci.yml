@@ -18,8 +18,8 @@ jobs:
       - run: pip install -r requirements.lock
       - run: pip install -e . --no-deps
       - run: python -m playwright install --with-deps chromium
-      - run: ruff check enterprise tests
-      - run: ruff format --check enterprise tests
+      - run: ruff check src tests
+      - run: ruff format --check src tests
       - run: mkdir -p runtime
       - run: pytest -q -x --basetemp=runtime/test-temp --junitxml=runtime/test-results.xml
       - uses: actions/upload-artifact@v4
@@ -40,14 +40,14 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      - run: dotnet run --project windows/AccountingSmoke/AccountingSmoke.csproj -c Release
-      - run: dotnet publish windows/DemoBooks/DemoBooks.csproj -c Release -r win-x64 --self-contained true -o windows/publish
-      - run: dotnet publish windows/DesktopAgent/DesktopAgent.csproj -c Release -r win-x64 --self-contained true -o windows/desktop-publish
+      - run: dotnet run --project src/demobooks/AccountingSmoke/AccountingSmoke.csproj -c Release
+      - run: dotnet publish src/demobooks/DemoBooks/DemoBooks.csproj -c Release -r win-x64 --self-contained true -o src/demobooks/publish
+      - run: dotnet publish src/enterprise/harness/windows/DesktopAgent/DesktopAgent.csproj -c Release -r win-x64 --self-contained true -o src/enterprise/harness/windows/desktop-publish
       - uses: actions/upload-artifact@v4
         with:
           name: DemoBooks-Windows-x64
-          path: windows/publish/
+          path: src/demobooks/publish/
       - uses: actions/upload-artifact@v4
         with:
           name: Enterprise-DesktopAgent-Windows-x64
-          path: windows/desktop-publish/
+          path: src/enterprise/harness/windows/desktop-publish/

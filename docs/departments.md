@@ -2,7 +2,7 @@
 
 Enterprise Agent System is a shared platform. Finance is its first example department, not its product boundary. A department can supply one or several worker roles: People Operations onboarding review, IT service requests, Procurement purchase-order checks, and so on. Those additional production workflows are not implemented by this prototype.
 
-`enterprise.roles.WorkerRole` registers the trusted code implementing a workflow:
+`enterprise.workflows.roles.WorkerRole` registers the trusted code implementing a workflow:
 
 - Department and role identifiers and staff-facing labels.
 - A Pydantic input schema and the input field identifying the target record.

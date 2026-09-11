@@ -1,7 +1,7 @@
 import pytest
 from pydantic import BaseModel
-from enterprise.roles import WorkerRole, ROLES
-from enterprise.types import JobInput
+from enterprise.workflows.roles import WorkerRole, ROLES
+from enterprise.shared.types import JobInput
 
 
 class PeopleInputs(BaseModel):

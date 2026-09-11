@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
-from enterprise.backend import create_app
-from enterprise.config import Settings
+from enterprise.server.backend import create_app
+from enterprise.shared.config import Settings
 import pytest
 
 

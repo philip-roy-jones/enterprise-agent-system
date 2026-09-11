@@ -1,4 +1,4 @@
-from enterprise.procedures import resolve_amount_label
+from enterprise.workflows.finance.procedures import resolve_amount_label
 import pytest
 
 
