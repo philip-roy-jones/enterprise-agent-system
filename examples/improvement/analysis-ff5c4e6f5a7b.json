@@ -1,0 +1,59 @@
+{
+  "change": "extend_amount_resolver",
+  "library": {
+    "version": "v2",
+    "labels": [
+      "Correction amount",
+      "Adjusted total"
+    ],
+    "nodes": [
+      "validate",
+      "establish",
+      "compare",
+      "prepare",
+      "save",
+      "verify",
+      "complete",
+      "recover",
+      "assist",
+      "resume",
+      "review_discovery"
+    ],
+    "reused_operation": "prepare \u2192 set_field(amount) \u2192 save \u2192 verify",
+    "source_hashes": {
+      "enterprise/procedures.py": "395b621a047342a6fdd929846b1bdf693d44c8185859e69e8af1d7a5c8dea900",
+      "enterprise/graph.py": "54a09e33d03ba0f5cdd893263f0c913a81943fa0491855a524f53c8616793dc5"
+    }
+  },
+  "additions": [
+    "Reviewed adjustment 0"
+  ],
+  "version": "v3",
+  "evidence": [
+    {
+      "episode_id": "5d50ce112fb94c268909ff499514264a",
+      "approval_id": "7708bbe9ab0d4f078406442ade2ac1f4",
+      "label": "Reviewed adjustment 0",
+      "decision": "correct",
+      "model_mode": "simulated",
+      "app_version": "mock-1",
+      "graph_version": "v1",
+      "episode_sha256": "21485a5f1d2c4d323df2cd00a00d1f88848b2735de2af08df2ab0140b9df90c8",
+      "observation_revision": "4e63f68e137863faf9ffb5376cb8a3a1e29a8b9e2b055c4e56d11d03bab8f9a2",
+      "failure_sequences": [
+        17
+      ],
+      "verified_field_and_save": true
+    }
+  ],
+  "findings": [],
+  "recurring_gaps": [
+    {
+      "node": "prepare",
+      "kind": "unfamiliar",
+      "occurrences": 1
+    }
+  ],
+  "rationale": "Reuse the existing prepare operation and its verification; only the observed, approved amount label is missing. No new node or business permission is needed.",
+  "limits": "Deterministic analysis supports verified amount-target gaps. Other gap families require developer implementation. One accepted episode suggests a candidate, not proof of generality; generated tests cover new records and layouts."
+}
