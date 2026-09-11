@@ -1,5 +1,6 @@
 import logging
 import os
+import platform
 import faulthandler
 import signal
 import sqlite3
@@ -21,6 +22,7 @@ def run_worker(settings=None, once=False):
     if os.getenv("EAS_WORKER_DIAGNOSTICS") == "1":
         faulthandler.dump_traceback_later(45, repeat=True)
     settings = settings or Settings()
+    log.info("Worker started on %s; desktop adapter=%s", platform.system(), settings.desktop_adapter)
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     store = RemoteStore(settings.backend_url, settings.worker_token)
     adapter = None
@@ -56,7 +58,7 @@ def run_worker(settings=None, once=False):
                 if store.lease()["owner"] == "staff":
                     time.sleep(0.5)
                     continue
-                config = {"configurable": {"thread_id": job_id}, "recursion_limit": 160, "max_concurrency": 1}
+                config = {"configurable": {"thread_id": job_id}, "recursion_limit": 160, "max_concurrency": 4}
                 snapshot = graph.get_state(config)
                 # On every restart and resume observations come from the actual application.
                 if snapshot.next:
@@ -65,7 +67,7 @@ def run_worker(settings=None, once=False):
                     value = {"job_id": job_id, "paused": False}
                 else:
                     value = {"job_id": job_id, "turn": 0, "paused": False}
-                graph.invoke(value, config)
+                graph.invoke(value, config, durability="sync")
             except Stale:
                 # Handoffs invalidate queued actions; retry only after observing current authority.
                 time.sleep(0.25)

@@ -16,12 +16,14 @@ from .remote import WORKER_METHODS
 def create_app(settings=None):
     settings = settings or Settings()
     store = Store(settings.data_dir)
-    if settings.desktop_adapter == "windows":
-        from .windows_adapter import WindowsAccountingProxy
+    # Native desktop connections and credentials belong to the Windows worker.
+    mock = MockAccounting(store) if settings.desktop_adapter == "browser" else None
 
-        mock = WindowsAccountingProxy(store, settings)
-    else:
-        mock = MockAccounting(store)
+    def browser_fixture():
+        if mock is None:
+            raise HTTPException(404, "Browser test workspace is disabled; use the Windows application")
+        return mock
+
     app = FastAPI(title="Enterprise worker prototype")
     app.state.store, app.state.settings = store, settings
     static = Path(__file__).parent / "static"
@@ -67,6 +69,7 @@ def create_app(settings=None):
 
     @app.get("/mock")
     def mock_page():
+        browser_fixture()
         return FileResponse(static / "mock.html")
 
     @app.get("/api/health")
@@ -74,7 +77,7 @@ def create_app(settings=None):
         return {
             "status": "ok",
             "model_mode": settings.model_mode,
-            "application": "synthetic",
+            "application": "browser_fixture" if mock else "windows_desktop",
             "release": store.get_value("release")["version"],
             "desktop_adapter": settings.desktop_adapter,
         }
@@ -207,16 +210,16 @@ def create_app(settings=None):
 
     @app.get("/api/mock/state", dependencies=[Depends(principal)])
     def mock_state():
-        return mock.state()
+        return browser_fixture().state()
 
     @app.post("/api/mock/action")
     async def mock_action(request: Request, role=Depends(principal)):
         body = await request.json()
-        return mock.action(body["name"], body.get("args", {}), role)
+        return browser_fixture().action(body["name"], body.get("args", {}), role)
 
     @app.post("/api/mock/scenario", dependencies=[Depends(staff)])
     async def scenario(request: Request):
-        return mock.scenario(await request.json())
+        return browser_fixture().scenario(await request.json())
 
     @app.post("/api/worker/{method}", dependencies=[Depends(worker)])
     async def worker_rpc(method: str, request: Request):

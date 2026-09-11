@@ -2,7 +2,7 @@
 
 DemoBooks Desktop is a native Windows Forms application built for this prototype. It resembles a traditional accounting package, with a menu bar, company shortcuts, vendor invoices, purchase orders, draft forms, notices, and persistent records. It is not QuickBooks, is not an Intuit product, and does not integrate with real accounting software.
 
-The native application is the source of truth for accounting records. The Linux/backend machine hosts the staff console and worker; the Windows VM owns the visible accounting application. The worker reaches a loopback-only application bridge through an SSH tunnel. The bridge has a separate random token and exposes only synthetic accounting state, scoped controls, screenshots, and deliberate test scenarios.
+The native application is the source of truth for accounting records. The developer machine hosts the backend and staff console; the Windows VM runs the worker and visible accounting application. The worker reaches the application bridge over Windows loopback. See the [two-machine setup](developer-setup.md). The bridge has a separate random token and exposes only synthetic accounting state, scoped controls, screenshots, and deliberate test scenarios.
 
 ## Build and install
 
@@ -13,7 +13,7 @@ dotnet publish windows/DemoBooks/DemoBooks.csproj \
   -c Release -r win-x64 --self-contained true -o windows/publish
 ```
 
-This produces a Windows x64 application including its runtime. No SDK or Python installation is needed on the Windows machine. Copy `windows/publish` and `windows/install.ps1` into the same folder on the VM, then run the installer from an elevated PowerShell session as the intended desktop user:
+This produces a Windows x64 application including its runtime. Running the application needs no SDK. The Python worker running beside it requires Python. Copy `windows/publish` and `windows/install.ps1` into the same folder on the VM, then run the installer from an elevated PowerShell session as the intended desktop user:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\install.ps1
@@ -25,13 +25,7 @@ Accounting state lives in `...\DemoBooks\data\accounting-records.json`, separate
 
 ## Connect the worker
 
-Create an SSH tunnel from the backend/worker machine:
-
-```bash
-ssh -N -L 127.0.0.1:8765:127.0.0.1:8765 versahn@100.66.6.90
-```
-
-Set these values in your ignored `.env`, using the token from the VM:
+For the optional application API path, configure the **Windows worker's** ignored `.env` using the token from the same machine:
 
 ```dotenv
 EAS_DESKTOP_ADAPTER=windows
@@ -39,9 +33,9 @@ EAS_WINDOWS_BRIDGE_URL=http://127.0.0.1:8765
 EAS_WINDOWS_TOKEN=the-private-token-from-the-vm
 ```
 
-Restart `enterprise dev`. Create a Finance invoice-correction job in the staff console. The **same graph** now uses the native Windows adapter, and its screenshots come from the actual Windows application window. The console's demonstration controls configure that native application's test conditions. The browser accounting page becomes a staff mirror of the same native records.
+Restart the idle Windows worker. Create a Finance invoice-correction job in the staff console. The **same graph** now uses the native Windows adapter, and its screenshots come from the actual Windows application window. Introduce test conditions using the native application. The browser test workspace is disabled in Windows deployments.
 
-Use **Take control** before editing in the VM or through the staff mirror, and **Release control** to resume. Before capturing an approval preview, the worker automatically restores a minimized or covered DemoBooks window while it owns the desktop lease. It first requests normal activation; if Windows declines, it raises its own window and clicks a verified inert header location. This bounded setup does not dismiss dialogs or change accounting records. Staff takeover prevents activation and existing approvals are revalidated after release. A locked session or secure desktop still requires restoring an interactive Windows session. Screen geometry and native state are revalidated against each approved action.
+Use **Take control** before editing in the VM, and **Release control** to resume. Before capturing an approval preview, the worker automatically restores a minimized or covered DemoBooks window while it owns the desktop lease. It first requests normal activation; if Windows declines, it raises its own window and clicks a verified inert header location. This bounded setup does not dismiss dialogs or change accounting records. Staff takeover prevents activation and existing approvals are revalidated after release. A locked session or secure desktop still requires restoring an interactive Windows session. Screen geometry and native state are revalidated against each approved action.
 
 ## Adapter and evidence
 
@@ -59,4 +53,4 @@ Compilation and accounting-model tests can run on Linux. Native GUI and screensh
 
 ## Verified on the Windows VM
 
-The native app was installed and exercised in an interactive Windows session. Strict, Auto, changed-label assistance, and interrupted-save reconciliation all completed. A separate covering window and a minimized app were recovered automatically; the worker left focus alone during staff takeover and recovered after release. Model responses and staff decisions in these tests were explicitly simulated. See [recorded validation](validation.md).
+The native app was installed and exercised in an interactive Windows session. Strict, Auto, changed-label assistance, and interrupted-save reconciliation all completed. A separate covering window and a minimized app were recovered automatically; the worker left focus alone during staff takeover and recovered after release. The original bridge tests used simulated model and staff decisions. Subsequent live OpenRouter tests and an [independent desktop adapter with the application API disabled](legacy-desktop.md) are recorded separately in [validation](validation.md).

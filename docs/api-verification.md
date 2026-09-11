@@ -8,6 +8,7 @@ Verified against official documentation and installed packages on 2026-09-10. Th
 | LangGraph SQLite checkpointer | 3.1.1 | `SqliteSaver` with durable SQLite connections |
 | Deep Agents | 0.7.13 | `create_deep_agent(model=..., tools=..., middleware=..., checkpointer=...)` |
 | LangChain | 1.4.0 | `wrap_model_call`, `wrap_tool_call`, `ModelRequest.override`, configurable `init_chat_model` |
+| LangChain OpenRouter | 0.2.8 | `ChatOpenRouter`, `OPENROUTER_API_KEY`, tool calls, image inputs, token usage; request timeout is in milliseconds |
 | Playwright | 1.62.0 | Chromium, `page.screenshot`, DOM locators, `fill`, `press`, `wait_for_function` |
 | FastAPI | 0.141.1 | Auth dependencies, JSON endpoints, static files, SSE responses |
 
@@ -18,10 +19,13 @@ Official references:
 - [Deep Agents factory reference](https://reference.langchain.com/python/deepagents/graph/create_deep_agent)
 - [Deep Agents customization](https://docs.langchain.com/oss/python/deepagents/customization)
 - [Playwright Python Page API](https://playwright.dev/python/docs/api/class-page)
+- [LangChain OpenRouter integration](https://docs.langchain.com/oss/python/integrations/chat/openrouter)
+- [Windows UI Automation control patterns](https://learn.microsoft.com/en-us/dotnet/framework/ui-automation/ui-automation-control-patterns-overview)
+- [Windows SendInput](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput)
 
 Deep Agents provides `interrupt_on` for tool approval. This prototype uses custom tool middleware with the same durable interrupt mechanism so that **all executable calls pass through the shared authority layer**, including argument corrections, screenshot binding, lease enforcement, cancellation, permissions, and evidence. Built-in filesystem, execution, planning, and delegation tools are not exposed to the model and are denied if requested.
 
-No live provider/model ID is assumed. `EAS_MODEL_PROVIDER` and `EAS_MODEL_ID` must name a provider integration and model actually available to your account. Install that provider's supported LangChain package and credentials, then select `EAS_MODEL_MODE=live`. GPT-6 Astra is not hard-coded or claimed as a computer-use model. The prototype's computer interaction is implemented by Playwright tools, not a vendor-specific computer-use API.
+The OpenRouter public model catalog and an authenticated request verified `openai/gpt-5.6-luna`. The installed integration uses a 20,000-millisecond timeout, no automatic retries, and 2,048 output tokens per request. Live model binding requests one tool call at a time; the shared execution layer serializes desktop access even if a model produces a batch. Desktop interaction uses scoped application, accessibility, and input adapters rather than a vendor-specific computer-use API.
 
 The default simulated model subclasses LangChain's `BaseChatModel`, so tests execute the actual Deep Agents harness and its checkpoint/tool middleware without an API key. Those runs assess the harness and deterministic fixture policy, not real-model intelligence or reliability.
 

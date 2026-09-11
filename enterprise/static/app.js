@@ -13,6 +13,8 @@ const $ = (id) => document.getElementById(id),
     );
 const submitted = new Set();
 let roles = [];
+let desktopAdapter = "browser";
+let activeView = "jobs";
 let active = localStorage.getItem("active-job"),
   selectedApproval = null,
   current = null,
@@ -92,13 +94,15 @@ $("job-form").onsubmit = (e) => {
   e.preventDefault();
   action(async () => {
     const role = roles.find((r) => r.id === $("workflow").value);
-    if (!role) throw Error("Choose an installed workflow");
+    if (!role) throw Error("Choose an authorized worker");
     let inputs = {};
     if (role.id === "invoice_correction") {
-      await api("/api/mock/scenario", {
-        ...scenarios.normal,
-        ...scenarios[$("scenario").value],
-      });
+      if (desktopAdapter === "browser" && $("scenario").value !== "current") {
+        await api("/api/mock/scenario", {
+          ...scenarios.normal,
+          ...scenarios[$("scenario").value],
+        });
+      }
       inputs = { company_id: "ACME", invoice_id: $("invoice").value };
     } else {
       document.querySelectorAll("[data-workflow-input]").forEach((el) => {
@@ -110,11 +114,13 @@ $("job-form").onsubmit = (e) => {
       department_id: role.department_id,
       role_id: role.id,
       inputs,
+      task: $("request").value.trim() || null,
       selected_mode: $("mode").value,
     });
     active = j.id;
     localStorage.setItem("active-job", active);
     $("job-dialog").close();
+    selectView("jobs");
     connectStream();
   });
 };
@@ -129,7 +135,7 @@ function populateInputs() {
   const role = roles.find((r) => r.id === $("workflow").value);
   const invoice = role?.id === "invoice_correction";
   $("invoice-input").hidden = !invoice;
-  $("scenario-input").hidden = !invoice;
+  $("scenario-input").hidden = !invoice || desktopAdapter !== "browser";
   $("workflow-inputs").hidden = invoice;
   $("workflow-inputs").innerHTML =
     invoice || !role
@@ -251,10 +257,12 @@ function renderDetail(d) {
     ? j.accepted
       ? "Staff accepted the verified result."
       : j.status === "completed"
-        ? "Correction draft verified. Accept the work to make this episode available for improvement."
+        ? "Outcome verified. Accept the work to make this episode available for improvement."
         : `Job ${j.status}.`
     : d.lease.owner === "staff"
-      ? "You hold desktop control. Use the accounting workspace, then release control."
+      ? desktopAdapter === "browser"
+        ? "You hold desktop control. Use the browser test workspace, then release control."
+        : "You hold desktop control. Work in the application on the Windows machine, then release control."
       : "Worker is running or reconciling current state.";
   if (pending) {
     $("review-title").textContent =
@@ -264,7 +272,7 @@ function renderDetail(d) {
     $("review-kind").textContent =
       pending.kind === "tool" ? "STRICT · TOOL APPROVAL" : "NODE APPROVAL";
     $("proposal-copy").innerHTML =
-      `<h3>${esc(pending.name.replaceAll("_", " "))}</h3><p>${esc(pending.description)}</p><div class="proposal-meta"><span>Target<strong>${esc(pending.inputs.department_id || "finance")} / ${esc(pending.inputs.record_id || pending.inputs.invoice_id)}</strong></span><span>Expected result<strong>${esc(pending.expected)}</strong></span></div>`;
+      `<h3>${esc(pending.name.replaceAll("_", " "))}</h3><p>${esc(pending.description)}</p><div class="proposal-meta"><span>Target<strong>${esc(pending.inputs.department_id || "finance")} / ${esc(pending.inputs.record_id || pending.inputs.invoice_id)}</strong></span><span>Expected result<strong>${esc(pending.expected)}</strong></span></div>${pending.inputs.assistant_report ? `<p><strong>Requested outcome</strong><br>${esc(pending.inputs.request)}</p><p><strong>Assistant report</strong><br>${esc(pending.inputs.assistant_report)}</p>` : ""}`;
     if (selectedApproval?.id !== pending.id) {
       selectedApproval = pending;
       $("arguments").value = JSON.stringify(pending.arguments, null, 2);
@@ -368,25 +376,44 @@ $("message-form").onsubmit = (e) => {
     $("message").value = "";
   });
 };
-$("metrics-tab").onclick = () =>
-  action(async () => {
-    $("main-view").hidden = true;
-    $("metrics-view").hidden = false;
-    const m = await api("/api/metrics");
-    $("metrics-view").innerHTML =
-      `<section class="panel"><h2>Evaluation metrics</h2><p class="muted">Simulated harness runs and live-model runs are reported separately.</p><table><thead><tr><th>Metric</th><th>Simulated</th><th>Live</th></tr></thead><tbody>${Object.keys(
+function selectView(view) {
+  activeView = view;
+  const metrics = view === "metrics";
+  $("main-view").hidden = metrics;
+  $("job-overview").hidden = metrics;
+  $("metrics-view").hidden = !metrics;
+  for (const name of ["jobs", "metrics"]) {
+    const tab = $(name + "-tab");
+    tab.classList.toggle("nav-active", name === view);
+    if (name === view) tab.setAttribute("aria-current", "page");
+    else tab.removeAttribute("aria-current");
+  }
+  $("page-eyebrow").textContent = metrics ? "EVALUATION" : "WORKER CONSOLE";
+  $("page-title").textContent = metrics ? "Evaluation metrics" : "Work, with oversight.";
+  $("page-description").textContent = metrics
+    ? "Compare simulated and live runs. Results refresh automatically."
+    : "Run a procedure. Review the unexpected. Teach the next run.";
+}
+function metricValue(name, value) {
+  if (value == null) return "—";
+  if (name === "completion_rate") return (value * 100).toFixed(1) + "%";
+  if (name === "execution_seconds") return value.toLocaleString(undefined, { maximumFractionDigits: 1 }) + " s";
+  return value.toLocaleString();
+}
+async function refreshMetrics() {
+  const m = await api("/api/metrics");
+  $("metrics-view").innerHTML =
+      `<section class="panel"><h2>Run results</h2><p class="muted">Simulated harness runs and live-model runs are reported separately.</p><table><thead><tr><th>Metric</th><th>Simulated</th><th>Live</th></tr></thead><tbody>${Object.keys(
         m.simulated,
       )
         .map(
           (k) =>
-            `<tr><td>${esc(k.replaceAll("_", " "))}</td><td>${m.simulated[k] ?? "—"}</td><td>${m.live[k] ?? "—"}</td></tr>`,
+            `<tr><td>${esc(k.replaceAll("_", " "))}</td><td>${esc(metricValue(k, m.simulated[k]))}</td><td>${esc(metricValue(k, m.live[k]))}</td></tr>`,
         )
         .join("")}</tbody></table></section>`;
-  });
-$("jobs-tab").onclick = () => {
-  $("main-view").hidden = false;
-  $("metrics-view").hidden = true;
-};
+}
+$("metrics-tab").onclick = () => action(async () => selectView("metrics"));
+$("jobs-tab").onclick = () => action(async () => selectView("jobs"));
 async function refresh() {
   if (refreshing) return;
   refreshing = true;
@@ -412,8 +439,12 @@ async function refresh() {
     if (active && jobs.some((j) => j.id === active))
       renderDetail(await api("/api/jobs/" + active));
     const health = await api("/api/health");
+    desktopAdapter = health.desktop_adapter;
+    $("test-workspace").hidden = desktopAdapter !== "browser";
+    $("scenario-input").hidden = $("workflow").value !== "invoice_correction" || desktopAdapter !== "browser";
     $("model-label").textContent =
       health.model_mode === "simulated" ? "Simulated assistance" : "Live model";
+    if (activeView === "metrics") await refreshMetrics();
   } catch (e) {
     if (!$("login-dialog").open) toast(e.message);
   } finally {

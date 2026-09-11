@@ -37,6 +37,24 @@ def test_strict_gates_every_executable_node(browser_server):
     assert result["job"]["model_calls"] == 0
 
 
+def test_unmatched_request_enters_fallback_without_a_create_workflow_step(browser_server):
+    c = browser_server["client"]
+    job = create(c, "auto", task="Inspect this invoice and explain what needs attention without saving")
+    approval = pending(c, job)
+    assert approval["kind"] == "tool" and approval["name"] == "observe_app"
+    data = c.get("/api/jobs/" + job).json()
+    assert data["job"]["effective_mode"] == "strict"
+    assert not data["job"]["completed"]
+    trigger = next(e["data"]["trigger"] for e in data["events"] if e["kind"] == "fallback_started")
+    assert trigger == "missing_procedure"
+    result = drive(c, job)
+    assert result["job"]["mutation"] == "not_attempted"
+    assert result["job"]["effective_mode"] == "auto"
+    assert result["job"]["assistant_report"]
+    assert result["approvals"][-1]["name"] == "review_discovery"
+    assert not any(d["operation_id"] == job for d in c.get("/api/mock/state").json()["drafts"])
+
+
 @pytest.mark.parametrize(
     "scenario",
     [

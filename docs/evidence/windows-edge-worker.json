@@ -1,0 +1,51 @@
+{
+  "worker_platform": "Windows",
+  "deployment": "backend on developer machine; LangGraph and Deep Agent on Windows edge machine",
+  "application_api": "disabled",
+  "input_mode": "mouse_keyboard",
+  "provider": "openrouter",
+  "model_configured": "openai/gpt-5.6-luna",
+  "staff": "explicit automated simulator",
+  "job_id": "169826e21e1a423a96d91d695bc229c9",
+  "status": "completed",
+  "model_calls": 10,
+  "tokens": 40372,
+  "mutation": "confirmed_succeeded",
+  "actions": [
+    {
+      "method": "mouse_input",
+      "observation_revision": "E0FEE9A95F8EB564CCE51B5FED477A28570489206DBF2A01A03591DD237C9D7C",
+      "target": "invoices"
+    },
+    {
+      "method": "mouse_input",
+      "observation_revision": "BA660D910050CCB4DB925E43A676454DF8E3C410B458BF7B7F4BA2DFB508508C",
+      "target": "dialog-discard"
+    },
+    {
+      "method": "mouse_input",
+      "observation_revision": "6D77D555C7B4C0F98E1F0E3DC3F04B4826ED6F188E733BB83D38C0010D07F02B",
+      "target": "invoices"
+    },
+    {
+      "method": "mouse_input",
+      "observation_revision": "2BF735C0B80539887C3A55DFA1164F0165E1DC1DA0DA95979F362FCCD3420F51",
+      "target": "open-INV-1043"
+    },
+    {
+      "method": "keyboard_input",
+      "observation_revision": "ADE1B27D8619F289C701D32F0083916DC9DDB65E03A25F9DE8AA847AF5A57364",
+      "target": "amount"
+    },
+    {
+      "method": "keyboard_input",
+      "observation_revision": "8A0419D0050BFF619A0A9432301140CC0B8084A03F34FF2CCCC244F4C03AD73D",
+      "target": "note"
+    },
+    {
+      "method": "mouse_input",
+      "observation_revision": "BFEF86271E8FE97CA18BC2A1E98EC99B1D319BD80B99FED28E2AF9238754F20A",
+      "target": "save"
+    }
+  ]
+}

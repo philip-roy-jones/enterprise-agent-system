@@ -4,7 +4,7 @@
 
 **A digital worker that follows tested procedures, asks for help, and learns through reviewed code.**
 
-Python · LangGraph · Deep Agents · Playwright · FastAPI · SQLite
+Python · LangGraph · Deep Agents · OpenRouter · Windows UI Automation · FastAPI
 
 [Quick start](#quick-start) · [Try the demonstration](#try-the-demonstration) · [How it works](#how-it-works) · [Teach a reusable improvement](#teach-a-reusable-improvement) · [Validation](#validation)
 
@@ -14,24 +14,31 @@ Python · LangGraph · Deep Agents · Playwright · FastAPI · SQLite
 
 Enterprise Agent System is a department-agnostic platform for supervised digital workers. Departments supply role-specific workflows, tools, permissions, and knowledge scopes; the platform provides job dispatch, approvals, evidence, recovery, and developer-reviewed improvements.
 
+**This is an experimental prototype.** I'm sharing it to get my ideas out there and explore how supervised digital workers could work. I know it isn't ready for me to dogfood in day-to-day work or for a business to adopt. The demonstrations, tests, and documented limitations reflect an idea in development, not a finished product.
+
 The first runnable example is a Finance workflow: a worker opens a synthetic invoice, compares it with a purchase order, identifies a discrepancy, and saves and verifies a correction draft. Staff can approve each operation, supervise unfamiliar situations, correct proposed actions, or take over the desktop.
 
 An accepted episode can become a small, tested code proposal. A developer reviews the exact candidate before it can be released to idle workers. Future jobs pin the improved procedure version.
 
-**Default: simulated model, real LangGraph and Deep Agents harnesses, real Chromium automation, and persistent synthetic records. No model credentials are needed.** This is not a QuickBooks integration and does not handle real accounting data.
+Requests with no matching procedure enter supervised assistance automatically. Unfamiliar application states and failures in implemented procedures are separate fallback reasons. Staff review the proposed actions and the outcome in the same job. See [automatic workflow discovery](docs/workflow-discovery.md) for the implemented behavior and the limits of general workflow generation.
+
+**Desktop setup: the developer machine runs the backend and staff frontend; a separate Windows VM or PC runs LangGraph, the Deep Agent harness, desktop control, and DemoBooks.** The optional single-machine browser fixture uses a simulated model for regression tests. DemoBooks is a prototype application with synthetic records, not a QuickBooks integration.
 
 ![Enterprise Agent System console showing an example Finance workflow approval](docs/images/console.png)
 
-## Choose an accounting machine
+## Developer setup
 
 The shared platform is department-agnostic; the first runnable workflow belongs to **Finance**. [Department workflow extensions](docs/departments.md) explain how other departments bring their own input schemas, graphs, adapters, and permissions.
 
-- **Browser fixture:** quick local setup and automated regression tests, using the commands below.
-- **Windows VM:** native **DemoBooks Desktop** running on the accounting machine, with the same approval workflow and actual Windows screenshots. Follow the [Windows installation and connection guide](docs/windows-accounting-machine.md).
+The split has been exercised with a complete Windows job and live model assistance ([execution evidence](docs/evidence/windows-edge-worker.json)). Follow the [two-machine developer setup](docs/developer-setup.md): start `enterprise serve` on the developer machine and `enterprise worker` on Windows. Addresses and credentials are configured locally. The backend does not connect directly to the desktop controller.
+
+The native application can run with its API disabled. A separate controller reads accessibility controls and supplies accessibility actions or real clicks/typing. See [legacy desktop setup](docs/legacy-desktop.md) and the optional [application API adapter](docs/windows-accounting-machine.md).
 
 ![Native DemoBooks Desktop on the Windows accounting machine](docs/images/demobooks-windows.png)
 
 ## Quick start
+
+This is the **optional browser test fixture**, useful without a Windows machine or model key. For the desktop prototype, use the [two-machine setup](docs/developer-setup.md).
 
 Requires Python 3.11+ (tested on 3.12), Git, and a Chromium-compatible development machine. Linux is the tested platform.
 
@@ -63,7 +70,7 @@ enterprise serve
 enterprise worker
 ```
 
-The accounting workspace is at **[localhost:8000/mock](http://127.0.0.1:8000/mock)**. Use **Take control** before interacting with an active worker's desktop. Use **Release control** to resume automation.
+The browser test workspace is at **[localhost:8000/mock](http://127.0.0.1:8000/mock)** in browser mode only. Windows deployments disable it. Use **Take control** before interacting with an active worker's desktop. Use **Release control** to resume automation.
 
 ## Try the demonstration
 
@@ -102,7 +109,7 @@ flowchart LR
     Staff[Staff console] <-->|Jobs, decisions, evidence| Backend[Central backend]
     Backend <--> State[(SQLite + artifact store)]
     Backend <-->|Authenticated worker API| Graph
-    subgraph Worker[Worker process]
+    subgraph Worker[Windows VM or PC — worker process]
         Graph[Cyclic role LangGraph]
         Agent[Supervised Deep Agent]
         Shared[Shared execution and approval layer]
@@ -110,9 +117,7 @@ flowchart LR
         Graph <-->|Assistance / verified return| Agent
         Agent --> Shared
     end
-    Shared --> Browser[Playwright / one Chromium session]
-    Browser --> App[Persistent mock accounting app]
-    Shared --> Native[Windows adapter / SSH tunnel]
+    Shared --> Native[Local desktop controller / optional application API]
     Native --> DemoBooks[Native DemoBooks Desktop]
     State --> Dev[Isolated development checkout]
     Dev --> Review[Tests + developer review]
@@ -183,19 +188,21 @@ Copy `.env.example` to `.env`. Runtime data and credentials are ignored by Git.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `EAS_DATA_DIR` | `runtime` | Durable backend data, checkpoints, screenshots, proposals |
+| `EAS_BIND_HOST` / `EAS_BIND_PORT` | `127.0.0.1` / `8000` | Backend listener; configure locally |
 | `EAS_BACKEND_URL` | `http://127.0.0.1:8000` | Worker-to-backend endpoint |
 | `EAS_STAFF_TOKEN` | `local-staff-demo` | Staff decisions and artifact access |
 | `EAS_WORKER_TOKEN` | `local-worker-demo` | Restricted worker API and browser session |
 | `EAS_DEVELOPER_TOKEN` | `local-developer-demo` | Developer review and release commands |
 | `EAS_MODEL_MODE` | `simulated` | `simulated` or `live` |
-| `EAS_MODEL_PROVIDER` / `EAS_MODEL_ID` | unset | Verified provider and model available to your account |
+| `EAS_MODEL_PROVIDER` / `EAS_MODEL_ID` | `openrouter` / `openai/gpt-5.6-luna` in the example | Provider and model for live assistance |
+| `OPENROUTER_API_KEY` | unset | OpenRouter credential, kept in `.env` or the worker environment |
 | `EAS_HEADLESS` | `true` | Set `false` to show the worker browser on a graphical desktop |
 | `EAS_JOB_TIMEOUT_SECONDS` | `900` | Total job time budget, including staff waiting |
 | `EAS_MAX_MODEL_CALLS` | `12` | Maximum assistant model calls per job |
 
-Live mode uses LangChain's configurable `init_chat_model`. Install the chosen provider integration, configure its credentials, and supply an actually available model ID. The project does not invent a GPT-6 Astra API identifier or claim vendor-native computer-use capability. Live-provider behavior has not been evaluated without credentials.
+Live mode uses LangChain's configurable `init_chat_model`, with the OpenRouter integration included for GPT 5.6 Luna. Follow the [API key setup](docs/credential-access.md), then enable live mode and restart. Adding a key alone leaves simulated mode enabled. Live recovery has been tested on the Windows VM, including screenshots and actual mouse/keyboard input with DemoBooks' API disabled. Those runs use explicitly simulated staff approvals; they are limited demonstrations, not a general model-reliability evaluation.
 
-Use separate tokens and a trusted local environment. This prototype binds to localhost; production exposure requires proper identity, TLS, tenant isolation, and infrastructure hardening.
+Use separate tokens and a trusted local environment. This prototype binds to localhost by default; production exposure requires proper identity, TLS, tenant isolation, and infrastructure hardening.
 
 ## Validation
 

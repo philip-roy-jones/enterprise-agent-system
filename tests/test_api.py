@@ -1,6 +1,26 @@
 from fastapi.testclient import TestClient
 from enterprise.backend import create_app
 from enterprise.config import Settings
+import pytest
+
+
+@pytest.mark.parametrize("adapter", ["windows", "windows_accessibility"])
+def test_windows_backend_needs_no_desktop_connection(tmp_path, adapter):
+    settings = Settings(
+        data_dir=tmp_path,
+        desktop_adapter=adapter,
+        windows_token="",
+        desktop_agent_token="",
+        windows_bridge_url="http://127.0.0.1:1",
+        desktop_agent_url="http://127.0.0.1:1",
+    )
+    client = TestClient(create_app(settings), headers={"Authorization": "Bearer local-staff-demo"})
+    assert client.get("/api/health").json()["application"] == "windows_desktop"
+    assert client.get("/mock").status_code == 404
+    assert client.get("/api/mock/state").status_code == 404
+    assert client.post("/api/mock/scenario", json={"variant": "renamed"}).status_code == 404
+    assert client.post("/api/mock/action", json={"name": "save"}).status_code == 404
+    assert client.post("/api/jobs", json={"invoice_id": "INV-1042"}).status_code == 200
 
 
 def test_authentication_artifacts_and_worker_role(tmp_path):

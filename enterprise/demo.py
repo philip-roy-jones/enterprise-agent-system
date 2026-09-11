@@ -31,9 +31,16 @@ def drive(client, job_id, correction=False, timeout=90):
                 and approval["kind"] == "tool"
                 and approval["name"] == "set_field"
             ):
+                field = approval["arguments"].get("field")
+                expected_value = {
+                    "amount": f"{data['job']['expected']['amount'] / 100:.2f}",
+                    "note": data["job"]["expected"]["note"],
+                }.get(field)
                 decision.update(
                     decision="correct",
-                    arguments=approval["arguments"],
+                    arguments=dict(approval["arguments"], value=expected_value)
+                    if expected_value is not None
+                    else approval["arguments"],
                     explanation="Simulated staff confirms the semantic field and correct amount",
                 )
                 corrected = True

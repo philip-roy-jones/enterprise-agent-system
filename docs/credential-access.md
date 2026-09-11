@@ -1,11 +1,16 @@
-# Credential access during development
+# OpenRouter API key setup
 
-Use the existing ignored project `.env` for application configuration. Do not paste keys into chat. `.gitignore` prevents ordinary Git tracking; it does not prevent an agent with filesystem access from reading a file. The project `AGENTS.md` prohibits inspecting or exposing secrets, but instructions alone are not an OS access boundary.
+1. Create a key at [OpenRouter API keys](https://openrouter.ai/settings/keys).
+2. Add the following to the ignored `.env` in the **Windows worker checkout**, updating existing settings and preserving the desktop controller settings:
 
-Codex 0.154.0 supports named permission profiles with filesystem `deny` rules. A local `env-guard` profile has been prepared in the user's Codex configuration. It denies the exact project `.env` and `.env` files under workspace roots, with nested glob scanning limited to eight levels. It has **not** been made the default: on this host, sandbox startup currently fails while setting up a Linux user namespace (`uid map: Permission denied`). The current task still has unrestricted filesystem access. No real credential file was read in the deny-rule test; it used a newly created synthetic fixture.
+   ```dotenv
+   OPENROUTER_API_KEY=your-key-here
+   EAS_MODEL_PROVIDER=openrouter
+   EAS_MODEL_ID=openai/gpt-5.6-luna
+   ```
 
-After the host sandbox is repaired, test with a harmless fixture before selecting `env-guard` in Codex's permission controls. Full-access sessions do not enforce this profile. A lasting administrative policy must also prevent selecting a profile that bypasses it. The application needs to be launched separately by the user if Codex's sandbox is forbidden from reading its configuration file.
+3. Set `EAS_MODEL_MODE=live` on both machines when ready to make API calls. Restart the backend with `enterprise serve` and restart the idle Windows `EAS-Worker` task. Keep the key only on the worker. Jobs that need assistance can then call GPT 5.6 Luna through OpenRouter.
 
-For a stronger separation of the actual API credential, run the credential-bearing application under a separate OS identity or use a restricted credential service. An agent that can change and run credential-bearing application code must not be assumed unable to obtain its credentials solely because the filename is denied.
+The [LangChain OpenRouter integration](https://docs.langchain.com/oss/python/integrations/chat/openrouter) is included in the project dependencies. Adding a key alone does not switch out of simulated mode. The application consumes it through the environment; no key needs to appear in a conversation, screenshot, or source commit. Live calls are limited to 12 per job by default, with 2,048 output tokens per call, a 20-second request timeout, and no automatic provider retries. Assistant tools still require individual staff approval.
 
-Official references: [Codex permission profiles](https://learn.chatgpt.com/docs/permissions), [configuration and managed requirements](https://learn.chatgpt.com/docs/config-file/config-reference).
+An ignored `.env` remains readable to tools with filesystem access. This project does not enforce an agent-specific read ban. Use a separate project key, restricted permissions where supported, usage monitoring, and key rotation.

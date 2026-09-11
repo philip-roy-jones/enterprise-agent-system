@@ -60,3 +60,29 @@ def test_window_recovery_reserves_control_and_never_mutates_accounting(store, jo
     with pytest.raises(Stale):
         adapter.prepare_observation(job["id"], "script", lease["epoch"])
     assert adapter.bridge.calls.count("/activate") == 1
+
+
+@pytest.mark.parametrize("condition", ["minimized", "offscreen"])
+def test_unavailable_window_is_restored_even_if_reported_as_foreground(store, job, condition):
+    from enterprise.windows_adapter import WindowsAdapter
+
+    class Bridge:
+        minimized = True
+        calls = []
+
+        def call(self, path, data=None):
+            self.calls.append(path)
+            if path == "/activate":
+                self.minimized = False
+            return {
+                "foreground": True,
+                "minimized": self.minimized if condition == "minimized" else False,
+                "onscreen": not self.minimized if condition == "offscreen" else True,
+            }
+
+    adapter = object.__new__(WindowsAdapter)
+    adapter.store, adapter.bridge = store, Bridge()
+    lease = store.lease()
+    adapter.prepare_observation(job["id"], "script", lease["epoch"])
+    assert adapter.bridge.calls == ["/window", "/activate", "/window"]
+    assert not adapter.bridge.minimized

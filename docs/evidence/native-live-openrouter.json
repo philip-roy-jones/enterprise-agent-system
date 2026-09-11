@@ -1,0 +1,67 @@
+{
+  "model_mode": "live",
+  "provider": "openrouter",
+  "model": "openai/gpt-5.6-luna",
+  "staff": "simulated",
+  "desktop_adapter": "windows",
+  "scenario": "renamed amount field starting from invoice list",
+  "job_id": "a00e4223157c48d0b90516258f19ed3b",
+  "status": "completed",
+  "effective_mode": "auto",
+  "fallback_count": 1,
+  "model_calls": 4,
+  "tokens": 16115,
+  "approval_requests": 6,
+  "tools": [
+    {
+      "name": "observe_app",
+      "arguments": {},
+      "status": "executed"
+    },
+    {
+      "name": "set_field",
+      "arguments": {
+        "field": "amount",
+        "value": "2400.00"
+      },
+      "status": "executed"
+    },
+    {
+      "name": "set_field",
+      "arguments": {
+        "field": "note",
+        "value": "Align correction draft with approved purchase order PO-1043."
+      },
+      "status": "stale"
+    },
+    {
+      "name": "set_field",
+      "arguments": {
+        "field": "note",
+        "value": "Align correction draft with approved purchase order PO-1043."
+      },
+      "status": "executed"
+    },
+    {
+      "name": "save_draft",
+      "arguments": {},
+      "status": "executed"
+    }
+  ],
+  "earlier_failed_attempt": {
+    "job_id": "7b8f61f7243e42b78932391edbda7791",
+    "status": "denied",
+    "reason": "Cents were passed to the dollar form before units were documented in model context. Save was rejected.",
+    "persisted_drafts": 0,
+    "model_calls": 2,
+    "tokens": 4943
+  },
+  "pre_comparison_failure": {
+    "job_id": "d47c0de4f5284877805bc2ed4c48d9a2",
+    "status": "failed",
+    "model_calls": 10,
+    "tokens": 74850,
+    "finding": "The model attempted the wider invoice workflow before scripted comparison; Save reached the application, then verification failed because expected values were unavailable.",
+    "fix": "Before verified business values exist, the model receives read/navigation tools only, and the execution wrapper rejects edit/save requests independently."
+  }
+}

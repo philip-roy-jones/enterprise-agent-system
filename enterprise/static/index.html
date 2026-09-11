@@ -17,8 +17,8 @@
           >▤ <span class="platform-name">Enterprise<br />Agent System</span></a
         >
         <p class="eyebrow">OPERATIONS</p>
-        <button class="nav-active" id="jobs-tab">◫ &nbsp; Worker console</button
-        ><a href="/mock" target="_blank">▥ &nbsp; Accounting workspace ↗</a
+        <button class="nav-active" id="jobs-tab" aria-current="page">◫ &nbsp; Worker console</button
+        ><a id="test-workspace" href="/mock" target="_blank" hidden>▥ &nbsp; Browser test workspace ↗</a
         ><button id="metrics-tab">▥ &nbsp; Evaluation metrics</button>
         <div class="sidebar-bottom">
           <span class="worker-avatar">W1</span
@@ -37,15 +37,15 @@
         <main class="console">
           <div class="title-row">
             <div>
-              <div class="eyebrow">WORKER CONSOLE</div>
-              <h1>Work, with oversight.</h1>
-              <p class="muted">
+              <div class="eyebrow" id="page-eyebrow">WORKER CONSOLE</div>
+              <h1 id="page-title">Work, with oversight.</h1>
+              <p class="muted" id="page-description">
                 Run a procedure. Review the unexpected. Teach the next run.
               </p>
             </div>
             <button class="primary" id="new-job">＋ New job</button>
           </div>
-          <section class="overview-grid">
+          <section class="overview-grid" id="job-overview">
             <div class="overview-card">
               <span>Example department</span
               ><strong id="department-label">Finance</strong
@@ -184,9 +184,10 @@
           <h2>New job</h2>
           <button type="button" id="close-dialog" aria-label="Close">×</button>
         </div>
-        <p class="muted">Choose a department and an installed workflow.</p>
+        <p class="muted">Choose a worker and describe the outcome. Unfamiliar requests go to supervised assistance.</p>
         <label>Department<select id="department"></select></label>
-        <label>Workflow<select id="workflow"></select></label>
+        <label>Worker<select id="workflow"></select></label>
+        <label>What should the worker do?<textarea id="request" rows="2" placeholder="Leave blank for the standard invoice correction, or describe another request within this worker's scope."></textarea></label>
         <div id="workflow-inputs" hidden></div>
         <label id="invoice-input"
           >Invoice<select id="invoice">
@@ -201,6 +202,7 @@
           </select></label
         ><label id="scenario-input"
           >Demonstration condition<select id="scenario">
+            <option value="current">Use the current application state</option>
             <option value="normal">Normal workspace</option>
             <option value="wrong">Wrong invoice open</option>
             <option value="reordered">Reordered invoice rows</option>

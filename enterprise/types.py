@@ -40,6 +40,7 @@ class GraphState(TypedDict, total=False):
     next_node: str
     resume_node: str
     reason: str
+    recovery_kind: str
     result: dict
 
 

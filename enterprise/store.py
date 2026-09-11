@@ -136,6 +136,7 @@ class Store:
             "error",
             "elapsed_seconds",
             "assistance_thread",
+            "assistant_report",
         }
         if set(updates) - allowed:
             raise ValueError("Worker cannot change authorization or pinned version")

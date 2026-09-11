@@ -1,7 +1,8 @@
 param(
     [string]$Source = "$PSScriptRoot\publish",
     [string]$InstallDirectory = "$env:LOCALAPPDATA\EnterpriseAgentSystem\DemoBooks",
-    [string]$DesktopUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+    [string]$DesktopUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name,
+    [switch]$DisableApi
 )
 $ErrorActionPreference = 'Stop'
 if (-not (Test-Path "$Source\DemoBooks.exe")) { throw 'Publish DemoBooks first, or extract the Windows package next to this script.' }
@@ -18,7 +19,9 @@ if ($LASTEXITCODE -ne 0 -or -not ($existing -match 'http://127.0.0.1:8765/')) {
     if ($LASTEXITCODE -ne 0) { throw 'Could not reserve the local bridge URL. Run the installer as Administrator.' }
 }
 $executable = Join-Path $applicationDirectory 'DemoBooks.exe'
-$action = New-ScheduledTaskAction -Execute $executable -WorkingDirectory $applicationDirectory
+$launch = @{ Execute = $executable; WorkingDirectory = $applicationDirectory }
+if ($DisableApi) { $launch.Argument = '--no-api' }
+$action = New-ScheduledTaskAction @launch
 $principal = New-ScheduledTaskPrincipal -UserId $DesktopUser -LogonType Interactive -RunLevel Limited
 $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 # This task has NO schedule or trigger. It launches in the existing interactive session on demand.
@@ -32,6 +35,7 @@ $shortcut.Description = 'Enterprise Agent System synthetic Windows accounting ap
 $shortcut.Save()
 Write-Output "Installed: $executable"
 Write-Output "Launch task: EAS-DemoBooks (manual only; no recurring schedule)"
-Write-Output "Bridge: http://127.0.0.1:8765/ through an SSH tunnel"
+if ($DisableApi) { Write-Output 'Application API disabled; use the independent desktop controller.' }
+else { Write-Output "Bridge: http://127.0.0.1:8765/ through an SSH tunnel" }
 Write-Output "Token file: $InstallDirectory\data\bridge.token (keep private)"
 Write-Output 'A logged-in, unlocked Windows desktop session is required.'

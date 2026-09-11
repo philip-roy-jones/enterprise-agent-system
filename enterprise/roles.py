@@ -85,12 +85,16 @@ def _invoice_graph(*args, **kwargs):
 
 
 def _browser_adapter(settings, store):
+    if settings.desktop_adapter == "windows_accessibility":
+        from .accessibility_adapter import AccessibilityAdapter
+
+        return AccessibilityAdapter(settings, store)
     if settings.desktop_adapter == "windows":
         from .windows_adapter import WindowsAdapter
 
         return WindowsAdapter(settings, store)
     if settings.desktop_adapter != "browser":
-        raise ValueError("EAS_DESKTOP_ADAPTER must be browser or windows")
+        raise ValueError("EAS_DESKTOP_ADAPTER must be browser, windows, or windows_accessibility")
     from .adapter import ThreadedBrowserAdapter
 
     return ThreadedBrowserAdapter(settings, store)
@@ -103,7 +107,7 @@ register_role(
         department_name="Finance",
         name="Invoice correction",
         application="DemoBooks Desktop (Windows)"
-        if os.getenv("EAS_DESKTOP_ADAPTER") == "windows"
+        if os.getenv("EAS_DESKTOP_ADAPTER") in {"windows", "windows_accessibility"}
         else "Ledger (synthetic)",
         input_model=InvoiceCorrectionInputs,
         graph_factory=_invoice_graph,

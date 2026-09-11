@@ -1,6 +1,6 @@
 """Adapter for our native Windows DemoBooks application, not real QuickBooks.
 
-The loopback bridge is reached through an authenticated SSH tunnel. It exposes
+The edge worker reaches the application bridge over Windows loopback. It exposes
 scoped application controls and real Windows screenshots; never arbitrary code.
 """
 
@@ -44,8 +44,18 @@ class WindowsAdapter:
     def close(self):
         self.bridge.client.close()
 
+    def correction_note(self, note):
+        return note
+
+    def read_state(self):
+        return self.bridge.call("/state")
+
+    def get_model_image(self):
+        return getattr(self, "_model_image", None)
+
     def prepare_observation(self, job_id, owner, epoch):
-        if self.bridge.call("/window")["foreground"]:
+        window = self.bridge.call("/window")
+        if window["foreground"] and not window.get("minimized", False) and window.get("onscreen", True):
             return
         invocation = f"{job_id}:window:{uid()}"
         self.store.begin_window_recovery(job_id, owner, epoch, invocation)
@@ -55,7 +65,12 @@ class WindowsAdapter:
             deadline = time.monotonic() + 3
             while time.monotonic() < deadline:
                 self.store.check(job_id, owner, epoch)
-                if self.bridge.call("/window")["foreground"]:
+                window = self.bridge.call("/window")
+                if (
+                    window["foreground"]
+                    and not window.get("minimized", False)
+                    and window.get("onscreen", True)
+                ):
                     result = {"recovered": True, "application": "DemoBooks Desktop"}
                     return
                 time.sleep(0.1)
@@ -65,6 +80,7 @@ class WindowsAdapter:
 
     def observe(self):
         raw = self.bridge.call("/observe")
+        self._model_image = raw["screenshot"] if raw["foreground"] else None
         state = dict(raw["state"], foreground=raw["foreground"], desktop_session=raw["desktop_session"])
         shape = {"state": state, "targets": raw["targets"], "width": raw["width"], "height": raw["height"]}
         artifact = self.store.artifact(base64.b64decode(raw["screenshot"]))
@@ -81,7 +97,7 @@ class WindowsAdapter:
     def ready(self):
         deadline = time.monotonic() + 6
         while True:
-            state = self.bridge.call("/state")
+            state = self.read_state()
             if state["loading_until"] <= time.time():
                 break
             if time.monotonic() >= deadline:
@@ -95,7 +111,7 @@ class WindowsAdapter:
 
     def _action(self, name, args):
         self.fence()
-        state = self.bridge.call("/state")
+        state = self.read_state()
         return self.bridge.call(
             "/action",
             {
@@ -114,7 +130,7 @@ class WindowsAdapter:
         state = self.ready()
         if state["company_id"] != company_id:
             self.click_target("company")
-        if self.bridge.call("/state")["company_id"] != company_id:
+        if self.read_state()["company_id"] != company_id:
             raise PermissionError("Company identity mismatch")
         return {"company_id": company_id}
 
@@ -146,7 +162,7 @@ class WindowsAdapter:
         return {"field": field, "value": str(value)}
 
     def saved_result(self, expected):
-        state = self.bridge.call("/state")
+        state = self.read_state()
         draft = next((d for d in state["drafts"] if d["operation_id"] == self.job["id"]), None)
         if draft and any(draft[k] != expected[k] for k in ("company_id", "invoice_id", "amount")):
             raise Recovery("ambiguous", "Persisted native draft differs from expected business result")
@@ -156,6 +172,11 @@ class WindowsAdapter:
         saved = self.saved_result(expected_result)
         if saved:
             return saved
+        if self.job.get("mutation") == "attempted_uncertain":
+            raise Recovery(
+                "ambiguous",
+                "An earlier Save has no verified result; staff must reconcile before another Save",
+            )
         self.ensure_editable()
         try:
             result = self.click_target("save")
@@ -209,43 +230,3 @@ class WindowsAdapter:
         if name == "save_draft":
             return self.save_and_verify(self.job["expected"])
         raise PermissionError("Unknown native tool")
-
-
-class WindowsAccountingProxy:
-    """Staff scenario/mirror access to the same native accounting application."""
-
-    def __init__(self, store, settings):
-        self.store, self.bridge = store, WindowsBridge(settings)
-
-    def state(self):
-        return self.bridge.call("/state")
-
-    def _authority(self):
-        lease = self.store.lease()
-        if lease["job_id"]:
-            job = self.store.get_job(lease["job_id"])
-            from .types import TERMINAL
-
-            if job["status"] not in TERMINAL and lease["owner"] != "staff":
-                raise Stale("Take staff control before interacting with the Windows accounting machine")
-        return lease
-
-    def scenario(self, config):
-        self._authority()
-        return self.bridge.call("/scenario", config)
-
-    def action(self, name, args, principal):
-        if principal == "worker":
-            raise PermissionError("Use the native execution adapter, not the browser mirror")
-        lease = self._authority()
-        state = self.state()
-        return self.bridge.call(
-            "/action",
-            {
-                "name": name,
-                "args": args,
-                "operation_id": lease["job_id"] or "staff-" + str(time.time_ns()),
-                "invoice_id": state["invoice_id"],
-                "revision": state["revision"],
-            },
-        )

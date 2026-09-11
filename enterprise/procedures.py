@@ -5,5 +5,15 @@ AMOUNT_LABELS = ("Correction amount",)
 KNOWN_POPUPS = {"info": "acknowledge"}
 
 
+def matches_invoice_procedure(request: str) -> bool:
+    # Conservative matching: uncertainty enters supervised discovery. Never
+    # coerce a request with extra conditions into a more permissive procedure.
+    return request.strip().lower().rstrip(".") in {
+        "invoice_correction",
+        "correct this invoice",
+        "prepare an invoice correction draft",
+    }
+
+
 def resolve_amount_label(available: list[str]) -> str | None:
     return next((label for label in AMOUNT_LABELS if label in available), None)

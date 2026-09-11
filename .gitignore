@@ -10,3 +10,4 @@ runtime/
 windows/**/bin/
 windows/**/obj/
 windows/publish/
+windows/desktop-publish/

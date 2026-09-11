@@ -15,6 +15,10 @@ class Operation:
 
 
 OPERATIONS = {
+    "review_discovery": Operation(
+        "Review the assistant's report against the requested outcome and recorded evidence. Approve only if the request is satisfied; reject otherwise.",
+        "Staff confirms the outcome of this unfamiliar request; no workflow is installed automatically",
+    ),
     "validate": Operation(
         "Validate the requested task, record and worker permissions", "A supported scoped job", desktop=False
     ),

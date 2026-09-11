@@ -5,9 +5,9 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "enterprise-agent-system"
 version = "0.1.0"
-description = "Supervised invoice worker with durable approvals and reviewed improvements"
+description = "Department workflows with supervised digital workers and reviewed improvements"
 requires-python = ">=3.11"
-dependencies = ["fastapi>=0.115", "uvicorn>=0.34", "langgraph>=1.0", "langgraph-checkpoint-sqlite>=3.0", "deepagents>=0.4", "playwright>=1.50", "httpx>=0.28", "python-dotenv>=1"]
+dependencies = ["fastapi>=0.115", "uvicorn>=0.34", "langgraph>=1.0", "langgraph-checkpoint-sqlite>=3.0", "deepagents>=0.4", "langchain-openrouter>=0.2,<1", "playwright>=1.50", "httpx>=0.28", "python-dotenv>=1"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.11"]

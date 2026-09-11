@@ -1,0 +1,25 @@
+{
+  "job_id": "e1140e3729c3488091ef91f56d9faeaa",
+  "worker_platform": "Windows",
+  "provider": "openrouter",
+  "model": "openai/gpt-5.6-luna",
+  "staff": "explicit automated simulator; report checked against current visible invoice and PO values",
+  "status": "completed",
+  "model_calls": 1,
+  "tokens": 3186,
+  "mutation": "not_attempted",
+  "report": "- Invoice **INV-1043** total: **$2,640.00**\n- Purchase order **PO-1043** total: **$2,400.00**\n- Difference: **$240.00** (invoice exceeds PO)\n\nNo edits or saves were made.",
+  "approvals": [
+    {
+      "name": "review_discovery",
+      "kind": "node",
+      "arguments": {
+        "assistant_report": "- Invoice **INV-1043** total: **$2,640.00**\n- Purchase order **PO-1043** total: **$2,400.00**\n- Difference: **$240.00** (invoice exceeds PO)\n\nNo edits or saves were made.",
+        "company_id": "ACME",
+        "invoice_id": "INV-1043",
+        "reason": ""
+      },
+      "status": "executed"
+    }
+  ]
+}

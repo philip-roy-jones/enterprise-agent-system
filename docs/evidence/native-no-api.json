@@ -1,0 +1,110 @@
+{
+  "application_api": "disabled",
+  "adapter": "windows_accessibility",
+  "input_mode": "accessibility",
+  "staff": "simulated acceptance only",
+  "job_id": "5b245a80af33437dbecc75f4fa8176f0",
+  "status": "completed",
+  "model_calls": 0,
+  "approvals": 0,
+  "actions": [
+    {
+      "method": "accessibility_invoke",
+      "observation_revision": "88A6C0E207C6458A7456E898BC68BFBA6A1A26880E45FF7C4EB3A49CA91F68CE",
+      "target": "invoices"
+    },
+    {
+      "method": "accessibility_invoke",
+      "observation_revision": "F184E2F69B134356733D43904FABFC614ADEEC97BEFB0A7432438ABAEDA8EC5F",
+      "target": "open-INV-1043"
+    },
+    {
+      "method": "accessibility_value",
+      "observation_revision": "310DD171A215F431FDF8C16209C8F3CE4F76717B253EB4AD335A70B9FE746E7F",
+      "target": "amount"
+    },
+    {
+      "method": "accessibility_value",
+      "observation_revision": "AEC5D460C878C263CBDE8E375F27C83122614E929D6FD5E1BE84248C3B47FF07",
+      "target": "note"
+    },
+    {
+      "method": "accessibility_invoke",
+      "observation_revision": "4F948F3348125C41FDA26D4876AE44BFFCCB9342FDAA747357C6BB13F59999F5",
+      "target": "save"
+    }
+  ],
+  "mouse_keyboard_strict": {
+    "job_id": "bb8aac712bb345c59aa2d7aeb5711f66",
+    "status": "completed",
+    "model_calls": 0,
+    "approval_requests": 7,
+    "staff": "simulated",
+    "actions": [
+      {
+        "method": "mouse_input",
+        "observation_revision": "F1620E266370AF5E39DD5BFBE39DF02FD7CC3D0FD363C5565410E14F49279A02",
+        "target": "invoices"
+      },
+      {
+        "method": "mouse_input",
+        "observation_revision": "F55ECAAD711ABAB91C87C923148F90FCF003D2701FF1DEC2A74A7DF4C3C2419E",
+        "target": "open-INV-1044"
+      },
+      {
+        "method": "keyboard_input",
+        "observation_revision": "8F1F77961F90947C34411AD53E5B88C40162B28B7CF2BDBB7FA0C07A93134401",
+        "target": "amount"
+      },
+      {
+        "method": "keyboard_input",
+        "observation_revision": "7476226ADA0A15D5AE8ABF37E1B25BAB21F2D1DB8F1873E3943C11D87E544730",
+        "target": "note"
+      },
+      {
+        "method": "mouse_input",
+        "observation_revision": "84B3C1489201FFD06E7CF674382B7A81D08FD1F6EF9A5C2D030D2FA3D3DD3621",
+        "target": "save"
+      }
+    ]
+  },
+  "live_visual_recovery": {
+    "job_id": "6352420a64d54e2e93e3f6e7fa4b6315",
+    "status": "completed",
+    "model": "openai/gpt-5.6-luna",
+    "provider": "openrouter",
+    "model_calls": 3,
+    "tokens": 9570,
+    "approval_requests": 5,
+    "effective_mode": "auto",
+    "staff": "simulated",
+    "latest_screenshot_sent_to_model": true,
+    "actions": [
+      {
+        "method": "mouse_input",
+        "observation_revision": "F457EA3C1D46F52145D1118E4387491541B871AB5D2532395B24A166AB13AE24",
+        "target": "invoices"
+      },
+      {
+        "method": "mouse_input",
+        "observation_revision": "6E908AA6E26D9C3D4A0E6104A27551B91619E817C342704E2C06C3D506841E3C",
+        "target": "open-INV-1042"
+      },
+      {
+        "method": "keyboard_input",
+        "observation_revision": "11A1D82B4B7F8596B91508DA0C12518A424B08484BB0694C40FF86F977CD4587",
+        "target": "amount"
+      },
+      {
+        "method": "keyboard_input",
+        "observation_revision": "14BD12C6DEA66555C4DAEE669945A4E412A4CFB77BB8F6C8CE6B6BE3E19A307B",
+        "target": "note"
+      },
+      {
+        "method": "mouse_input",
+        "observation_revision": "551B38E7FE71AEBD5F3E40D9D88370D68292D0801C8E07ACD869145565B675BB",
+        "target": "save"
+      }
+    ]
+  }
+}

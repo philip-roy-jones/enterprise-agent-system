@@ -3,14 +3,22 @@
 from .operations import OPERATIONS
 from .store import fingerprint
 from .types import Paused, Recovery, Stale, Stopped
+from threading import RLock
 
 
 class ExecutionLayer:
     def __init__(self, store, adapter, operations=None):
         self.store, self.adapter = store, adapter
         self.operations = operations or OPERATIONS
+        self._desktop_lock = RLock()
 
     def run(self, job_id, invocation, name, arguments, execute, kind="node"):
+        # Graph checkpoint I/O can use multiple threads, while all observations,
+        # approval decisions, adapter state, and desktop effects stay serialized.
+        with self._desktop_lock:
+            return self._run(job_id, invocation, name, arguments, execute, kind)
+
+    def _run(self, job_id, invocation, name, arguments, execute, kind="node"):
         cached = self.store.result(invocation)
         if cached is not None:
             return cached
@@ -43,6 +51,8 @@ class ExecutionLayer:
                 "record_id": job.get("record_id", job.get("invoice_id")),
                 "invoice_id": job.get("invoice_id"),
                 "expected": job["expected"],
+                "request": job["task"],
+                "assistant_report": job.get("assistant_report"),
             },
             application=job.get("application", "Ledger (synthetic)"),
             observation=observation.model_dump(),
@@ -83,6 +93,7 @@ class ExecutionLayer:
             arguments = approval.get("corrected_arguments", arguments)
         action = dict(name=name, arguments=arguments, observation_revision=observation.revision)
         self.store.begin_action(job_id, owner, lease["epoch"], invocation, action, approval_id)
+        self.adapter.approved_observation = observation if kind == "tool" else None
         self.adapter.fence = lambda: self.store.check(job_id, owner, lease["epoch"])
         try:
             self.adapter.fence()
@@ -106,6 +117,23 @@ class ExecutionLayer:
             raise
         except Exception as error:
             self.store.finish_action(job_id, invocation, {"error": str(error)}, approval_id, cache=False)
-            raise
+            # Only failures inside an authorized operation become procedure
+            # failures. Authority/approval failures above this block cannot route
+            # around their restriction through the assistant.
+            self.store.event(
+                job_id,
+                "procedure_failure",
+                {
+                    "operation": name,
+                    "error_type": type(error).__name__,
+                    "message": str(error),
+                    "invocation": invocation,
+                    "mutation": self.store.get_job(job_id)["mutation"],
+                },
+            )
+            raise Recovery(
+                "code_failure", f"Procedure {name} failed: {type(error).__name__}: {error}"
+            ) from error
         finally:
+            self.adapter.approved_observation = None
             self.adapter.fence = lambda: (_ for _ in ()).throw(PermissionError("No active operation"))

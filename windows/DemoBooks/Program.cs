@@ -10,12 +10,12 @@ namespace DemoBooks;
 static class Program
 {
     [STAThread]
-    static void Main()
+    static void Main(string[] args)
     {
         using var mutex = new Mutex(true, "Local\\EAS-DemoBooks", out bool first);
         if (!first) return;
         ApplicationConfiguration.Initialize();
-        Application.Run(new AccountingWindow());
+        Application.Run(new AccountingWindow(!args.Contains("--no-api")));
     }
 }
 
@@ -40,7 +40,7 @@ public sealed class AccountingWindow : Form
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hWnd);
 
-    public AccountingWindow()
+    public AccountingWindow(bool enableApi = true)
     {
         dataDir = Environment.GetEnvironmentVariable("EAS_WINDOWS_DATA_DIR") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EnterpriseAgentSystem", "DemoBooks", "data");
         store = new AccountingStore(dataDir);
@@ -59,6 +59,19 @@ public sealed class AccountingWindow : Form
         foreach (string name in new[] { "File", "Edit", "View", "Company", "Vendors", "Reports", "Help" }) menu.Items.Add(name);
         ((ToolStripMenuItem)menu.Items[0]).DropDownItems.Add("Exit", null, (_, _) => Close());
         ((ToolStripMenuItem)menu.Items[6]).DropDownItems.Add("About this synthetic application", null, (_, _) => MessageBox.Show("DemoBooks is an Enterprise Agent System test application. It is not QuickBooks or an Intuit product. All records are synthetic.", "About DemoBooks"));
+        var trainingMenu = new ToolStripMenuItem("Training scenarios");
+        foreach (var item in new[] {
+            ("Standard layout", "{\"variant\":\"standard\",\"dialog\":null}"),
+            ("Changed amount label", "{\"variant\":\"renamed\"}"),
+            ("Changed layout", "{\"variant\":\"layout\"}"),
+            ("Informational notice", "{\"dialog\":\"info\"}"),
+            ("Unfamiliar notice", "{\"dialog\":\"unfamiliar\"}"),
+            ("Unsaved changes", "{\"dialog\":\"unsaved\",\"unsaved\":true}"),
+            ("Reordered records", "{\"reordered\":true}"),
+            ("Interrupted save confirmation", "{\"interrupt_save\":true}") })
+            trainingMenu.DropDownItems.Add(item.Item1, null, (_, _) => { store.Scenario(JsonSerializer.Deserialize<JsonElement>(item.Item2)); Render(); });
+        menu.Items.Add(trainingMenu);
+        if (!enableApi) Text += " — Application API disabled";
         var header = new Panel { Dock = DockStyle.Top, Width = ClientSize.Width, Height = 72, BackColor = Color.FromArgb(26, 67, 48) };
         header.Controls.Add(new Label { Text = "DemoBooks Desktop", ForeColor = Color.White, Font = new("Segoe UI", 20, FontStyle.Bold), AutoSize = true, Location = new(23, 15) });
         var company = MakeButton("company", "Acme Manufacturing  ▾", () => Apply("company", new { company_id = "ACME" }));
@@ -80,7 +93,7 @@ public sealed class AccountingWindow : Form
         MainMenuStrip = menu;
         timer.Tick += (_, _) => { if (loadingShown && store.State.loading_until <= AccountingStore.Now) Render(); };
         timer.Start();
-        Shown += (_, _) => { Render(); StartBridge(); Activate(); };
+        Shown += (_, _) => { Render(); if (enableApi) StartBridge(); Activate(); };
         FormClosed += (_, _) => { listener?.Stop(); timer.Stop(); };
     }
 
@@ -176,7 +189,7 @@ public sealed class AccountingWindow : Form
     void AddField(string id, string label, int x, int y, int width)
     {
         var field = new TextBox { Name = id, AccessibleName = label, Text = store.State.fields[id], Location = new(x, y), Size = new(width, 32), Font = new("Segoe UI", 12) };
-        field.TextChanged += (_, _) => { if (rendering) return; store.State.fields[id] = field.Text; store.State.unsaved = true; store.Changed(); statusText.Text = "Unsaved correction draft changes"; };
+        field.TextChanged += (_, _) => { if (rendering) return; store.State.fields[id] = field.Text; store.State.unsaved = true; store.Changed(); statusText.Text = $"Company: {store.State.company_id}    |    Unsaved correction draft changes"; };
         content.Controls.Add(field); targets[id] = field;
     }
     void ShowDialogOverlay(string kind)

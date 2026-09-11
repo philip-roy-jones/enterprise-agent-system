@@ -1,6 +1,9 @@
 import pytest
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from enterprise.execution import ExecutionLayer
-from enterprise.types import Observation, Paused, Stale
+from enterprise.types import Observation, Paused, Stale, Recovery
 
 
 class FakeAdapter:
@@ -84,3 +87,46 @@ def test_backend_revalidates_exact_action_arguments(store, job):
             },
             a["id"],
         )
+
+
+def test_code_failure_releases_control_and_records_diagnostics_for_fallback(store, job):
+    adapter = FakeAdapter()
+    layer = ExecutionLayer(store, adapter)
+    store.mode(job["id"], "auto")
+
+    def broken_procedure(args):
+        raise KeyError("changed_control")
+
+    with pytest.raises(Recovery) as caught:
+        layer.run(job["id"], "broken", "prepare", {}, broken_procedure)
+    assert caught.value.kind == "code_failure"
+    assert store.lease()["inflight"] is None
+    assert store.result("broken") is None
+    diagnostic = next(e["data"] for e in store.events(job["id"]) if e["kind"] == "procedure_failure")
+    assert diagnostic["error_type"] == "KeyError"
+    assert diagnostic["operation"] == "prepare"
+
+
+def test_parallel_graph_tasks_serialize_desktop_access(store, job):
+    layer = ExecutionLayer(store, FakeAdapter())
+    store.mode(job["id"], "auto")
+    ready = threading.Barrier(2)
+    active = 0
+    maximum = 0
+
+    def execute(args):
+        nonlocal active, maximum
+        active += 1
+        maximum = max(maximum, active)
+        time.sleep(0.03)
+        active -= 1
+        return {"ok": True}
+
+    def task(index):
+        ready.wait(timeout=5)
+        return layer.run(job["id"], f"parallel-{index}", "validate", {}, execute)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(task, range(2)))
+    assert len(results) == 2 and maximum == 1
+    assert store.lease()["inflight"] is None

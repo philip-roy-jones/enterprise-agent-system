@@ -16,9 +16,15 @@ def main():
     logging.getLogger("httpx").setLevel(logging.WARNING)
     if options.command == "serve":
         import uvicorn
+        from .config import Settings
 
+        settings = Settings()
         uvicorn.run(
-            "enterprise.backend:create_app", factory=True, host="127.0.0.1", port=8000, access_log=False
+            "enterprise.backend:create_app",
+            factory=True,
+            host=settings.bind_host,
+            port=settings.bind_port,
+            access_log=False,
         )
     elif options.command == "worker":
         from .worker import run_worker

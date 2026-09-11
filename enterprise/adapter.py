@@ -1,6 +1,7 @@
 """Browser adapter. Only ExecutionLayer grants action-time fencing callbacks."""
 
 from typing import Protocol
+import base64
 import time
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 from .store import fingerprint
@@ -44,6 +45,12 @@ class BrowserAdapter:
         self.browser.close()
         self.playwright.stop()
 
+    def correction_note(self, note):
+        return note
+
+    def get_model_image(self):
+        return getattr(self, "_model_image", None)
+
     def prepare_observation(self, job_id, owner, epoch):
         # This adapter owns a dedicated browser page, independent of OS focus.
         return None
@@ -55,6 +62,7 @@ class BrowserAdapter:
             """els => els.filter(e => e.getBoundingClientRect().width && !e.closest('#app')?.hidden).map(e => {const r=e.getBoundingClientRect();return {target:e.dataset.target,label:e.getAttribute('aria-label')||e.innerText,x:r.x+r.width/2,y:r.y+r.height/2,width:r.width,height:r.height}})"""
         )
         png = self.page.screenshot()
+        self._model_image = base64.b64encode(png).decode("ascii")
         screenshot = self.store.artifact(png) if hasattr(self.store, "artifact") else "test.png"
         shape = {"state": state, "targets": targets, "width": 1200, "height": 800}
         return Observation(
@@ -138,6 +146,11 @@ class BrowserAdapter:
         existing = self.saved_result(expected_result)
         if existing:
             return existing
+        if self.job.get("mutation") == "attempted_uncertain":
+            raise Recovery(
+                "ambiguous",
+                "An earlier Save has no verified result; staff must reconcile before another Save",
+            )
         self.ensure_editable()
         try:
             self.click_target("save")

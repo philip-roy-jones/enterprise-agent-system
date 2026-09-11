@@ -2,17 +2,21 @@
 
 ## Processes
 
-The FastAPI backend owns job dispatch, staff decisions, conversation events, role authentication, artifacts, the release registry, and persistent synthetic accounting records. SQLite uses WAL and transactional writes. The staff console uses server-sent events and periodic reconciliation so reconnecting retrieves the actual outstanding decision.
+The FastAPI backend owns job dispatch, staff decisions, conversation events, role authentication, artifacts, and the release registry. It does not run LangGraph, initialize Deep Agents, or connect to the Windows desktop. The optional browser fixture stores its synthetic application records here for tests only. SQLite uses WAL and transactional writes. The staff console uses server-sent events and periodic reconciliation so reconnecting retrieves the actual outstanding decision.
 
-The Python worker polls a restricted HTTP RPC boundary, claims one session, selects an installed department workflow, runs its cyclic LangGraph, and initializes Deep Agents in the same process. The shared job envelope and execution layer are independent of the Finance example. With the browser adapter, a dedicated thread owns Chromium because Playwright's synchronous API is thread-affine. With the Windows adapter, the same graph controls the native DemoBooks application through its scoped loopback bridge over SSH. The browser reaches the mock application's authenticated HTTP interface through real buttons and form fields. Shared execution checks a fencing epoch before each desktop action.
+The Python worker runs on the edge VM/PC alongside the target application. It polls a restricted HTTP RPC boundary, claims one session, selects an installed department workflow, runs its cyclic LangGraph, and initializes Deep Agents in the same process. The shared job envelope and execution layer are independent of the Finance example. With the browser adapter, a dedicated thread owns Chromium because Playwright's synchronous API is thread-affine. With the Windows adapter, the same graph controls the native DemoBooks application through its local desktop controller or optional scoped application API. The browser reaches the mock application's authenticated HTTP interface through real buttons and form fields. Shared execution checks a fencing epoch before each desktop action.
 
-The worker's two SQLite checkpoint files are on a durable volume, outside process memory. They are distinct from the accounting application state. Moving the worker to a different machine requires moving or mounting these files and using a reachable authenticated backend URL. Backend and worker credentials are separate.
+The worker's two SQLite checkpoint files are on a durable volume, outside process memory. They are distinct from the accounting application state. Both graphs use synchronous checkpoint durability and a pool with room for checkpoint I/O dependencies. A lock in the shared execution layer serializes desktop observations and effects independently of graph concurrency. Moving the worker to a different machine requires moving or mounting these files and using a reachable authenticated backend URL. Backend and worker credentials are separate.
+
+The independent Windows desktop controller also supports an application with its own API disabled. It observes UI Automation controls, screenshots the assigned window, and uses accessibility patterns or real input. The application-specific adapter decodes visible business values and verifies saved drafts through a unique reference in the explanation. See [legacy desktop behavior and limits](legacy-desktop.md).
 
 ## Role graph
 
 ```mermaid
 flowchart TD
-    Start([Job]) --> Validate[Validate task and permissions]
+    Start([Job]) --> Match{Known procedure?}
+    Match -->|yes| Validate[Validate task and permissions]
+    Match -->|no| Assist[Supervised Deep Agent]
     Validate --> Establish[Establish company and invoice]
     Establish --> Compare[Compare invoice and purchase order]
     Compare --> Prepare[Prepare correction draft]
@@ -22,9 +26,11 @@ flowchart TD
     Establish & Prepare & Save --> Classify{Structured recovery}
     Classify -->|known or temporary| Recover[Known recovery / bounded readiness]
     Recover --> Establish
-    Classify -->|unfamiliar or unsupported| Assist[Supervised Deep Agent]
+    Classify -->|unfamiliar state or code failure| Assist
     Classify -->|uncertain save| Resume[Observe and reconcile]
-    Assist --> Resume
+    Assist -->|known procedure recovery| Resume
+    Assist -->|unmatched request| Review[Staff reviews reported outcome]
+    Review --> Accepted([Complete; request acceptance])
     Resume -->|draft exists| Verify
     Resume -->|fields verified| Save
     Resume -->|navigation needed| Establish
