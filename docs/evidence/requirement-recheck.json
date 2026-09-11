@@ -1,0 +1,39 @@
+{
+  "checked_commit": "c810a8a4efe6e38141700e96d1aee27fc3be3b56",
+  "scope": "Original prompt sections 3 and 10: job deadline enforcement while paused",
+  "model": "simulated",
+  "staff": "simulated",
+  "method": "Real isolated backend and browser worker processes. After a pending approval or takeover, backdate only the synthetic job started_at beyond its 120-second budget; allow two seconds of worker polling.",
+  "existing_suite": {
+    "tests": 158,
+    "failures": 0,
+    "ci": "https://github.com/philip-roy-jones/enterprise-agent-system/actions/runs/34561944890"
+  },
+  "new_checks": {
+    "tests": 2,
+    "failures": 2
+  },
+  "results": [
+    {
+      "waiting": "fallback",
+      "status": "running",
+      "elapsed": 127.02245998382568,
+      "timeout": 120,
+      "worker_alive": true,
+      "pending_approvals": [
+        "observe_app"
+      ]
+    },
+    {
+      "waiting": "takeover",
+      "status": "running",
+      "elapsed": 127.01998209953308,
+      "timeout": 120,
+      "worker_alive": true,
+      "pending_approvals": []
+    }
+  ],
+  "expected": "Expired jobs transition to a terminal failure rather than retaining the desktop job indefinitely.",
+  "impact": "Deadline handling is inconsistent during pauses. This repro establishes a stuck running job, not an unauthorized desktop action.",
+  "fixed": false
+}

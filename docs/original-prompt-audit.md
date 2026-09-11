@@ -2,7 +2,18 @@
 
 This audit covers the bounded demonstration in `original-prompt.txt`, including the requested Windows deployment and OpenRouter provider. It does not treat arbitrary new workflow generation, production adoption, or an unlimited number of worker VMs as requirements for the original demonstration.
 
-**The bounded prototype is implemented and demonstrated.** This audit distinguishes the runnable prototype from production readiness, generic legacy-app support, and arbitrary workflow generation. The evidence below covers the original requirements plus the requested separate Windows deployment. New generated proposals still require their own developer decision; an unapproved proposal is never a release.
+**The core demonstration is implemented, but the original requirements are not fully satisfied yet.** A direct recheck found missing deadline enforcement while fallback awaits staff approval and during staff takeover. These are outstanding defects in the original bounded-execution requirement; the earlier unconditional completion statement was too strong. This audit distinguishes the runnable prototype from production readiness, generic legacy-app support, and arbitrary workflow generation. The evidence below covers the original requirements plus the requested separate Windows deployment. New generated proposals still require their own developer decision; an unapproved proposal is never a release.
+
+## Direct recheck — 2026-09-11
+
+The existing 158-test suite and the latest CI passed, but two additional isolated browser integration checks failed. Both used explicitly simulated staff and model behavior. With a configured 120-second job budget and the synthetic job clock advanced past that budget, the worker continued polling and the job remained `running` at approximately 127 elapsed seconds:
+
+- **Waiting for fallback approval:** the completed outer `assist` invocation is returned from the execution cache, and `run_assistant()` returns its pending interrupt without entering the execution layer's deadline check.
+- **Staff takeover:** `run_worker()` sleeps and continues while the owner is `staff`, before checking the job deadline.
+
+Relevant code is in `src/edge-harness/eas_harness/worker.py`, `execution.py`, and `assistance.py`; the deadline check itself is in `src/server/eas_server/store.py`. These jobs can retain the single desktop job slot beyond their budget. This finding does not show actions executing after expiry: action-time authorization and deadline checks are separate.
+
+[Recheck evidence](evidence/requirement-recheck.json) records both failures. The [reproduction source](evidence/job-deadline-repro.py) can be copied into `tests/test_job_deadlines.py` and run with `pytest -q tests/test_job_deadlines.py` to use the existing integration fixtures. The implementation has not been changed by this audit. The deadline checks must cover paused paths, and the two regression cases must pass, before restoring a complete status.
 
 ## Final acceptance evidence
 
