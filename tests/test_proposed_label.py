@@ -1,4 +1,4 @@
-from enterprise.workflows.finance.procedures import resolve_amount_label
+from eas_harness.workflows.finance.procedures import resolve_amount_label
 import pytest
 
 

@@ -1,9 +1,9 @@
 from dataclasses import replace
 import pytest
-from enterprise.shared.config import Settings
-from enterprise.workflows.roles import ROLES
-from enterprise.shared.types import JobInput
-from enterprise.harness.worker import validate_assignment, run_worker
+from eas_harness.config import Settings
+from eas_harness.workflows.roles import ROLES
+from eas_shared.types import JobInput
+from eas_harness.worker import validate_assignment, run_worker
 
 
 @pytest.mark.parametrize(
@@ -25,7 +25,7 @@ def test_receiver_rejects_inconsistent_or_unauthorized_assignment(store, updates
 def test_misrouted_job_never_initializes_desktop_or_graph(store, monkeypatch, tmp_path):
     job = store.create_job(JobInput(organization_id="other", invoice_id="INV-1042").model_dump())
     store.claim("dispatcher")
-    monkeypatch.setattr("enterprise.harness.worker.RemoteStore", lambda *args: store)
+    monkeypatch.setattr("eas_harness.worker.RemoteStore", lambda *args: store)
     monkeypatch.setattr(store, "claim", lambda *args: job)
 
     def forbidden(*args):
@@ -45,6 +45,12 @@ def test_misrouted_job_never_initializes_desktop_or_graph(store, monkeypatch, tm
 def test_multiple_explicitly_authorized_roles_can_share_a_worker(store, monkeypatch):
     role = replace(ROLES["invoice_correction"], id="invoice_review")
     monkeypatch.setitem(ROLES, role.id, role)
+    from eas_server.roles import ROLES as SERVER_ROLES
+    from eas_shared.roles import RoleDefinition
+    from dataclasses import fields
+
+    metadata = RoleDefinition(**{f.name: getattr(role, f.name) for f in fields(RoleDefinition)})
+    monkeypatch.setitem(SERVER_ROLES, role.id, metadata)
     job = store.create_job(JobInput(role_id=role.id, invoice_id="INV-1042").model_dump())
     with pytest.raises(PermissionError):
         validate_assignment(Settings(), job)

@@ -1,7 +1,7 @@
 import pytest
 
-from enterprise.harness.adapters.accessibility_adapter import AccessibilityAdapter, decode_observation
-from enterprise.shared.types import Recovery, Stale, Observation
+from eas_harness.adapters.accessibility_adapter import AccessibilityAdapter, decode_observation
+from eas_shared.types import Recovery, Stale, Observation
 
 
 def visible_invoice(note="", amount="900.00", company="ACME", offset=0):

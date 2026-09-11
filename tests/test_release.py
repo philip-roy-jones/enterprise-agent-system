@@ -1,10 +1,10 @@
 import json
 import subprocess
 import pytest
-from enterprise.shared.config import Settings
-from enterprise.development.improve import deploy, review, verify_candidate, require_development
-from enterprise.server.store import Store
-from enterprise.shared.types import JobInput
+from eas_server.config import Settings
+from enterprise_dev.improve import deploy, review, verify_candidate, require_development
+from eas_server.store import Store
+from eas_shared.types import JobInput
 
 
 def test_proposal_generation_requires_explicit_development_scope(monkeypatch):
@@ -51,7 +51,7 @@ def test_rejected_or_changes_requested_candidate_cannot_deploy(candidate, tmp_pa
 def test_changed_candidate_or_evidence_invalidates_review(candidate, tmp_path, artifact):
     settings = Settings(data_dir=tmp_path / "live")
     review(candidate, "approve", "Test developer", settings.developer_token, settings)
-    from enterprise.development.improve import candidate_library
+    from enterprise_dev.improve import candidate_library
 
     path = candidate_library(candidate / "checkout")[0] if artifact == "source" else candidate / artifact
     path.write_text(path.read_text() + "\nchanged")

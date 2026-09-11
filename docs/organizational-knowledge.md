@@ -8,7 +8,7 @@ Authorized staff can add a document with `POST /api/knowledge`. For example, fro
 import json
 from pathlib import Path
 import httpx
-from enterprise.shared.config import Settings
+from enterprise_dev.config import Settings
 
 settings = Settings()
 document = json.loads(Path("examples/finance-knowledge.json").read_text())

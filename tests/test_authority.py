@@ -1,9 +1,9 @@
 import json
 import time
 import pytest
-from enterprise.server.store import Store
-from enterprise.shared.identity import canonical
-from enterprise.shared.types import Stale, Stopped, JobInput
+from eas_server.store import Store
+from eas_shared.identity import canonical
+from eas_shared.types import Stale, Stopped, JobInput
 
 
 def proposal(store, job, invocation="one", kind="node"):

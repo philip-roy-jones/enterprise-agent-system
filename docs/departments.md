@@ -2,7 +2,7 @@
 
 Enterprise Agent System is a shared platform. Finance is its first example department, not its product boundary. A department can supply one or several worker roles: People Operations onboarding review, IT service requests, Procurement purchase-order checks, and so on. Those additional production workflows are not implemented by this prototype.
 
-`enterprise.workflows.roles.WorkerRole` registers the trusted code implementing a workflow:
+`eas_harness.workflows.roles.WorkerRole` registers the trusted code implementing a workflow:
 
 - Department and role identifiers and staff-facing labels.
 - A Pydantic input schema and the input field identifying the target record.
@@ -21,7 +21,7 @@ The backend accepts a generic envelope with `organization_id`, `department_id`, 
 }
 ```
 
-The worker resolves the installed workflow and uses its graph, operation registry, and adapter through the shared execution layer. New department workflow modules can call `register_role()` and be explicitly loaded via `EAS_ROLE_MODULES=package.module`. These are reviewed application modules, never import paths supplied by a model or untrusted job.
+The worker resolves the installed workflow and uses its graph, operation registry, and adapter through the shared execution layer. Install executable workflow modules on the edge and register `WorkerRole` through `eas_harness.workflows.roles.register_role()`. Load them with `EAS_WORKFLOW_MODULES=package.module` (the former `EAS_ROLE_MODULES` remains an edge-only alias). Separately install a server metadata module that registers an `eas_shared.roles.RoleDefinition` through `eas_server.roles.register_role()`, and load it with `EAS_SERVER_ROLE_MODULES=package.module`. The public input schema and capabilities must agree; the server metadata module must not import harness code. These are reviewed application modules, never import paths supplied by a model or untrusted job.
 
 The console discovers installed workflows from `/api/roles`, groups them by department, and renders their inputs. The Finance demonstration includes a custom invoice selector and interruption controls. Other installed workflows use ordinary form fields derived from their schemas.
 

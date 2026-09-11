@@ -1,0 +1,6 @@
+# Run from the repository root. Each application can also be installed separately.
+-c requirements.lock
+-e src/shared
+-e src/server
+-e src/edge-harness[browser]
+-e .[dev]

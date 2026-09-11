@@ -6,9 +6,9 @@ import sys
 import time
 import httpx
 import pytest
-from enterprise.shared.config import Settings
-from enterprise.server.store import Store
-from enterprise.shared.types import JobInput
+from enterprise_dev.config import Settings
+from eas_server.store import Store
+from eas_shared.types import JobInput
 
 
 @pytest.fixture
@@ -50,7 +50,7 @@ def server(tmp_path_factory):
             sys.executable,
             "-m",
             "uvicorn",
-            "enterprise.server.backend:create_app",
+            "eas_server.backend:create_app",
             "--factory",
             "--host",
             "127.0.0.1",
@@ -75,7 +75,7 @@ def server(tmp_path_factory):
         backend.terminate()
         pytest.fail((data_dir / "backend.log").read_text())
     worker = subprocess.Popen(
-        [sys.executable, "-m", "enterprise.cli", "worker"],
+        [sys.executable, "-m", "eas_harness"],
         env=env,
         cwd=root,
         stdout=worker_log,
@@ -164,17 +164,24 @@ def pending(client, job_id):
     return next(a for a in data["approvals"] if a["status"] == "pending")
 
 
-@pytest.fixture(params=["src", "legacy"])
+@pytest.fixture(params=["split", "src", "legacy"])
 def candidate(tmp_path, request):
     import json
-    from enterprise.development.improve import sha
+    from enterprise_dev.improve import sha
 
     folder = tmp_path / "proposal"
     checkout = folder / "checkout"
-    package = checkout / ("src/enterprise/workflows/finance" if request.param == "src" else "enterprise")
+    layouts = {
+        "split": ("src/edge-harness", "eas_harness/workflows/finance"),
+        "src": ("src", "enterprise/workflows/finance"),
+        "legacy": (".", "enterprise"),
+    }
+    source_root, module = layouts[request.param]
+    package_root = checkout / source_root
+    package = package_root / module
     package.mkdir(parents=True)
     for parent in [package, *package.parents]:
-        if parent in {checkout, checkout / "src"}:
+        if parent == package_root:
             break
         (parent / "__init__.py").write_text("")
     source = package / "procedures.py"

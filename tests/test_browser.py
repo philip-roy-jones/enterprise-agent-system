@@ -2,9 +2,9 @@ import subprocess
 import sys
 import time
 import pytest
-from enterprise.development.demo import drive
-from enterprise.shared.identity import canonical
-from enterprise.workflows.finance.procedures import AMOUNT_LABELS
+from enterprise_dev.demo import drive
+from eas_shared.identity import canonical
+from eas_harness.workflows.finance.procedures import AMOUNT_LABELS
 from conftest import pending, wait_for
 
 pytestmark = pytest.mark.browser
@@ -246,7 +246,7 @@ def test_restart_after_ambiguous_save_reconciles_without_second_save(browser_ser
         lease["expires"] = 0
         db.execute("UPDATE lease SET data=?", (canonical(lease),))
     ctx["worker"] = subprocess.Popen(
-        [sys.executable, "-m", "enterprise.cli", "worker"],
+        [sys.executable, "-m", "eas_harness"],
         env=ctx["env"],
         cwd=ctx["root"],
         stdout=ctx["worker_log"],
@@ -271,7 +271,7 @@ def test_improved_library_on_new_record(browser_server, invoice, variant):
 
 
 def test_review_release_new_instance_and_rollback_in_isolated_demo(browser_server, candidate):
-    from enterprise.development.improve import deploy, review, rollback
+    from enterprise_dev.improve import deploy, review, rollback
 
     c, settings = browser_server["client"], browser_server["settings"]
     c.post("/api/mock/scenario", json={"variant": "renamed"}).raise_for_status()

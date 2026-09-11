@@ -1,7 +1,7 @@
 import pytest
 from pydantic import BaseModel
-from enterprise.workflows.roles import WorkerRole, ROLES
-from enterprise.shared.types import JobInput
+from eas_harness.workflows.roles import WorkerRole, ROLES
+from eas_shared.types import JobInput
 
 
 class PeopleInputs(BaseModel):
@@ -27,6 +27,12 @@ def people_role(monkeypatch):
         stages=("review",),
     )
     monkeypatch.setitem(ROLES, role.id, role)
+    from eas_server.roles import ROLES as SERVER_ROLES
+    from eas_shared.roles import RoleDefinition
+    from dataclasses import fields
+
+    metadata = RoleDefinition(**{f.name: getattr(role, f.name) for f in fields(RoleDefinition)})
+    monkeypatch.setitem(SERVER_ROLES, role.id, metadata)
     return role
 
 
@@ -75,3 +81,13 @@ def test_episodes_do_not_cross_department_or_role_scopes(store, people_role):
         ).model_dump()
     )
     assert store.relevant_episodes(people["id"]) == []
+
+
+def test_server_and_worker_share_public_contract_without_runtime_factories():
+    from eas_server.roles import ROLES as server_roles
+
+    server_role = server_roles["invoice_correction"]
+    assert server_role.public() == ROLES["invoice_correction"].public()
+    assert not hasattr(server_role, "graph_factory")
+    assert not hasattr(server_role, "adapter_factory")
+    assert not hasattr(server_role, "operations")

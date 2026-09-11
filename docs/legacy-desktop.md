@@ -10,7 +10,7 @@ Publish both Windows executables:
 
 ```bash
 dotnet publish src/demobooks/DemoBooks/DemoBooks.csproj -c Release -r win-x64 --self-contained true -o src/demobooks/publish
-dotnet publish src/enterprise/harness/windows/DesktopAgent/DesktopAgent.csproj -c Release -r win-x64 --self-contained true -o src/enterprise/harness/windows/desktop-publish
+dotnet publish src/edge-harness/windows/DesktopAgent/DesktopAgent.csproj -c Release -r win-x64 --self-contained true -o src/edge-harness/windows/desktop-publish
 ```
 
 Copy both published directories and the installers to the Windows machine. In PowerShell, install DemoBooks with its application API disabled and install the independent controller:

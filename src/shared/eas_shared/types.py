@@ -1,0 +1,56 @@
+from typing import Any, Literal
+from pydantic import BaseModel, Field
+
+Mode = Literal["strict", "auto"]
+TERMINAL = {"completed", "cancelled", "rejected", "denied", "failed"}
+
+
+class JobInput(BaseModel):
+    organization_id: str = "acme"
+    department_id: str = "finance"
+    role_id: str = "invoice_correction"
+    inputs: dict[str, Any] = Field(default_factory=dict)
+    company_id: str | None = None
+    invoice_id: str | None = Field(default=None, pattern=r"^INV-\d{4}$")
+    task: str | None = None
+    selected_mode: Mode = "strict"
+    permissions: list[str] | None = None
+
+
+class Decision(BaseModel):
+    decision: Literal["approve", "reject", "correct"]
+    arguments: dict[str, Any] | None = None
+    explanation: str = ""
+
+
+class KnowledgeDocument(BaseModel):
+    organization_id: str = Field(min_length=1, max_length=100)
+    department_id: str | None = Field(default=None, min_length=1, max_length=100)
+    role_id: str | None = Field(default=None, min_length=1, max_length=100)
+    company_id: str | None = Field(default=None, min_length=1, max_length=100)
+    title: str = Field(min_length=1, max_length=200)
+    content: str = Field(min_length=1, max_length=12000)
+
+
+class Observation(BaseModel):
+    revision: str
+    timestamp: float
+    screenshot: str
+    width: int = 1200
+    height: int = 800
+    state: dict[str, Any]
+    targets: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class Recovery(Exception):
+    def __init__(self, kind: str, reason: str):
+        self.kind, self.reason = kind, reason
+        super().__init__(reason)
+
+
+class Stopped(Exception):
+    pass
+
+
+class Stale(Exception):
+    pass

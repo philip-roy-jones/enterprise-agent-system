@@ -12,18 +12,20 @@ The independent Windows desktop controller also supports an application with its
 
 ## Repository boundaries
 
-The prototype is a monorepo with explicit source packages under `src/`. They map to these future repository boundaries:
+The prototype has three applications in one repository. Each Python application is independently packaged and installed; neither depends on the other.
 
-| Source directory | Responsibility |
+| Source directory | Installed component and responsibility |
 | --- | --- |
-| `src/enterprise/server/` | Staff frontend, backend, dispatch, approvals, audit storage, and release registry |
-| `src/enterprise/harness/` | LangGraph and Deep Agent runtime, shared execution authority, desktop control, and adapter interfaces |
-| `src/enterprise/workflows/` | Department graphs, reusable business operations, application-specific rules, and their regression tests |
-| `src/demobooks/` | Independent synthetic Windows application |
+| `src/server/` | `enterprise-agent-server`: frontend, HTTP API, dispatch, approvals, audit storage and release registry |
+| `src/edge-harness/` | `enterprise-edge-harness`: worker, Deep Agent, LangGraph workflows, execution authority and desktop adapters |
+| `src/demobooks/` | Independent .NET synthetic Windows application |
+| `src/shared/` | `enterprise-agent-contracts`: public messages, role schemas, value identifiers and RPC declarations |
 
-The harness should have its own repository in practice. Workflow packages can initially be a clearly separated part of that repository, then move into their own repositories as department-specific procedures grow. They are loaded by the harness, so this still represents three running applications; a workflow package is not another server or VM.
+`enterprise-server` and `enterprise-harness` are separate startup commands. The harness owns its workflow packages under `eas_harness/workflows/`; these are executable edge code. The server has a separate metadata catalog containing role input schemas, labels and allowed capabilities, so listing roles and validating requests never imports an executable graph or adapter. Both applications independently validate role permissions.
 
-An improvement such as proposal #2 belongs to the workflow package: it extends an amount-label rule consumed by the existing graph. It does not update the LangGraph dependency or change graph topology. Changes to the harness's approval, permission, and execution code are infrastructure changes with a different review scope. Separate repositories make that distinction clearer, while runtime authorization remains the harness's responsibility. The directories and Python imports are separated now; extracting them into independent repositories and distributions remains future work. `src/enterprise/shared/` holds common configuration, contracts, identifiers and RPC declarations; the harness does not import server persistence. `src/enterprise/development/` owns proposal/review/release tooling, and `src/enterprise/fixtures/` contains the optional browser test application. The server reads workflow metadata without initializing the edge runtime. These directories clarify ownership, but do not establish OS isolation.
+The shared library has no environment loading, credentials, persistence, desktop operations, runtime factories or dependency on either application. Configuration belongs to each application. `tools/enterprise_dev/` is a separate development package for demonstrations, isolated learning proposals, review and release. It may depend on both applications for integration tests. The optional browser accounting fixture is owned by the server and enabled only in browser mode.
+
+An improvement such as proposal #2 changes the workflow package's amount-label rule, rather than the LangGraph dependency or harness permission machinery. Existing checked proposals retain support for their historical source locations; new proposals target `src/edge-harness/eas_harness/workflows/finance/`. Separate repositories can follow later without changing these application boundaries. Package separation clarifies installation and ownership; operating-system isolation still determines the security boundary.
 
 ## Role graph
 

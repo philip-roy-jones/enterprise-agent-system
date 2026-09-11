@@ -4,10 +4,11 @@ import time
 import pytest
 from pydantic import ValidationError
 
-from enterprise.harness.adapters.adapter import BrowserAdapter
-from enterprise.harness.execution import ExecutionLayer
-from enterprise.workflows.finance.operations import OPERATIONS
-from enterprise.shared.types import Paused, Recovery
+from eas_harness.adapters.adapter import BrowserAdapter
+from eas_harness.execution import ExecutionLayer
+from eas_harness.workflows.finance.operations import OPERATIONS
+from eas_harness.errors import Paused
+from eas_shared.types import Recovery
 from test_execution import FakeAdapter, node_args
 
 
@@ -105,7 +106,7 @@ def test_unverified_save_output_never_becomes_confirmed_success(store, job):
 
 
 def test_rejection_for_another_operation_does_not_clear_save_uncertainty(store, job):
-    from enterprise.shared.types import MutationRejected
+    from eas_harness.errors import MutationRejected
 
     layer = layer_for(store, job, name="save_draft")
 
@@ -118,7 +119,7 @@ def test_rejection_for_another_operation_does_not_clear_save_uncertainty(store, 
 
 
 def test_click_contract_rejects_conflicting_target_and_coordinates():
-    from enterprise.shared.contracts import ClickInputs
+    from eas_harness.contracts import ClickInputs
     from pydantic import ValidationError
 
     with pytest.raises(ValidationError):

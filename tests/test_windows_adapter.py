@@ -1,8 +1,8 @@
 import httpx
 import pytest
-from enterprise.shared.config import Settings
-from enterprise.shared.types import Recovery, Stale
-from enterprise.harness.adapters.windows_adapter import WindowsBridge
+from eas_harness.config import Settings
+from eas_shared.types import Recovery, Stale
+from eas_harness.adapters.windows_adapter import WindowsBridge
 
 
 def test_native_bridge_requires_explicit_private_token():
@@ -32,8 +32,8 @@ def test_native_bridge_classifies_restrictions(status, reason, exception):
 
 
 def test_window_recovery_reserves_control_and_never_mutates_accounting(store, job):
-    from enterprise.harness.adapters.windows_adapter import WindowsAdapter
-    from enterprise.shared.types import Stale
+    from eas_harness.adapters.windows_adapter import WindowsAdapter
+    from eas_shared.types import Stale
 
     class Bridge:
         focused = False
@@ -64,7 +64,7 @@ def test_window_recovery_reserves_control_and_never_mutates_accounting(store, jo
 
 @pytest.mark.parametrize("condition", ["minimized", "offscreen"])
 def test_unavailable_window_is_restored_even_if_reported_as_foreground(store, job, condition):
-    from enterprise.harness.adapters.windows_adapter import WindowsAdapter
+    from eas_harness.adapters.windows_adapter import WindowsAdapter
 
     class Bridge:
         minimized = True

@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "enterprise-agent-server"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = ["enterprise-agent-contracts==0.1.0", "fastapi>=0.115", "uvicorn>=0.34", "python-dotenv>=1"]
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["eas_server*"]
+namespaces = false
+
+[project.scripts]
+enterprise-server = "eas_server.cli:main"
+
+[tool.setuptools.package-data]
+eas_server = ["frontend/*"]
+"eas_server.fixtures" = ["static/*"]

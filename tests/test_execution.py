@@ -2,8 +2,9 @@ import pytest
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from enterprise.harness.execution import ExecutionLayer
-from enterprise.shared.types import Observation, Paused, Stale, Recovery
+from eas_harness.execution import ExecutionLayer
+from eas_shared.types import Observation, Stale, Recovery
+from eas_harness.errors import Paused
 
 
 def node_args(job, **extra):

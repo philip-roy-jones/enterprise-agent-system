@@ -3,15 +3,15 @@ from langchain_core.messages import AIMessage, ToolMessage, HumanMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langgraph.checkpoint.memory import InMemorySaver
 
-from enterprise.harness.assistance import build_assistant, run_assistant
-from enterprise.shared.config import Settings
-from enterprise.harness.execution import ExecutionLayer
+from eas_harness.assistance import build_assistant, run_assistant
+from enterprise_dev.config import Settings
+from eas_harness.execution import ExecutionLayer
 from test_assistant import BatchModel, ReadAdapter
 from fastapi.testclient import TestClient
-from enterprise.server.backend import create_app
+from eas_server.backend import create_app
 
-from enterprise.server.conversation import Conversation
-from enterprise.shared.types import JobInput, Stale, Stopped
+from eas_server.conversation import Conversation
+from eas_shared.types import JobInput, Stale, Stopped
 
 
 def ask_approved(store, job, question="Which explanation should the draft include?"):
@@ -133,7 +133,7 @@ class QuestionModel(BatchModel):
 
 
 def test_agent_question_waits_without_model_calls_then_resumes_with_staff_answer(store, job, monkeypatch):
-    monkeypatch.setattr("enterprise.harness.assistance.SimulatedModel", QuestionModel)
+    monkeypatch.setattr("eas_harness.assistance.SimulatedModel", QuestionModel)
     store.mode(job["id"], "auto")
     store.transfer(job["id"], "assistant")
     checkpoint = InMemorySaver()
@@ -175,7 +175,7 @@ def test_agent_question_waits_without_model_calls_then_resumes_with_staff_answer
 
 
 def test_new_guidance_discards_queued_tools_and_reaches_the_next_model_turn(store, job, monkeypatch):
-    monkeypatch.setattr("enterprise.harness.assistance.SimulatedModel", BatchModel)
+    monkeypatch.setattr("eas_harness.assistance.SimulatedModel", BatchModel)
     store.transfer(job["id"], "assistant")
     adapter = ReadAdapter()
     agent = build_assistant(

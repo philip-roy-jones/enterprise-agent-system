@@ -93,3 +93,10 @@ A live OpenRouter model on the Windows harness asked an approved question, waite
 After the combined rollout, a native mouse/keyboard job on INV-1042 completed in 21.93 seconds with zero fallback/model calls and a verified saved draft. The application API remained disabled. Chromium then submitted an explicitly simulated staff assessment, verified that the live metric incremented, and checked both sidebar selections with no JavaScript errors. [Rollout evidence](evidence/final-windows-validation.json).
 
 Incorrect-action totals represent staff reports; unassessed operations are counted separately. They are not a general safety score. Historical debug runs with missing elapsed times are identified rather than backfilled with invented durations.
+
+
+## Independent application packages — 2026-09-11
+
+The server and edge harness now build as separate Python distributions, alongside a small contracts library. Fresh virtual environments installed each application with its own dependencies. The server served packaged frontend assets, listed roles and accepted a job with no harness, LangGraph, Deep Agent or Playwright installed. The harness contacted a synthetic HTTP claim endpoint and created its local checkpoints with no server, development tooling or Playwright installed. These checks run in CI through `tools/check_installation.py`.
+
+The full regression suite passed **158 tests**. Three additional generated-workflow checks passed against an isolated copy of the new package layout, using simulated staff and model behavior. Review/deployment regression tests cover candidates from all three historical source layouts; the existing proposal #2 still verifies against its original hashes and remains pending review. The relocated Windows desktop controller built successfully, and the harness installer scripts parsed successfully in Windows PowerShell. This validates packaging and compatibility, not new model quality or a new accounting transaction.

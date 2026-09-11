@@ -19,11 +19,10 @@ git clone git@github.com:philip-roy-jones/enterprise-agent-system.git
 cd enterprise-agent-system
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.lock
-pip install --no-deps -e .
+pip install -c requirements.lock ./src/shared ./src/server
 ```
 
-On a Windows developer machine, use `.venv\Scripts\python.exe` and `.venv\Scripts\enterprise.exe` instead of activating the Linux environment. Chromium installation is only needed for browser fixture tests.
+On a Windows developer machine, use `.venv\Scripts\python.exe` and `.venv\Scripts\enterprise-server.exe` instead of activating the Linux environment. Chromium installation is only needed for browser fixture tests.
 
 Create an ignored `.env` on the backend:
 
@@ -42,7 +41,7 @@ EAS_DEVELOPER_TOKEN=replace-with-private-developer-token
 
 Generate separate random tokens, for example with `python -c "import secrets; print(secrets.token_urlsafe(32))"`. The backend needs neither the OpenRouter key nor the desktop controller token. `EAS_MODEL_MODE` labels jobs; set it consistently on both machines.
 
-Run **`enterprise serve`**. Publish its loopback listener through your own private HTTPS reverse proxy, or configure `EAS_BIND_HOST` for your trusted development network. Use the reachable backend URL in the Windows configuration below. Keep local addresses in `.env`, not source files. This prototype uses bearer tokens; protect remote connections with HTTPS or an encrypted tunnel.
+Run **`enterprise-server`**. Publish its loopback listener through your own private HTTPS reverse proxy, or configure `EAS_BIND_HOST` for your trusted development network. Use the reachable backend URL in the Windows configuration below. Keep local addresses in `.env`, not source files. This prototype uses bearer tokens; protect remote connections with HTTPS or an encrypted tunnel.
 
 ## 2. Application and controller on Windows
 
@@ -73,14 +72,14 @@ Copy the controller token from `%LOCALAPPDATA%\EnterpriseAgentSystem\DesktopAgen
 From PowerShell in the Windows checkout:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\src\enterprise\harness\windows\install-worker.ps1 -Python 'C:\path\to\python.exe'
+powershell -NoProfile -ExecutionPolicy Bypass -File .\src\edge-harness\windows\install-worker.ps1 -Python 'C:\path\to\python.exe'
 Start-ScheduledTask EAS-Worker
 Get-Content .\runtime\worker.log -Tail 20
 ```
 
-The installer creates a virtual environment and registers a manual `EAS-Worker` task in the desktop user's session. It installs no recurring schedule. Alternatively, install the requirements and editable package manually, then run `.\.venv\Scripts\enterprise.exe worker` in that session.
+The installer creates a virtual environment and registers a manual `EAS-Worker` task in the desktop user's session. It installs no recurring schedule. Alternatively, install only the contracts and harness with `python -m pip install -c requirements.lock ./src/shared ./src/edge-harness`, then run `.\.venv\Scripts\enterprise-harness.exe` in that session.
 
-Keep exactly one worker running for this prototype's single desktop lease. **Do not run `enterprise dev` on the backend in this setup:** it starts another worker there. After jobs finish, run `powershell -ExecutionPolicy Bypass -File .\src\enterprise\harness\windows\stop-worker.ps1` before upgrading its checkout. This stops the task and its Python process tree. Preserve `runtime/worker-checkpoints.sqlite` and `runtime/assistant-checkpoints.sqlite` on Windows across restarts; central job/evidence data stays on the backend.
+Keep exactly one worker running for this prototype's single desktop lease. **Do not run `enterprise dev` on the backend in this setup:** it starts another worker there. After jobs finish, run `powershell -ExecutionPolicy Bypass -File .\src\edge-harness\windows\stop-worker.ps1` before upgrading its checkout. This stops the task and its Python process tree. Preserve `runtime/worker-checkpoints.sqlite` and `runtime/assistant-checkpoints.sqlite` on Windows across restarts; central job/evidence data stays on the backend.
 
 ## 3. Use the staff console
 
@@ -90,4 +89,12 @@ Screenshots and observations come from the Windows worker and are uploaded to th
 
 ## Optional single-machine test fixture
 
-For regression work without Windows, copy `.env.example` to `.env`, keep `EAS_DESKTOP_ADAPTER=browser` and `EAS_MODEL_MODE=simulated`, install Chromium using `python -m playwright install chromium`, and run `enterprise dev`. This starts a backend and browser worker locally and enables `/mock`, the synthetic browser test workspace. It exercises the same graph, approvals, and recovery infrastructure without validating Windows desktop behavior.
+For regression work without Windows, install the full development environment with `pip install -r requirements-dev.txt` from the repository root. Then copy `.env.example` to `.env`, keep `EAS_DESKTOP_ADAPTER=browser` and `EAS_MODEL_MODE=simulated`, install Chromium using `python -m playwright install chromium`, and run `enterprise dev`. This starts a backend and browser worker locally and enables `/mock`, the synthetic browser test workspace. It exercises the same graph, approvals, and recovery infrastructure without validating Windows desktop behavior.
+
+## Upgrading the earlier combined installation
+
+Stop the idle Windows worker before replacing source or its environment. The relocated stop script recognizes all previous launcher paths. Remove or archive the old `.venv`, keeping `.env` and `runtime/` intact, then run the new installer with the system Python executable. It registers the new `src/edge-harness/windows/run-worker.py` launcher and installs only the harness and contracts. Restart with `Start-ScheduledTask EAS-Worker` after confirming the backend is available. The controller and DemoBooks executables do not need reinstalling for a Python package layout change.
+
+On the backend, stop the server and create a fresh virtual environment using the server-only install command above, then start `enterprise-server`. This avoids retaining unused model and desktop dependencies from the earlier combined package. Independent packages have their own `pyproject.toml`; `requirements.lock` supplies version constraints without installing every dependency in that file.
+
+Both applications load configuration from their working directory's `.env`. Set `EAS_ENV_FILE` to an explicit path when starting from another directory. Relative `EAS_DATA_DIR` values are still relative to the process working directory, so keep that directory stable when restarting.

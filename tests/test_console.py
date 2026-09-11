@@ -1,14 +1,14 @@
 import pytest
 from playwright.sync_api import sync_playwright
-from enterprise.development.demo import drive
+from enterprise_dev.demo import drive
 
 pytestmark = pytest.mark.browser
 
 
 @pytest.mark.parametrize("failure", ["network", "inflight"])
 def test_failed_refresh_never_relabels_historical_state_as_fresh(browser_server, failure):
-    from enterprise.harness.adapters.adapter import BrowserAdapter
-    from enterprise.shared.types import Recovery
+    from eas_harness.adapters.adapter import BrowserAdapter
+    from eas_shared.types import Recovery
 
     adapter = BrowserAdapter(browser_server["settings"], browser_server["store"])
     try:

@@ -34,7 +34,7 @@ Requests with no matching procedure enter supervised assistance automatically. U
 
 The shared platform is department-agnostic; the first runnable workflow belongs to **Finance**. [Department workflow extensions](docs/departments.md) explain how other departments bring their own input schemas, graphs, adapters, and permissions.
 
-The split has been exercised with a complete Windows job and live model assistance ([execution evidence](docs/evidence/windows-edge-worker.json)). Follow the [two-machine developer setup](docs/developer-setup.md): start `enterprise serve` on the developer machine and `enterprise worker` on Windows. Addresses and credentials are configured locally. The backend does not connect directly to the desktop controller.
+The two-machine execution model has been exercised with a complete Windows job and live model assistance ([execution evidence](docs/evidence/windows-edge-worker.json)). Follow the [two-machine developer setup](docs/developer-setup.md): start `enterprise-server` on the developer machine and `enterprise-harness` on Windows. Addresses and credentials are configured locally. The backend does not connect directly to the desktop controller.
 
 The native application can run with its API disabled. A separate controller reads accessibility controls and supplies accessibility actions or real clicks/typing. See [legacy desktop setup](docs/legacy-desktop.md) and the optional [application API adapter](docs/windows-accounting-machine.md).
 
@@ -52,8 +52,7 @@ cd enterprise-agent-system
 
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.lock
-pip install -e . --no-deps
+pip install -r requirements-dev.txt
 python -m playwright install chromium
 cp .env.example .env
 
@@ -68,10 +67,10 @@ Open **[localhost:8000](http://127.0.0.1:8000)**. The default local staff token 
 
 ```bash
 # Terminal 1
-enterprise serve
+enterprise-server
 
 # Terminal 2
-enterprise worker
+enterprise-harness
 ```
 
 The browser test workspace is at **[localhost:8000/mock](http://127.0.0.1:8000/mock)** in browser mode only. Windows deployments disable it. Use **Take control** before interacting with an active worker's desktop. Use **Release control** to resume automation.
@@ -142,7 +141,7 @@ Staff can add guidance in the same job conversation. During assistance, the agen
 
 ## Teach a reusable improvement
 
-Here, **learning means turning demonstrated behavior into reviewed procedure code**. For example, [proposal #2](https://github.com/philip-roy-jones/enterprise-agent-system/pull/2) adds `Reviewed adjustment 0` to the amount-label tuple in the then-current `enterprise/procedures.py` (now `src/enterprise/workflows/finance/procedures.py`), advances the procedure version, and adds evidence and tests. Before that rule is installed, the unfamiliar label requires assistance; afterward, the existing node can handle it without a model call. This particular teaching run used simulated staff and a simulated model. It demonstrates a small procedure improvement, not model training or automatic generation of arbitrary workflows.
+Here, **learning means turning demonstrated behavior into reviewed procedure code**. For example, [proposal #2](https://github.com/philip-roy-jones/enterprise-agent-system/pull/2) adds `Reviewed adjustment 0` to the amount-label tuple in the then-current `enterprise/procedures.py` (now `src/edge-harness/eas_harness/workflows/finance/procedures.py`), advances the procedure version, and adds evidence and tests. Before that rule is installed, the unfamiliar label requires assistance; afterward, the existing node can handle it without a model call. This particular teaching run used simulated staff and a simulated model. It demonstrates a small procedure improvement, not model training or automatic generation of arbitrary workflows.
 
 The development command reads accepted episodes, joins staff-approved or corrected field actions with their observations and verified saved results, and inspects the graph and operation library. It groups recurring failures and proposes a resolver extension when the evidence establishes a missing amount label. Its generated tests exercise that label on different invoices and layouts. Labels and versions come from the evidence and source, rather than a predetermined patch.
 
@@ -221,8 +220,8 @@ Use separate tokens and a trusted local environment. This prototype binds to loc
 ```bash
 pytest -q                       # Includes real Chromium integration tests
 pytest -q -m 'not browser'       # Authority, persistence, API and release checks
-ruff check src tests
-ruff format --check src tests
+ruff check src tools tests
+ruff format --check src tools tests
 ```
 
 Browser tests start their own backend and worker using temporary databases and a separate port. They cover per-node/per-tool approval, mode transitions, stale and duplicate decisions, permissions, navigation and UI variants, known/unfamiliar/unsaved dialogs, screenshot corrections, takeover, exclusive control, and worker restart after an ambiguous save. Candidate-only tests run the improved resolver on new invoices and layouts in the improvement checkout.
@@ -233,30 +232,47 @@ See the [original requirement audit](docs/original-prompt-audit.md) and [validat
 
 ```text
 src/
-├── enterprise/                  Python namespace; enterprise CLI entry point
-│   ├── server/                  Backend, persistence, approvals and audit
-│   │   └── frontend/            Staff console HTML, JavaScript and styles
-│   ├── harness/                 Edge worker, Deep Agent and execution authority
-│   │   ├── adapters/            Browser, application API and UI Automation adapters
-│   │   └── windows/             Native desktop controller and worker installers
-│   ├── workflows/               Workflow registry and department packages
-│   │   └── finance/             LangGraph, operation definitions and learned rules
-│   ├── shared/                  Configuration, data contracts and RPC declarations
-│   ├── development/             Learning proposals, review, release and demo driver
-│   └── fixtures/                Optional synthetic browser accounting application
-└── demobooks/                   Independent Windows desktop application
-    ├── DemoBooks/               Native application and accounting model
-    ├── AccountingSmoke/         Native accounting invariant checks
-    └── install.ps1              Application installer
-tests/                           Authority, workflow and browser regression tests
-docs/                            Architecture, setup and validation records
-original-prompt.txt               Original project specification
+├── server/                         Independent frontend/backend application
+│   ├── pyproject.toml              enterprise-agent-server package
+│   └── eas_server/
+│       ├── frontend/               Staff console
+│       └── fixtures/               Optional synthetic browser accounting app
+├── edge-harness/                   Independent Windows edge application
+│   ├── pyproject.toml              enterprise-edge-harness package
+│   ├── eas_harness/
+│   │   ├── workflows/finance/      LangGraph and reusable procedure rules
+│   │   └── adapters/               Application API and desktop adapters
+│   └── windows/                    Desktop controller and worker installers
+├── demobooks/                      Independent native Windows application
+│   ├── DemoBooks/
+│   ├── AccountingSmoke/
+│   └── install.ps1
+└── shared/                         Small API contract library; no running service
+    ├── pyproject.toml              enterprise-agent-contracts package
+    └── eas_shared/                 Requests, results, role schemas and RPC definitions
+tools/enterprise_dev/               Local demo, reviewed learning and release tooling
+tests/                             Cross-application regression tests
+docs/                              Setup, architecture and validation records
+original-prompt.txt                 Original project specification
 ```
 
-These are real source packages within one repository. The server runs on the developer/backend machine; the harness loads workflow packages on the Windows edge machine; DemoBooks runs independently beside it. `shared/` contains common definitions, and `development/` owns the reviewed learning loop. Moving files does not add a new service or security boundary. The existing `enterprise serve`, `enterprise worker`, and development commands remain the entry points.
+The server and edge harness are **independently installable applications** with separate dependencies, startup commands and configuration classes. Neither package depends on the other. LangGraph, Deep Agent and workflows execute inside the harness. DemoBooks remains a separate .NET application. The shared package contains public contracts and validation definitions, with no credentials, environment loading, databases, desktop actions or graph factories.
 
-After updating an existing checkout, reinstall the editable package with `python -m pip install -e . --no-deps` and restart its processes. For Windows, stop the idle worker **before** updating, then rerun the installer at `src/enterprise/harness/windows/install-worker.ps1` to update its scheduled-task launcher. Existing runtime databases and checkpoint paths stay under `runtime/`.
+From the repository root, install only the software a machine needs:
 
+```bash
+# Backend environment: no LangGraph, Deep Agent or desktop automation dependencies.
+python -m pip install -c requirements.lock ./src/shared ./src/server
+enterprise-server
+
+# Separate Windows edge environment: no server or development tooling.
+python -m pip install -c requirements.lock ./src/shared ./src/edge-harness
+enterprise-harness
+```
+
+Each application reads `.env` from its launch directory, or the file named by `EAS_ENV_FILE`. Keep the model and desktop-controller credentials on the edge machine. Development tooling is a separate root package; `pip install -r requirements-dev.txt` installs the full local test environment. Its `enterprise` CLI retains demo/improvement commands and compatibility aliases for `serve` and `worker`.
+
+For an existing Windows checkout, stop the idle worker **before** upgrading and rerun `src/edge-harness/windows/install-worker.ps1`. The installer updates the launcher and installs only the contracts and harness. For a clean package boundary when migrating an old all-in-one installation, recreate its virtual environment after stopping it; reinstalling packages alone does not remove previously installed server dependencies. Preserve `.env` and `runtime/`, including checkpoint databases. The [developer setup](docs/developer-setup.md) has machine-specific steps.
 
 ## Implemented, simulated, and deferred
 

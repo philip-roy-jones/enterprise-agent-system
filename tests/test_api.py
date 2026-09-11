@@ -1,19 +1,15 @@
 from fastapi.testclient import TestClient
-from enterprise.server.backend import create_app
-from enterprise.shared.config import Settings
+from eas_server.backend import create_app
+from eas_server.config import Settings
 import pytest
 
 
 @pytest.mark.parametrize("adapter", ["windows", "windows_accessibility"])
 def test_windows_backend_needs_no_desktop_connection(tmp_path, adapter):
-    settings = Settings(
-        data_dir=tmp_path,
-        desktop_adapter=adapter,
-        windows_token="",
-        desktop_agent_token="",
-        windows_bridge_url="http://127.0.0.1:1",
-        desktop_agent_url="http://127.0.0.1:1",
-    )
+    settings = Settings(data_dir=tmp_path, desktop_adapter=adapter)
+    assert not hasattr(settings, "windows_token")
+    assert not hasattr(settings, "desktop_agent_token")
+    assert not hasattr(settings, "desktop_agent_url")
     client = TestClient(create_app(settings), headers={"Authorization": "Bearer local-staff-demo"})
     assert client.get("/api/health").json()["application"] == "windows_desktop"
     assert client.get("/mock").status_code == 404
