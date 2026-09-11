@@ -2,6 +2,15 @@
 
 This audit covers the bounded demonstration in `original-prompt.txt`, including the requested Windows deployment and OpenRouter provider. It does not treat arbitrary new workflow generation, production adoption, or an unlimited number of worker VMs as requirements for the original demonstration.
 
+**Status: the end-to-end teaching demonstration has passed; the full specification is not yet complete.** The table below records existing implementation and evidence, not unconditional completion of every sentence in each requirement.
+
+## Requirements still partial
+
+- **Section 8 — operation contracts:** job inputs and assistant tool arguments have schemas, but native/browser operation results are mostly unstructured dictionaries. `Operation.timeout_seconds` and `retry_limit` are disclosed metadata; the shared execution layer does not enforce them. Adapter-specific timeouts and the overall job/recovery budgets exist, but do not complete the requested per-operation contracts.
+- **Sections 2 and 12 — conversation:** staff messages are saved as audit events and shown in the console, but are not included in the assistant context. Approvals and corrected tool arguments work; free-text conversation does not yet guide assistance or provide an agent question/answer cycle.
+- **Section 14 — improvement analysis:** isolation, tests, PR review, exact-commit CI checks, release and rollback work. Gap analysis is a predefined amount-label recipe: it checks for a label-related recovery reason and patches known source text. It does not yet infer the required change from the recorded correction or inspect the graph to choose among useful improvements. This is narrower than the requested development process, even without adding arbitrary workflow generation.
+- **Windows mouse/keyboard extension:** two release checks paused at the keyboard-focus guard. Accessibility-mode execution passed. Resolving that input bug remains follow-up work; the original prompt explicitly permits accessibility and does not require clicks-only execution.
+
 | Requirement | Implementation and evidence |
 | --- | --- |
 | 1. Bounded accounting example and interruptions | Browser fixture plus independent native DemoBooks; invoice/PO comparison, correction drafts, verification, deliberately introduced UI conditions. Browser tests and separate native evidence are listed in `validation.md`. |
@@ -24,7 +33,7 @@ This audit covers the bounded demonstration in `original-prompt.txt`, including 
 
 The human project developer approved [PR #1](https://github.com/philip-roy-jones/enterprise-agent-system/pull/1), commit `cac88dea82cdd5aa05f78113012fa1d75385ff67`, after 95 isolated tests and GitHub checks passed. The prototype released version v2 while idle and retained v1 for rollback. A different invoice completed on Windows with the changed label, the application API disabled, zero fallback/model calls, and a verified saved draft. The accepted teaching episode remains pinned to v1. See [reviewed release evidence](evidence/reviewed-release.json).
 
-The successful check used Windows accessibility actions. Two earlier mouse/keyboard checks recognized the label but paused on an unrelated focus guard before Save; both were cancelled without saving. These findings remain in the evidence. Staff acceptance of the successful test was simulated; developer release approval was human. The bounded original demonstration is complete, with the prototype limits below.
+The successful check used Windows accessibility actions. Two earlier mouse/keyboard checks recognized the label but paused on an unrelated focus guard before Save; both were cancelled without saving. These findings remain in the evidence. Staff acceptance of the successful test was simulated; developer release approval was human. This completes the demonstrated teaching cycle; it does not close the partial requirements listed above.
 
 ## Deliberate prototype limits
 
