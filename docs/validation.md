@@ -4,7 +4,7 @@ Regression tests use an explicitly **simulated model**. Separate native Windows 
 
 ## Local regression suite
 
-Latest local result: **90 passed, 2 candidate-only tests skipped** in 179.20 seconds. Lint and formatting passed; the independent desktop controller build passed in the preceding native validation.
+The pre-improvement baseline passed **90 tests, with 2 candidate-only tests skipped**, in 179.20 seconds. The reviewed improvement passed **95 tests** in 188.65 seconds. Lint, formatting, GitHub regression checks, and both Windows builds passed on the reviewed candidate.
 
 The Linux suite exercises real Chromium, separate backend/worker processes, temporary persistent databases, strict node and tool approvals, automatic discovery, modes, corrections, handoff, rejected/denied/cancelled work, and restart after an ambiguous save. Candidate-only tests are skipped on the baseline and enabled in the improvement checkout. Additional tests cover delayed SQLite checkpoints, serialized desktop access, code-failure diagnostics, preventing edits before verified business values exist, accessibility parsing, stale geometry, and refusing another uncertain Save. Native accounting-model tests validate 10 invariants. Both Windows executables include their .NET runtime.
 
@@ -66,4 +66,12 @@ A separate knowledge store now enforces organization, department, role, and comp
 
 An isolated browser test now exercises the complete release path with an explicitly simulated developer decision: unfamiliar label recovery, rejected unapproved deployment, reviewed fixture deployment, a different record/layout completing without fallback, version pinning, and rollback. That fixture decision does not approve or release the real improvement PR.
 
-The [original requirement audit](original-prompt-audit.md) maps the implementation, evidence, deliberate limits, and remaining human release gate.
+The [original requirement audit](original-prompt-audit.md) maps the implementation, evidence, and deliberate limits.
+
+## Human-approved release on Windows
+
+The project developer explicitly approved PR #1 commit `cac88dea82cdd5aa05f78113012fa1d75385ff67` in the project conversation. The release command verified the exact candidate, its test evidence, and passing GitHub checks, then activated v2 while idle. The PR was subsequently merged.
+
+Invoice INV-1042 completed with the changed “Adjusted total” label in **12.56 seconds**, with **zero fallback calls, zero model calls, and a confirmed saved draft**. The teaching episode used INV-1044 and remains pinned to v1. The successful check used the Windows edge harness and accessibility actions with DemoBooks' application API disabled. Staff acceptance was explicitly simulated; developer release approval was human. The previous v1 registry remains available for rollback. See [reviewed release evidence](evidence/reviewed-release.json).
+
+Two preceding mouse/keyboard checks paused on “Input focus changed before typing” and were cancelled without saving. The label itself was recognized. The first attempt to switch input modes was blocked by PowerShell's execution policy, so the second check still used keyboard input; the worker was then restarted successfully in accessibility mode. The demonstrated Windows environment now uses accessibility input. Keyboard focus recovery remains a documented limitation, and the successful procedure run is not a new live-model evaluation.

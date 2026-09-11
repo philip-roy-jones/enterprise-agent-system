@@ -22,6 +22,8 @@ The first runnable example is a Finance workflow: a worker opens a synthetic inv
 
 An accepted episode can become a small, tested code proposal. A developer reviews the exact candidate before it can be released to idle workers. Future jobs pin the improved procedure version.
 
+The bounded teaching cycle has now been demonstrated through a human-approved release: a different invoice completed on Windows with the changed field label, zero fallback/model calls, and the application API disabled. See the [release evidence and input-mode limitations](docs/validation.md#human-approved-release-on-windows).
+
 Requests with no matching procedure enter supervised assistance automatically. Unfamiliar application states and failures in implemented procedures are separate fallback reasons. Staff review the proposed actions and the outcome in the same job. See [automatic workflow discovery](docs/workflow-discovery.md) for the implemented behavior and the limits of general workflow generation.
 
 **Desktop setup: the developer machine runs the backend and staff frontend; a separate Windows VM or PC runs LangGraph, the Deep Agent harness, desktop control, and DemoBooks.** The optional single-machine browser fixture uses a simulated model for regression tests. DemoBooks is a prototype application with synthetic records, not a QuickBooks integration.
@@ -139,6 +141,8 @@ Read [the architecture and trust boundaries](docs/architecture.md) for state tra
 ## Teach a reusable improvement
 
 The initial library recognizes **Correction amount**. An unfamiliar **Adjusted total** label triggers assistance. The bounded development command proposes adding that label to the existing resolver, with regression tests and selected synthetic evidence. It does not add a node for one invoice or memorize coordinates.
+
+Current `main` includes that reviewed example improvement. To repeat proposal generation from its original state, use a separate teaching checkout at commit `12fc5e96c7cde98f317082b19a5addf5e2ed931c`, then follow setup and the steps below. Keep its runtime separate from a running deployment. The generator deliberately refuses to propose the same label addition when it is already present in the source; pulling merged code alone does not activate a release registry.
 
 1. Complete and accept a job using **Changed amount field label**, or run the automated demonstration and copy its improvement episode ID.
 2. Generate the isolated proposal:

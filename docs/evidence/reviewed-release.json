@@ -1,0 +1,93 @@
+{
+  "proposal": "https://github.com/philip-roy-jones/enterprise-agent-system/pull/1",
+  "approved_commit": "cac88dea82cdd5aa05f78113012fa1d75385ff67",
+  "developer_review": "Human project developer explicitly approved release in the project conversation",
+  "ci": "https://github.com/philip-roy-jones/enterprise-agent-system/actions/runs/34550904190",
+  "isolated_tests_passed": 95,
+  "teaching_episode": {
+    "id": "7b64596c3bdf447eb34836a09f2d156e",
+    "invoice_id": "INV-1044",
+    "graph_version": "v1",
+    "accepted": true
+  },
+  "worker_platform": "Windows",
+  "desktop_adapter": "windows_accessibility",
+  "input_mode": "accessibility",
+  "application_api_enabled": false,
+  "staff": "Explicit synthetic test driver accepted the verified result; no action approvals were needed in Auto",
+  "model_evaluation": "No model calls were made in the successful release check; this is native procedure validation, not a live-model evaluation",
+  "job": {
+    "id": "9c47f89f1b22498496f5b4fd10145842",
+    "invoice_id": "INV-1042",
+    "company_id": "ACME",
+    "graph_version": "v2",
+    "amount_labels": [
+      "Correction amount",
+      "Adjusted total"
+    ],
+    "status": "completed",
+    "accepted": true,
+    "selected_mode": "auto",
+    "effective_mode": "auto",
+    "fallback_count": 0,
+    "model_calls": 0,
+    "tokens": 0,
+    "mutation": "confirmed_succeeded",
+    "elapsed_seconds": 12.56,
+    "expected": {
+      "amount": 128000,
+      "company_id": "ACME",
+      "difference": 20000,
+      "invoice_id": "INV-1042",
+      "note": "Align correction draft with approved purchase order PO-1042. [EAS:9c47f89f1b22498496f5b4fd10145842]",
+      "po_id": "PO-1042"
+    }
+  },
+  "desktop_inputs": [
+    {
+      "target": "amount",
+      "method": "accessibility_value"
+    },
+    {
+      "target": "note",
+      "method": "accessibility_value"
+    },
+    {
+      "target": "save",
+      "method": "accessibility_invoke"
+    }
+  ],
+  "rollback_available": "v1",
+  "earlier_input_focus_checks": [
+    {
+      "id": "13f54eb0419b45d78a1f87e4ff18e25f",
+      "status": "cancelled",
+      "mutation": "not_attempted",
+      "model_calls": 1,
+      "tokens": 3106,
+      "input_mode": "mouse_keyboard",
+      "recovery_reasons": [
+        {
+          "kind": "unfamiliar",
+          "node": "prepare",
+          "reason": "Input focus changed before typing"
+        }
+      ]
+    },
+    {
+      "id": "b0ebf5076e034551a9c959a25b46d36d",
+      "status": "cancelled",
+      "mutation": "not_attempted",
+      "model_calls": 1,
+      "tokens": 3074,
+      "input_mode": "mouse_keyboard",
+      "recovery_reasons": [
+        {
+          "kind": "unfamiliar",
+          "node": "prepare",
+          "reason": "Input focus changed before typing"
+        }
+      ]
+    }
+  ]
+}

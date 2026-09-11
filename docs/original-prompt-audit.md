@@ -20,9 +20,11 @@ This audit covers the bounded demonstration in `original-prompt.txt`, including 
 | 16. Validation and metrics | Baseline and isolated candidate suites, separate native/live evidence, and console metrics. A recorded zero incorrect-action count is not a proof of general safety. |
 | 17. Teaching and correction demonstration | Strict/Auto, unfamiliar label, approved/corrected tools, verified return, accepted episode, and reusable improvement proposal. Isolated tests exercise a simulated developer review, deployment, a new invoice without fallback, version pinning, and rollback. |
 
-## Real improvement release gate
+## Reviewed release demonstration
 
-The actual improvement PR remains separate from fixture-only simulated reviewer decisions. Its current candidate must pass checks and receive human developer approval before it can be released to the running prototype. The code paths and isolated release demonstration can be completed without approving that real PR. The final real-release demonstration remains pending until the developer authorizes the exact candidate; the system must not supply that approval itself.
+The human project developer approved [PR #1](https://github.com/philip-roy-jones/enterprise-agent-system/pull/1), commit `cac88dea82cdd5aa05f78113012fa1d75385ff67`, after 95 isolated tests and GitHub checks passed. The prototype released version v2 while idle and retained v1 for rollback. A different invoice completed on Windows with the changed label, the application API disabled, zero fallback/model calls, and a verified saved draft. The accepted teaching episode remains pinned to v1. See [reviewed release evidence](evidence/reviewed-release.json).
+
+The successful check used Windows accessibility actions. Two earlier mouse/keyboard checks recognized the label but paused on an unrelated focus guard before Save; both were cancelled without saving. These findings remain in the evidence. Staff acceptance of the successful test was simulated; developer release approval was human. The bounded original demonstration is complete, with the prototype limits below.
 
 ## Deliberate prototype limits
 
