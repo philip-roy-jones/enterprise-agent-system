@@ -35,5 +35,53 @@
   ],
   "expected": "Expired jobs transition to a terminal failure rather than retaining the desktop job indefinitely.",
   "impact": "Deadline handling is inconsistent during pauses. This repro establishes a stuck running job, not an unauthorized desktop action.",
-  "fixed": false
+  "fixed": true,
+  "correction": {
+    "date": "2026-09-12",
+    "implementation": "Worker checks the existing server authority and total job deadline on every claimed-job polling cycle, before adapter initialization, graph resumption, or staff waiting.",
+    "policy": "Total elapsed time includes staff waiting. An offline worker checks expiry when it reconnects.",
+    "regression_source": "tests/test_job_deadlines.py",
+    "model": "simulated",
+    "staff": "simulated",
+    "before": {
+      "tests": 3,
+      "failures": 2,
+      "passing": [
+        "strict"
+      ],
+      "failing": [
+        "fallback",
+        "takeover"
+      ]
+    },
+    "after": {
+      "tests": 3,
+      "failures": 0,
+      "passing": [
+        "fallback",
+        "takeover",
+        "strict"
+      ]
+    },
+    "assertions": [
+      "Terminal failure with budget error and end time",
+      "Outstanding approvals stale",
+      "No mutation attempted",
+      "Worker remains alive",
+      "Next job acquires desktop slot"
+    ],
+    "full_suite": {
+      "tests": 161,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "lint_and_dependency_checks": "passed",
+    "windows_deployment": {
+      "task": "EAS-Worker",
+      "state": "Running",
+      "worker_source_sha256": "7f96943b85c3364b72668ee23d4efaff20512aba785d76c0a1617ecd6a5b5bfb",
+      "business_transaction_run": false
+    }
+  }
 }

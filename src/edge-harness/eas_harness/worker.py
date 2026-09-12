@@ -53,6 +53,10 @@ def run_worker(settings=None, once=False):
             job_id = job["id"]
             try:
                 role = validate_assignment(settings, job)
+                # Paused assistants and staff takeovers may never enter an operation.
+                # Enforce the total job budget before either waiting or resuming.
+                lease = store.lease()
+                store.check(job_id, lease["owner"], lease["epoch"])
                 role_id = job.get("role_id", "invoice_correction")
                 if role_id != active_role:
                     if adapter:
