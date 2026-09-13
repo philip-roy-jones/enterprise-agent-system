@@ -233,9 +233,6 @@ function renderDetail(d) {
   $("job-id").textContent = `${j.graph_version} / ${j.id.slice(0, 8)}`;
   $("job-title").textContent =
     `${j.role_name || "Invoice correction"} · ${j.record_id || j.invoice_id || "Conversation"}`;
-  $("department-label").textContent = j.department_name || "Finance";
-  $("role-label").textContent =
-    j.role_name || "Invoice correction · first example";
   $("job-status").textContent = (done ? j.status : j.execution_state || j.status);
 
   $("cancel-job").disabled = done;
@@ -243,18 +240,6 @@ function renderDetail(d) {
   $("takeover").textContent =
     d.lease.owner === "staff" ? "Release control" : "Take control";
   $("accept-job").hidden = j.status !== "completed" || j.accepted || ["conversation", "record_unavailable"].includes(j.result_kind);
-  $("control-label").textContent = done
-    ? "Available"
-    : {
-        script: "Scripted worker",
-        assistant: "Supervised assistant",
-        staff: "Staff",
-      }[d.lease.owner] || "Waiting";
-  $("control-detail").textContent = done
-    ? "Ready for the next request"
-    : `Exclusive session · lease ${d.lease.epoch}`;
-  $("mode-label").textContent = "Strict";
-  $("mode-detail").textContent = "Staff approval before every operation";
   // The composer always addresses the persistent staff session, even while an older activity is inspected.
   $("conversation-label").textContent = "Your ongoing conversation · history is retained across context changes";
   $("skill-runs").innerHTML = Object.values(j.skill_runs || {}).map(run => `<p><strong>${esc(run.skill_id)}</strong> · ${esc(run.state.replaceAll("_"," "))} · step ${run.index + 1}<br><small>Version ${esc(run.version.slice(0,12))} · Run ${esc(run.run_id)}</small>${run.reason ? `<br>${esc(run.reason)}` : ""}</p>`).join("");
@@ -429,7 +414,6 @@ function selectView(view) {
   activeView = view;
   const metrics = view === "metrics";
   $("main-view").hidden = metrics;
-  $("job-overview").hidden = metrics;
   $("chat-composer").hidden = metrics;
   $("learning-panel").hidden = metrics;
   $("metrics-view").hidden = !metrics;

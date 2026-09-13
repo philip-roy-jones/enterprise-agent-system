@@ -224,6 +224,9 @@ textarea {
   align-items: center;
   gap: 20px;
 }
+.console > .title-row {
+  margin-bottom: 26px;
+}
 .title-row p {
   margin: 0;
 }
@@ -240,33 +243,6 @@ textarea {
 .muted {
   color: var(--muted);
   font-size: 0.925rem;
-}
-.overview-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1.3fr;
-  gap: 17px;
-  margin: 30px 0 26px;
-}
-.overview-card {
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  padding: 20px 22px;
-  background: #fff;
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-.overview-card > span {
-  font-size: 0.8rem;
-  color: var(--muted);
-}
-.overview-card > strong {
-  font-size: 1rem;
-  font-weight: 600;
-}
-.overview-card > small {
-  color: #8591a1;
-  font-size: 0.76rem;
 }
 .console-grid {
   display: grid;
@@ -724,9 +700,6 @@ th {
     grid-template-columns: minmax(0, 1fr);
     gap: 15px;
   }
-  .overview-card {
-    padding: 16px;
-  }
   .panel {
     padding: 18px;
   }
@@ -735,12 +708,6 @@ th {
   }
   .proposal-meta {
     grid-template-columns: 1fr;
-  }
-  .overview-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-  .overview-card:last-child {
-    grid-column: 1/-1;
   }
 }
 @media (max-width: 800px) {
@@ -792,13 +759,6 @@ th {
   }
   .console-grid {
     grid-template-columns: 1fr;
-  }
-  .overview-grid {
-    gap: 10px;
-    margin: 24px 0;
-  }
-  .overview-card {
-    padding: 15px;
   }
   .app-footer span {
     display: none;
