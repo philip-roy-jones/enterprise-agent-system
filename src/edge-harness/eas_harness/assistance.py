@@ -314,4 +314,6 @@ def run_assistant(agent, context, thread_id, store, job_id):
         value = {"messages": [HumanMessage(content=json.dumps(context))]}
     # Persist each step and leave room for checkpoint I/O dependencies. Desktop
     # serialization belongs to ExecutionLayer, not the checkpoint executor.
-    return agent.invoke(value, config, durability="sync")
+    from eas_harness.streaming import stream_agent
+
+    return stream_agent(agent, value, config, store, job_id)

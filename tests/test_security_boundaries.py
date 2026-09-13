@@ -389,3 +389,27 @@ def test_artifacts_are_bound_to_assignment_and_owner(secured):
         ).status_code
         == 404
     )
+
+
+def test_public_response_chunks_are_assignment_bound_and_bounded(secured):
+    _, client, headers, rpc, _ = secured
+    job = new_job(secured)
+    rpc("exec-a", "claim", "stream-worker").raise_for_status()
+    chunk = {"message_id": "answer", "text": "Public reply"}
+    assert rpc("planner", "event", job["id"], ["invalid-kind"], chunk).status_code == 403
+    rpc("planner", "event", job["id"], "assistant_message_delta", chunk).raise_for_status()
+    assert rpc("exec-b", "event", job["id"], "assistant_message_delta", chunk).status_code == 404
+    assert (
+        rpc(
+            "planner", "event", job["id"], "assistant_message_delta", {**chunk, "reasoning": "hidden"}
+        ).status_code
+        == 400
+    )
+    assert (
+        rpc(
+            "planner", "event", job["id"], "assistant_message_delta", {**chunk, "text": "x" * 16001}
+        ).status_code
+        == 400
+    )
+    assert client.get(f"/api/jobs/{job['id']}/stream", headers=headers("bob")).status_code == 404
+    assert client.get(f"/api/jobs/{job['id']}/stream", headers=headers("sales")).status_code == 404

@@ -26,6 +26,8 @@ Accepted, verified work enters a durable learning queue. A separate model contex
 
 Staff can teach through ordinary chat. After a request ends, a separate edge reviewer looks for corrections, preferences and reusable lessons, links them to the conversation evidence, and can update skill instructions after runtime validation. No assessment form is needed. Inferred feedback is labeled separately from verified outcomes, and chat cannot add executable graph steps. [Conversation learning and screenshots](docs/conversation-learning-and-screenshots.md) describes the boundaries.
 
+Agent replies stream into chat as the model generates them. Reconnecting resumes from the last received event; completed replies replace their partial text, and interrupted replies remain labeled. Streaming does not change approval requirements. See [response streaming](docs/response-streaming.md) for implementation and validation.
+
 The agent can capture the entire Windows desktop and send an annotated screenshot in chat. Each capture and share requires approval; attachments retain their capture time. The browser test fixture captures only its own viewport. The Ubuntu Marketing worker uses an application API and does not currently expose an interactive desktop screenshot tool.
 
 This implements the direction in the [agent-led learning plan](docs/plans/agent-led-learning-plan.md), which supersedes the graph-first ordering, Auto mode, and mandatory learned-package PR review in the [original specification](docs/plans/original-prompt.txt). Earlier reviewed releases and PRs remain historical evidence; they are not silently activated by this change.

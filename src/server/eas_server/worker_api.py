@@ -392,6 +392,24 @@ def install_worker_api(app, security):
             if method == "proposal":
                 validate_proposal(job, args[2])
             if method == "event":
+                if isinstance(args[1], str) and args[1] in {
+                    "assistant_message_delta",
+                    "assistant_stream_end",
+                }:
+                    data = args[2]
+                    expected_keys = (
+                        {"message_id", "text"} if args[1] == "assistant_message_delta" else {"message_id"}
+                    )
+                    if (
+                        set(data) != expected_keys
+                        or not isinstance(data.get("message_id"), str)
+                        or not 1 <= len(data["message_id"]) <= 300
+                        or (
+                            "text" in data
+                            and (not isinstance(data["text"], str) or not 1 <= len(data["text"]) <= 16000)
+                        )
+                    ):
+                        raise HTTPException(400, "Invalid public response chunk")
                 if (
                     not isinstance(args[1], str)
                     or args[1].startswith("staff_")

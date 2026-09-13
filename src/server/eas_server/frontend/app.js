@@ -12,6 +12,9 @@ const $ = (id) => document.getElementById(id),
         })[c],
     );
 const submitted = new Set();
+const streamedEvents = new Map();
+const renderedBubbles = new Map();
+let renderedSession = null, renderedJobs = [];
 let roles = [];
 let desktopAdapter = "browser";
 let activeView = "jobs";
@@ -37,6 +40,10 @@ async function api(path, body) {
     if (source) { source.close(); source = null; }
     // Clear cached private content immediately on logout or policy revocation.
     if (typeof transcriptCache !== "undefined") transcriptCache.clear();
+    streamedEvents.clear();
+    renderedBubbles.clear();
+    renderedSession = null;
+    renderedJobs = [];
     $("session-messages").replaceChildren();
     if (!$("login-dialog").open) $("login-dialog").showModal();
     throw Error("Connect to your workspace to continue.");
@@ -100,12 +107,26 @@ function connectStream() {
   source?.close();
   source = null;
   if (!active) return;
-  source = new EventSource(`/api/jobs/${active}/stream`);
-  source.onmessage = () => refresh();
+  const requestId = active;
+  const after = transcriptCache.get(requestId)?.events.at(-1)?.seq || 0;
+  source = new EventSource(`/api/jobs/${requestId}/stream?after=${after}`);
+  source.onmessage = message => {
+    if (active !== requestId) return;
+    const event = JSON.parse(message.data);
+    streamedEvents.set(event.seq, event);
+    const detail = transcriptCache.get(requestId);
+    if (detail) cacheTranscript(detail);
+    if (["assistant_message_delta", "assistant_message", "assistant_stream_end"].includes(event.kind) && detail && renderedSession) {
+      renderTranscript(renderedSession, renderedJobs);
+      if (event.kind !== "assistant_message") return;
+    }
+    refresh();
+  };
 }
 function selectRequest(id) {
   if (active === id) return;
   active = id;
+  streamedEvents.clear();
   selectedApproval = null;
   current = null;
   lastImage = "";
@@ -443,6 +464,7 @@ async function renderSession(session, jobs, selectedDetail) {
     transcriptLimit = 20;
     transcriptMarkup = "";
     transcriptCache.clear();
+    renderedBubbles.clear();
     $("session-messages").replaceChildren();
   }
   const done = !j || ["completed", "cancelled", "rejected", "failed", "denied"].includes(j.status);
@@ -454,26 +476,41 @@ async function renderSession(session, jobs, selectedDetail) {
   const visible = history.slice(-transcriptLimit);
   $("earlier-messages").hidden = history.length <= visible.length;
   if (selectedDetail && visible.some(turn => turn.id === selectedDetail.job.id)) {
-    transcriptCache.set(selectedDetail.job.id, selectedDetail);
+    cacheTranscript(selectedDetail);
   }
   const missing = visible.filter(turn => !transcriptCache.has(turn.id) || !["completed", "cancelled", "rejected", "failed", "denied"].includes(transcriptCache.get(turn.id).job.status));
   // Fetch full public exchanges, not the last-reply summaries. Limit concurrent
   // reads and cache ended requests; active requests stay fresh while polling.
   for (let i=0; i<missing.length; i+=5) {
     const batch = await Promise.all(missing.slice(i,i+5).map(turn => api("/api/jobs/"+turn.id)));
-    batch.forEach(data => transcriptCache.set(data.job.id, data));
+    batch.forEach(cacheTranscript);
   }
+  renderedSession = session;
+  renderedJobs = jobs;
+  renderTranscript(session, jobs);
+}
+function cacheTranscript(data) {
+  // A fetch can finish after newer SSE chunks arrive. Merge by server sequence
+  // so reconnects and concurrent refreshes neither duplicate nor erase text.
+  const events = new Map(data.events.map(event => [event.seq, event]));
+  if (data.job.id === active) streamedEvents.forEach((event, seq) => events.set(seq, event));
+  transcriptCache.set(data.job.id, {...data, events:[...events.values()].sort((a,b) => a.seq-b.seq)});
+}
+function renderTranscript(session, jobs) {
+  const visible = jobs.filter(turn => turn.conversation_id === session.conversation_id)
+    .sort((a,b) => a.created_at-b.created_at || a.id.localeCompare(b.id)).slice(-transcriptLimit);
   const entries = visible.flatMap(turn => {
     const data = transcriptCache.get(turn.id);
+    if (!data) return [];
     const created = data.events.find(event => event.kind === "job_created");
     const shares = new Set(data.events.filter(e => e.kind === "action_started" && e.data.action?.name === "share_screenshot").map(e => e.data.invocation));
     return [{id: "request-"+turn.id, requestId: turn.id, at: turn.created_at, seq: created?.seq || 0, speaker: "staff", text: turn.task, record: turn.record_id},
-      ...data.events.filter(event => ["staff_message", "assistant_message", "assistant_question"].includes(event.kind) || (event.kind === "action_result" && shares.has(event.data.invocation)))
-        .map(event => ({id: "event-"+event.seq, at: event.at, seq: event.seq, speaker: event.kind === "staff_message" ? "staff" : "agent", text: event.data.text || event.data.question || "", attachment: event.kind === "action_result" ? event.data.result?.value?.data : null}))];
+      ...chatStream.events(data.events, data.job.status).filter(event => ["staff_message", "assistant_message", "assistant_question"].includes(event.kind) || (event.kind === "action_result" && shares.has(event.data.invocation)))
+        .map(event => ({id: event.data.message_id && event.kind === "assistant_message" ? "reply-"+event.data.message_id : "event-"+event.seq, at: event.at, seq: event.seq, speaker: event.kind === "staff_message" ? "staff" : "agent", text: event.data.text || event.data.question || "", partial:event.partial, interrupted:event.interrupted, attachment: event.kind === "action_result" ? event.data.result?.value?.data : null}))];
   }).sort((a,b) => a.at-b.at || a.seq-b.seq);
   const markup = entries.map(entry => {
     const date = new Date(entry.at*1000);
-    return `<div class="chat-message ${entry.speaker}" data-message-id="${esc(entry.id)}"><div class="chat-message-meta"><strong>${entry.speaker === "staff" ? "Staff" : "Worker"}${entry.record ? ` · ${esc(entry.record)}` : ""}</strong><time datetime="${date.toISOString()}" title="${esc(date.toLocaleString())}">${esc(date.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}))}</time></div><p>${esc(entry.text)}</p>${entry.attachment ? renderScreenshot(entry.attachment) : ""}${entry.requestId ? `<button type="button" class="chat-activity-link" data-request-activity="${esc(entry.requestId)}">View activity</button>` : ""}</div>`;
+    return `<div class="chat-message ${entry.speaker}${entry.partial && !entry.interrupted ? " streaming" : ""}" data-message-id="${esc(entry.id)}"><div class="chat-message-meta"><strong>${entry.speaker === "staff" ? "Staff" : "Worker"}${entry.record ? ` · ${esc(entry.record)}` : ""}</strong><time datetime="${date.toISOString()}" title="${esc(date.toLocaleString())}">${esc(date.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}))}</time></div><p>${esc(entry.text)}</p>${entry.partial ? `<small class="stream-status">${entry.interrupted ? "Response interrupted" : "Responding…"}</small>` : ""}${entry.attachment ? renderScreenshot(entry.attachment) : ""}${entry.requestId ? `<button type="button" class="chat-activity-link" data-request-activity="${esc(entry.requestId)}">View activity</button>` : ""}</div>`;
   }).join("");
   const transcript = $("session-messages");
   if (markup !== transcriptMarkup) {
@@ -481,7 +518,19 @@ async function renderSession(session, jobs, selectedDetail) {
     const oldHeight = transcript.scrollHeight, oldTop = transcript.scrollTop;
     const atBottom = oldHeight-transcript.clientHeight-oldTop < 48;
     const wasEmpty = !transcriptMarkup;
-    transcript.innerHTML = markup;
+    const template = document.createElement("template");
+    template.innerHTML = markup;
+    const existing = new Map([...transcript.children].map(node => [node.dataset.messageId, node]));
+    const fragment = document.createDocumentFragment(), nextBubbles = new Map();
+    for (const node of [...template.content.children]) {
+      const id = node.dataset.messageId, html = node.outerHTML;
+      // Retain unchanged bubbles, including enlarged historical screenshots.
+      fragment.append(existing.has(id) && renderedBubbles.get(id) === html ? existing.get(id) : node);
+      nextBubbles.set(id, html);
+    }
+    transcript.replaceChildren(fragment);
+    renderedBubbles.clear();
+    nextBubbles.forEach((html,id) => renderedBubbles.set(id, html));
     const prepended = first && first !== transcript.firstElementChild?.dataset.messageId;
     if (prepended) transcript.scrollTop = oldTop + transcript.scrollHeight-oldHeight;
     else if (atBottom || wasEmpty) transcript.scrollTop = transcript.scrollHeight;

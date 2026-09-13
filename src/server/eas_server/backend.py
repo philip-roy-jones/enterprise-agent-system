@@ -349,6 +349,12 @@ def create_app(settings=None):
 
     @app.get("/api/jobs/{job_id}/stream", dependencies=[Depends(staff)])
     async def stream(job_id: str, request: Request, after: int = 0):
+        security.job(current_principal.get(), job_id)
+        try:
+            after = max(0, after, int(request.headers.get("last-event-id", "0")))
+        except ValueError:
+            raise HTTPException(400, "Invalid event cursor") from None
+
         async def events():
             cursor = after
             while not await request.is_disconnected():
@@ -359,9 +365,13 @@ def create_app(settings=None):
                     yield f"id: {cursor}\ndata: {json.dumps(row)}\n\n"
                 if not rows:
                     yield ": heartbeat\n\n"
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.1)
 
-        return StreamingResponse(events(), media_type="text/event-stream")
+        return StreamingResponse(
+            events(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     @app.post("/api/approvals/{approval_id}", dependencies=[Depends(staff)])
     def decision(approval_id: str, body: Decision):

@@ -1,0 +1,44 @@
+{
+  "model_mode": "live",
+  "provider": "openrouter",
+  "model": "openai/gpt-5.6-luna",
+  "staff_mode": "synthetic staff message; no approvals requested",
+  "job_id": "8939afabec0340eeb30866ef977a95b8",
+  "public_text_chunks": 13,
+  "distinct_visible_partial_updates": 12,
+  "first_chunk_before_final_seconds": 1.618,
+  "final_text_matches_chunks": true,
+  "one_final_chat_bubble": true,
+  "javascript_errors": [],
+  "deployment": {
+    "windows": {
+      "installed_source_matches": true,
+      "files": 51
+    },
+    "ubuntu": {
+      "installed_source_matches": true,
+      "files": 51
+    }
+  },
+  "simulated_regression": {
+    "distinct_tests_passed": 72,
+    "execution": "Focused suites and reruns after fixture corrections",
+    "model_mode": "simulated",
+    "staff_mode": "simulated",
+    "scope": [
+      "streaming",
+      "stateful approvals",
+      "checkpoint restart",
+      "session context",
+      "screenshots",
+      "worker and staff authorization",
+      "console",
+      "Finance and Marketing workflows"
+    ]
+  },
+  "limits": [
+    "One live educational request, not a latency guarantee or business evaluation.",
+    "Network delivery uses small batches of real text chunks.",
+    "Raw conversations, desktop images and deployment credentials are excluded."
+  ]
+}

@@ -59,7 +59,7 @@ const activityView = (() => {
     const filter = document.getElementById("activity-filter").value;
     const search = document.getElementById("activity-search").value.trim().toLowerCase();
     const quiet = new Set(["context_window", "conversation_context", "operation_completed"]);
-    const events = data.events.filter(e => (filter === "all" ? !quiet.has(e.kind) : categories(e.kind) === filter) && (!search || JSON.stringify(e).toLowerCase().includes(search)));
+    const events = data.events.filter(e => !["assistant_message_delta", "assistant_stream_end"].includes(e.kind) && (filter === "all" ? !quiet.has(e.kind) : categories(e.kind) === filter) && (!search || JSON.stringify(e).toLowerCase().includes(search)));
     const calls = new Set(data.events.filter(e=>e.kind === "agent_tool_call").map(e=>e.data.invocation));
     if (!calls.size) data.approvals.filter(a=>a.kind === "tool").forEach(a=>calls.add(a.invocation));
     const steps = new Set(data.events.filter(e=>e.kind === "action_started" && e.data.invocation.includes(":skill:")).map(e=>e.data.invocation));
