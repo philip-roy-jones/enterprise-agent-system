@@ -15,7 +15,17 @@ class LearningStore:
         task = re.sub(r"\b(?:INV|PO)-?\d+\b|\d+", "record", job["task"], flags=re.I).lower()
         return canonical(
             [
-                *[job.get(k) for k in ("organization_id", "department_id", "role_id", "company_id")],
+                *[
+                    job.get(k)
+                    for k in (
+                        "organization_id",
+                        "department_id",
+                        "role_id",
+                        "company_id",
+                        "staff_id",
+                        "desktop_id",
+                    )
+                ],
                 skills or task,
             ]
         )
@@ -63,7 +73,7 @@ class LearningStore:
         proposal = CapabilityGap.model_validate(proposal).model_dump()
         with self.db() as db:
             job = self._job(db, job_id)
-            lease = json.loads(db.execute("SELECT data FROM lease WHERE id=1").fetchone()[0])
+            lease = self._lease(db, job)
             self._check(job, lease, "assistant", lease["epoch"])
             old = db.execute(
                 "SELECT data FROM events WHERE job_id=? AND kind='capability_gap'", (job_id,)
@@ -94,11 +104,17 @@ class LearningStore:
         with self.db() as db:
             for row in db.execute("SELECT id,data FROM maintenance ORDER BY rowid"):
                 item = json.loads(row["data"])
+                if item.get("target_worker_id") and item["target_worker_id"] != worker_id:
+                    continue
                 if (
                     item["organization_id"] != scope["organization_id"]
                     or item["role_id"] not in scope["role_ids"]
                 ):
                     continue
+                if "predicate" in scope:
+                    target = self._job(db, item["job_id"]) if item.get("job_id") else item
+                    if not scope["predicate"](target):
+                        continue
                 if item["status"] not in {"queued", "running"} or item.get("expires", 0) > time.time():
                     continue
                 if item.get("attempts", 0) >= 3:
@@ -141,7 +157,7 @@ class LearningStore:
             db.execute("UPDATE maintenance SET data=? WHERE id=?", (canonical(item), item_id))
             return item
 
-    def skills_publish(self, metadata, scope):
+    def skills_publish(self, metadata, scope, worker_id="legacy-local"):
         if len(canonical(metadata)) > 200000:
             raise ValueError("Skill metadata exceeds budget")
         for item in metadata.get("versions", []):
@@ -150,9 +166,7 @@ class LearningStore:
                 or item["role_id"] not in scope["role_ids"]
             ):
                 raise PermissionError("Skill scope mismatch")
-        self.put_value(
-            "skills:" + scope["organization_id"] + ":" + ",".join(sorted(scope["role_ids"])), metadata
-        )
+        self.put_value("skills:" + scope["organization_id"] + ":" + worker_id, metadata)
         return {"published": True}
 
     def learning_status(self):
@@ -166,7 +180,7 @@ class LearningStore:
                 ],
             }
 
-    def skill_command(self, skill_id, version=None):
+    def skill_command(self, skill_id, version=None, *, selected=None):
         status = self.learning_status()
         matches = [
             v
@@ -176,7 +190,7 @@ class LearningStore:
         ]
         if not matches:
             raise ValueError("Unknown installed skill/version")
-        selected = matches[0]
+        selected = selected or matches[0]
         item = dict(
             id=uid(),
             kind="skill_change",
@@ -184,6 +198,9 @@ class LearningStore:
             version=version,
             organization_id=selected["organization_id"],
             role_id=selected["role_id"],
+            department_id=selected.get("department_id"),
+            company_id=selected.get("company_id"),
+            target_worker_id=selected.get("worker_id"),
             status="queued",
             created_at=time.time(),
         )

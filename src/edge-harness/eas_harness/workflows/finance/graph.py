@@ -142,8 +142,10 @@ class RoleGraph(FinanceOperations):
                 },
             }
             if name in {"complete", "review_discovery"}:
-                updates.update(status="completed", elapsed_seconds=round(time.time() - job["started_at"], 2))
+                updates.update(elapsed_seconds=round(time.time() - job["started_at"], 2))
             self.store.update_job(job_id, updates)
+            if name in {"complete", "review_discovery"}:
+                self.store.conclude(job_id)
             self.store.event(
                 job_id,
                 "progress",

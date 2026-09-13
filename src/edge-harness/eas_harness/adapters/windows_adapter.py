@@ -106,7 +106,7 @@ class WindowsAdapter:
                 time.sleep(0.1)
             raise Recovery("temporary", "The assigned Windows application could not be activated")
         finally:
-            self.store.finish_action(job_id, invocation, result, cache=False)
+            self.store.finish_window_recovery(job_id, invocation, result)
 
     def observe(self):
         raw = self.bridge.call("/observe")

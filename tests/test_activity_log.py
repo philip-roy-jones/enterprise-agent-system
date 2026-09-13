@@ -29,7 +29,10 @@ def test_activity_exposes_tools_errors_and_keeps_expanded_evidence(browser_serve
     )
     other.raise_for_status()
     foreign_id = other.json()["job"]["id"]
-    finish(ctx, foreign_id)
+    import httpx
+
+    with httpx.Client(base_url=ctx["url"], headers={"Authorization": "Bearer test-developer"}) as developer:
+        finish({**ctx, "client": developer}, foreign_id)
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page(extra_http_headers={"Authorization": "Bearer test-staff"})

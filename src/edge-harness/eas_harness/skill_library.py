@@ -60,6 +60,10 @@ class SkillLibrary:
         root = Path(__file__).parent
         files = [
             "execution.py",
+            "executor.py",
+            "adapters/adapter.py",
+            "adapters/windows_adapter.py",
+            "adapters/accessibility_adapter.py",
             "workflow_tools.py",
             "workflows/finance/runtime.py",
             "workflows/finance/operations.py",
@@ -285,6 +289,7 @@ class SkillLibrary:
                         "active": active.get(key) == version,
                         "instructions": spec["instructions"],
                         "resources": list(spec.get("supporting_files", {})),
+                        "package": spec,
                     }
                 )
         return {"versions": versions, "history": self.history()}

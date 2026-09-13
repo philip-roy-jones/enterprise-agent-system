@@ -1,6 +1,8 @@
 """Transactional central persistence. Worker access is a restricted HTTP RPC boundary."""
 
 from contextlib import contextmanager
+from contextvars import ContextVar
+
 import json
 import re
 from pathlib import Path
@@ -11,6 +13,8 @@ from eas_shared.types import TERMINAL, Stale, Stopped
 
 
 from eas_server.learning import LearningStore
+
+desktop_context = ContextVar("desktop_context", default=None)
 
 
 class Store(LearningStore):
@@ -25,6 +29,7 @@ class Store(LearningStore):
             CREATE TABLE IF NOT EXISTS events(seq INTEGER PRIMARY KEY AUTOINCREMENT, job_id TEXT, kind TEXT, at REAL, data TEXT);
             CREATE TABLE IF NOT EXISTS invocations(id TEXT PRIMARY KEY, job_id TEXT, result TEXT);
             CREATE TABLE IF NOT EXISTS lease(id INTEGER PRIMARY KEY CHECK(id=1), data TEXT);
+            CREATE TABLE IF NOT EXISTS desktop_leases(id TEXT PRIMARY KEY, data TEXT);
             CREATE TABLE IF NOT EXISTS kv(key TEXT PRIMARY KEY, data TEXT);
             CREATE TABLE IF NOT EXISTS maintenance(id TEXT PRIMARY KEY, data TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS knowledge(id TEXT PRIMARY KEY, data TEXT NOT NULL);
@@ -162,7 +167,7 @@ class Store(LearningStore):
 
         with self.db() as db:
             job = self._job(db, job_id)
-            lease = json.loads(db.execute("SELECT data FROM lease WHERE id=1").fetchone()[0])
+            lease = self._lease(db, job)
             self._check(job, lease, "assistant", lease["epoch"])
             row = db.execute(
                 "SELECT data FROM approvals WHERE job_id=? AND invocation=? ORDER BY rowid DESC LIMIT 1",
@@ -280,12 +285,31 @@ class Store(LearningStore):
                 )
             ]
 
+    def _lease(self, db, job=None):
+        desktop = (job or {}).get("desktop_id") or desktop_context.get()
+        if desktop:
+            empty = dict(job_id=None, owner=None, epoch=0, expires=0, inflight=None, desktop_id=desktop)
+            db.execute("INSERT OR IGNORE INTO desktop_leases VALUES(?,?)", (desktop, canonical(empty)))
+            return json.loads(
+                db.execute("SELECT data FROM desktop_leases WHERE id=?", (desktop,)).fetchone()[0]
+            )
+        legacy = json.loads(db.execute("SELECT data FROM lease WHERE id=1").fetchone()[0])
+        # Local test/admin inspection may address a sole desktop; HTTP callers bind
+        # their own context before reaching this method.
+        rows = db.execute("SELECT data FROM desktop_leases").fetchall()
+        return json.loads(rows[0][0]) if len(rows) == 1 and not legacy.get("job_id") else legacy
+
     def lease(self):
         with self.db() as db:
-            return json.loads(db.execute("SELECT data FROM lease WHERE id=1").fetchone()[0])
+            return self._lease(db)
 
     def _set_lease(self, db, lease):
-        db.execute("UPDATE lease SET data=? WHERE id=1", (canonical(lease),))
+        if lease.get("desktop_id"):
+            db.execute(
+                "INSERT OR REPLACE INTO desktop_leases VALUES(?,?)", (lease["desktop_id"], canonical(lease))
+            )
+        else:
+            db.execute("UPDATE lease SET data=? WHERE id=1", (canonical(lease),))
 
     def _invalidate(self, db, job_id):
         for row in db.execute("SELECT id,data FROM approvals WHERE job_id=?", (job_id,)).fetchall():
@@ -297,13 +321,20 @@ class Store(LearningStore):
     def claim(self, worker_id, scope=None):
         def authorized(job):
             return scope is None or (
-                job["organization_id"] == scope["organization_id"] and job["role_id"] in scope["role_ids"]
+                job["organization_id"] == scope["organization_id"]
+                and job["role_id"] in scope["role_ids"]
+                and ("predicate" not in scope or scope["predicate"](job))
             )
 
         with self.db() as db:
-            lease = json.loads(db.execute("SELECT data FROM lease WHERE id=1").fetchone()[0])
+            lease = self._lease(db)
             if lease["job_id"]:
                 job = self._job(db, lease["job_id"])
+                if job["status"] in TERMINAL and lease.get("inflight"):
+                    # Cancellation cannot release a desktop while its effect is
+                    # still in flight. A matching receipt or reconciliation must
+                    # finish before another request can acquire this desktop.
+                    return None
                 if job["status"] not in TERMINAL:
                     if (
                         job.get("selected_mode") != "strict"
@@ -350,6 +381,8 @@ class Store(LearningStore):
                 self._event(db, job["id"], "approval_policy_migrated", {"policy": "strict"})
                 return None
             job.update(status="running", execution_state="running", started_at=time.time())
+            if lease.get("desktop_id"):
+                job["desktop_id"] = lease["desktop_id"]
             lease.update(
                 job_id=job["id"],
                 owner="script",
@@ -387,7 +420,7 @@ class Store(LearningStore):
             job = self._job(db, job_id)
             if "read" not in job["permissions"]:
                 raise PermissionError("Knowledge access requires read permission")
-            lease = json.loads(db.execute("SELECT data FROM lease WHERE id=1").fetchone()[0])
+            lease = self._lease(db)
             self._check(job, lease, "assistant", lease["epoch"])
             row = db.execute(
                 "SELECT data FROM approvals WHERE job_id=? AND invocation=? ORDER BY rowid DESC LIMIT 1",
@@ -431,7 +464,7 @@ class Store(LearningStore):
     def check(self, job_id, owner, epoch):
         with self.db() as db:
             job = self._job(db, job_id)
-            lease = json.loads(db.execute("SELECT data FROM lease WHERE id=1").fetchone()[0])
+            lease = self._lease(db, job)
             self._check(job, lease, owner, epoch)
             return job
 
@@ -453,7 +486,7 @@ class Store(LearningStore):
             raise ValueError("Unknown controller")
         with self.db() as db:
             job = self._job(db, job_id)
-            lease = json.loads(db.execute("SELECT data FROM lease WHERE id=1").fetchone()[0])
+            lease = self._lease(db, job)
             if job["status"] in TERMINAL or lease["job_id"] != job_id:
                 raise Stopped("Job does not own this desktop")
             if expected_epoch is not None and expected_epoch != lease["epoch"]:
@@ -501,7 +534,8 @@ class Store(LearningStore):
     def proposal(self, job_id, invocation, proposal):
         with self.db() as db:
             for row in db.execute(
-                "SELECT data FROM approvals WHERE invocation=? ORDER BY rowid DESC", (invocation,)
+                "SELECT data FROM approvals WHERE job_id=? AND invocation=? ORDER BY rowid DESC",
+                (job_id, invocation),
             ):
                 a = json.loads(row[0])
                 if a["status"] in {"pending", "approved", "corrected", "executing"}:
@@ -566,7 +600,7 @@ class Store(LearningStore):
         """Reserve non-business setup of the assigned window before capturing a preview."""
         with self.db() as db:
             job = self._job(db, job_id)
-            lease = json.loads(db.execute("SELECT data FROM lease WHERE id=1").fetchone()[0])
+            lease = self._lease(db, job)
             self._check(job, lease, owner, epoch)
             if owner == "staff" or lease["inflight"]:
                 raise Stale("Desktop is not available for window recovery")
@@ -574,11 +608,36 @@ class Store(LearningStore):
             self._set_lease(db, lease)
             self._event(db, job_id, "window_recovery_started", {"invocation": invocation})
 
-    def begin_action(self, job_id, owner, epoch, invocation, action, approval_id=None):
+    def finish_window_recovery(self, job_id, invocation, result):
         with self.db() as db:
             job = self._job(db, job_id)
-            lease = json.loads(db.execute("SELECT data FROM lease WHERE id=1").fetchone()[0])
+            lease = self._lease(db, job)
+            started = db.execute(
+                "SELECT 1 FROM events WHERE job_id=? AND kind='window_recovery_started' AND json_extract(data,'$.invocation')=?",
+                (job_id, invocation),
+            ).fetchone()
+            if (
+                not started
+                or lease.get("inflight") != invocation
+                or type(result.get("recovered")) is not bool
+            ):
+                raise PermissionError("No matching window recovery is in progress")
+            lease["inflight"] = None
+            self._set_lease(db, lease)
+            self._event(
+                db,
+                job_id,
+                "window_recovery_finished",
+                {"invocation": invocation, "recovered": result["recovered"]},
+            )
+
+    def begin_action(self, job_id, owner, epoch, invocation, action, approval_id=None, *, authorization=None):
+        with self.db() as db:
+            job = self._job(db, job_id)
+            lease = self._lease(db, job)
             self._check(job, lease, owner, epoch)
+            if authorization:
+                authorization(db, job, lease)
             if lease["inflight"] and lease["inflight"] != invocation:
                 raise Stale("Another desktop operation is in flight")
             if approval_id:
@@ -614,7 +673,7 @@ class Store(LearningStore):
                 "INSERT OR REPLACE INTO invocations VALUES(?,?,?)",
                 (invocation, job_id, canonical(result)),
             )
-        lease = json.loads(db.execute("SELECT data FROM lease WHERE id=1").fetchone()[0])
+        lease = self._lease(db, self._job(db, job_id))
         if lease["inflight"] == invocation:
             lease["inflight"] = None
             self._set_lease(db, lease)
@@ -628,6 +687,42 @@ class Store(LearningStore):
         with self.db() as db:
             r = db.execute("SELECT result FROM invocations WHERE id=?", (invocation,)).fetchone()
             return json.loads(r[0]) if r else None
+
+    def conclude(self, job_id):
+        """Completion classification follows execution receipts, never planner assertions."""
+        job = self.get_job(job_id)
+        approvals = self.approvals(job_id)
+        executed = {a["name"] for a in approvals if a["status"] == "executed"}
+        if any(a["status"] in {"pending", "approved", "corrected", "executing"} for a in approvals):
+            raise Stale("Outstanding business operation")
+        if "complete" in executed:
+            kind = "verified_work"
+        elif "review_discovery" in executed:
+            kind = "reviewed_outcome"
+        elif job.get("record_lookup"):
+            kind = "record_unavailable"
+        elif not executed - {"select_record"}:
+            kind = "conversation"
+        else:
+            raise PermissionError("Business completion requires verified execution or staff outcome review")
+        if any(
+            r["state"] not in {"completed", "record_unavailable"}
+            for r in job.get("workflow_runs", {}).values()
+        ):
+            raise Stale("Workflow is not finished")
+        with self.db() as db:
+            current = self._job(db, job_id)
+            if current["status"] in TERMINAL:
+                raise Stopped(current["status"])
+            current.update(
+                status="completed",
+                execution_state="completed",
+                result_kind=kind,
+                evidence_status="executor_reported" if executed else "conversation",
+            )
+            self._invalidate(db, job_id)
+            self._put(db, current)
+        return current
 
     def accept(self, job_id):
         with self.db() as db:
@@ -643,6 +738,7 @@ class Store(LearningStore):
             if "incorrect" in assessments.values():
                 raise ValueError("Resolve reported incorrect operations before accepting this episode")
             job["accepted"] = True
+            job["evidence_status"] = "staff_accepted"
             reviewed = db.execute(
                 "SELECT 1 FROM approvals WHERE job_id=? AND json_extract(data,'$.name')='review_discovery' AND json_extract(data,'$.status')='executed'",
                 (job_id,),

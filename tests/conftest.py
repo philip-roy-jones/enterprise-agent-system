@@ -42,8 +42,37 @@ def server(tmp_path_factory):
         EAS_DESKTOP_ADAPTER="browser",
         EAS_JOB_TIMEOUT_SECONDS="120",
         EAS_MAX_MODEL_CALLS="32",
+        EAS_PLANNER_TOKEN="test-planner",
     )
     root = Path(__file__).resolve().parents[1]
+    # Explicit test identities. Direct ledger fixtures identify their simulated
+    # approver separately; production never maps this actor implicitly.
+    import json
+    from eas_server.config import Settings as ServerSettings
+    from eas_server.security import Security
+
+    registry = (
+        Security(
+            ServerSettings(
+                data_dir=data_dir,
+                staff_token="test-staff",
+                developer_token="test-developer",
+                worker_token="test-worker",
+                planner_token="test-planner",
+            ),
+            Store(data_dir),
+        )
+        .registry()
+        .model_dump()
+    )
+    simulated = dict(
+        registry["principals"][0], id="simulated-staff", name="Simulated staff", token_sha256=None
+    )
+    simulated["grants"] = [{**g, "own_only": False} for g in simulated["grants"]]
+    registry["principals"].append(simulated)
+    identity_file = data_dir / "test-identities.json"
+    identity_file.write_text(json.dumps(registry))
+    env["EAS_IDENTITY_FILE"] = str(identity_file)
     backend_log = open(data_dir / "backend.log", "w")
     worker_log = open(data_dir / "worker.log", "w")
     backend = subprocess.Popen(
@@ -75,6 +104,18 @@ def server(tmp_path_factory):
     else:
         backend.terminate()
         pytest.fail((data_dir / "backend.log").read_text())
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        executor_port = s.getsockname()[1]
+    executor_log = open(data_dir / "executor.log", "w")
+    executor = subprocess.Popen(
+        [sys.executable, "-m", "eas_harness.executor"],
+        env={**env, "EAS_EXECUTOR_PORT": str(executor_port)},
+        cwd=root,
+        stdout=executor_log,
+        stderr=executor_log,
+    )
+    env.update(EAS_EXECUTOR_URL=f"http://127.0.0.1:{executor_port}", EAS_WORKER_TOKEN="test-planner")
     worker = subprocess.Popen(
         [sys.executable, "-m", "eas_harness"],
         env=env,
@@ -91,6 +132,7 @@ def server(tmp_path_factory):
         url=url,
         data_dir=data_dir,
         worker_log=worker_log,
+        executor=executor,
         settings=Settings(
             data_dir=data_dir,
             backend_url=url,
@@ -101,7 +143,7 @@ def server(tmp_path_factory):
     )
 
     def check_processes(request):
-        for name, process in (("backend", backend), ("worker", context["worker"])):
+        for name, process in (("backend", backend), ("executor", executor), ("worker", context["worker"])):
             code = process.poll()
             if code is not None:
                 pytest.fail(
@@ -117,6 +159,9 @@ def server(tmp_path_factory):
     backend.wait(timeout=15)
     client.close()
     worker_log.close()
+    executor.terminate()
+    executor.wait(timeout=15)
+    executor_log.close()
     backend_log.close()
 
 

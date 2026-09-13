@@ -26,7 +26,7 @@ Accepted, verified work enters a durable learning queue. A separate model contex
 
 This implements the direction in the [agent-led learning plan](docs/plans/agent-led-learning-plan.md), which supersedes the graph-first ordering, Auto mode, and mandatory learned-package PR review in the [original specification](docs/plans/original-prompt.txt). Earlier reviewed releases and PRs remain historical evidence; they are not silently activated by this change.
 
-The accepted learning milestone is complete for this prototype: **214 regression tests pass**, and live Windows runs demonstrate teaching, revision, reuse after restart, prior-case checks and rollback for two workflow families, plus guidance-only learning. The [validation record](docs/cumulative-learning-validation.md) includes the failed attempts and the limits of these results. Staff decisions in the demonstrations were simulated.
+The accepted learning milestone is complete for this prototype: its baseline passed **214 regression tests**, and live Windows runs demonstrate teaching, revision, reuse after restart, prior-case checks and rollback for two workflow families, plus guidance-only learning. The [validation record](docs/cumulative-learning-validation.md) includes the failed attempts and the limits of these results. Staff decisions in the demonstrations were simulated.
 
 **Desktop setup: the developer machine runs the backend and staff frontend; a separate Windows VM or PC runs LangGraph, the Deep Agent harness, desktop control, and DemoBooks.** The optional single-machine browser fixture uses a simulated model for regression tests. DemoBooks is a prototype application with synthetic records, not a QuickBooks integration.
 
@@ -42,7 +42,7 @@ The agent should choose capabilities that match the requested outcome; a related
 
 The shared platform is department-agnostic; the first runnable workflow belongs to **Finance**. [Department workflow extensions](docs/departments.md) explain how other departments bring their own input schemas, graphs, adapters, and permissions.
 
-The two-machine execution model has been exercised with a complete Windows job and live model assistance ([execution evidence](docs/evidence/windows-edge-worker.json)). Follow the [two-machine developer setup](docs/developer-setup.md): start `enterprise-server` on the developer machine and `enterprise-harness` on Windows. Addresses and credentials are configured locally. The backend does not connect directly to the desktop controller.
+The two-machine execution model has been exercised with a complete Windows job and live model assistance ([execution evidence](docs/evidence/windows-edge-worker.json)). Follow the [two-machine developer setup](docs/developer-setup.md): start `enterprise-server` on the developer machine and install the isolated planner/executor/learner tasks on Windows. Addresses and credentials are configured locally. The backend does not connect directly to the desktop controller.
 
 The native application can run with its API disabled. A separate controller reads accessibility controls and supplies accessibility actions or real clicks/typing. See [legacy desktop setup](docs/legacy-desktop.md) and the optional [application API adapter](docs/windows-accounting-machine.md).
 
@@ -69,7 +69,7 @@ enterprise dev
 
 On a minimal Linux machine, install browser system dependencies with `python -m playwright install --with-deps chromium`.
 
-Open **[localhost:8000](http://127.0.0.1:8000)**. The default local staff token is prefilled in the connection dialog. Send a request in the conversation and approve its first business operation.
+Open **[localhost:8000](http://127.0.0.1:8000)**. Use the explicitly labeled local development credential in the sign-in dialog. Send a request in the conversation and approve its first business operation.
 
 `enterprise dev` starts the backend and worker as separate processes. Ctrl+C stops both. To run them independently:
 
@@ -110,13 +110,14 @@ For a repeatable browser walkthrough, run `enterprise demo --simulate-staff` whi
 flowchart LR
     Staff[Conversation and approval console] <--> Server[Dispatch, evidence and metadata]
     Server <--> Agent
+    Server -->|Exact signed grants| Authority
     subgraph Edge[Edge harness on Windows]
         Agent[Deep Agent coordinator] --> Skills[Versioned skill content]
         Agent --> Graph[Durable LangGraph workflow tools]
-        Agent --> Authority[Strict operation execution]
+        Agent -->|Proposals| Authority[Protected executor]
         Graph --> Authority
         Graph --> Judgment[Separate scoped judgment context]
-        Learner[Bounded model maintenance] --> Checks[Runtime-owned synthetic checks]
+        Learner[Isolated model learner] -->|Candidate data| Checks[Protected admission checks]
         Checks --> Skills
     end
     Authority --> Controller[Desktop controller or optional application API]
@@ -127,6 +128,8 @@ flowchart LR
 The execution ledger, fresh observations, exclusive desktop lease, fencing epochs, deadlines, and uncertain-write reconciliation are shared by direct tools and workflows. Checkpoint replay resumes a stable invocation; it does not grant fresh authority or restore the external application. Rejection and permission denial cannot be routed around through another tool.
 
 See [architecture](docs/architecture.md), [department boundaries](docs/departments.md), and [library API verification](docs/api-verification.md). One VM is enough for this synthetic development example. Staff identities and security boundaries do not imply one VM per employee.
+
+The [security implementation](docs/security.md) adds individual identities, server-enforced resource permissions, exact signed execution grants, protected context and skill delivery, and separate Windows planner/learner accounts. Its final regression suite passed **235 tests**. Business operations remain Strict. The [security validation record](docs/security-validation.md) distinguishes actual account-isolation and live learning tests from controlled OIDC tests and the multi-VM/fleet work that remains unverified.
 
 ## Teach a reusable improvement
 
@@ -168,7 +171,7 @@ Copy `.env.example` to `.env`. Runtime data and credentials are ignored by Git.
 
 Live mode uses LangChain's configurable `init_chat_model`, with the OpenRouter integration included for GPT 5.6 Luna. Follow the [API key setup](docs/credential-access.md), then enable live mode and restart. Adding a key alone leaves simulated mode enabled. Live recovery has been tested on the Windows VM, including screenshots and actual mouse/keyboard input with DemoBooks' API disabled. Those runs use explicitly simulated staff approvals; they are limited demonstrations, not a general model-reliability evaluation.
 
-Use separate tokens and a trusted local environment. This prototype binds to localhost by default; production exposure requires proper identity, TLS, tenant isolation, and infrastructure hardening.
+The loopback fixture uses labeled demo credentials. Remote setups require explicit individual identities, separate worker service credentials and HTTPS. Use the [isolated setup guide](docs/developer-setup.md); the [.env file alone is not a secret boundary](docs/credential-access.md).
 
 ## Validation
 
@@ -212,7 +215,7 @@ docs/                              Setup, architecture and validation records
 docs/plans/                        Original specification and accepted implementation plans
 ```
 
-The server and edge harness are **independently installable applications** with separate dependencies, startup commands and configuration classes. Neither package depends on the other. LangGraph, Deep Agent and workflows execute inside the harness. DemoBooks remains a separate .NET application. The shared package contains public contracts and validation definitions, with no credentials, environment loading, databases, desktop actions or graph factories.
+The server and edge harness are **independently installable applications** with separate dependencies, startup commands and configuration classes. The Windows harness installer separates its planner, executor and learner into differently privileged processes; they remain components of one edge application. Neither package depends on the other. LangGraph, Deep Agent and workflows execute inside the harness. DemoBooks remains a separate .NET application. The shared package contains public contracts and validation definitions, with no credentials, environment loading, databases, desktop actions or graph factories.
 
 From the repository root, install only the software a machine needs:
 
@@ -221,9 +224,9 @@ From the repository root, install only the software a machine needs:
 python -m pip install -c requirements.lock ./src/shared ./src/server
 enterprise-server
 
-# Separate Windows edge environment: no server or development tooling.
+# Package-only edge environment: no server or development tooling.
 python -m pip install -c requirements.lock ./src/shared ./src/edge-harness
-enterprise-harness
+# For the Windows account boundary, use install-isolated-worker.ps1 in the setup guide.
 ```
 
 Each application reads `.env` from its launch directory, or the file named by `EAS_ENV_FILE`. Keep the model and desktop-controller credentials on the edge machine. Development tooling is a separate root package; `pip install -r requirements-dev.txt` installs the full local test environment. Its `enterprise` CLI retains demo/improvement commands and compatibility aliases for `serve` and `worker`.
@@ -236,7 +239,7 @@ For an existing Windows checkout, stop the idle worker **before** upgrading and 
 | --- | --- |
 | **Implemented** | Runnable console, backend, worker, mock app; real cyclic LangGraph and Deep Agents; real browser automation; durable approval/evidence storage; Strict-only enforcement; agent-led workflow tools; correction/takeover; bounded recovery; save reconciliation; declarative skill learning, automatic admission, version pinning and rollback |
 | **Simulated by default** | The model's decisions, all accounting records, and staff decisions only when the explicit demo/test driver is used |
-| **Bounded prototype choices** | One company, one worker/session, pluggable department roles, three synthetic Finance invoices, correction drafts only, bounded declarative learning, local token roles, SQLite persistence |
-| **Deferred** | Real QuickBooks and generic third-party Windows automation; broad real-model quality evaluation; production SSO and tenant isolation; hardened development sandbox; general autonomous code generation; arbitrary graph-code deployment and checkpoint migration; multiworker fleet orchestration |
+| **Bounded prototype choices** | One deployed company/Windows desktop, pluggable department roles, synthetic Finance records, bounded declarative learning, explicit individual development identities, SQLite persistence |
+| **Deferred** | Real QuickBooks and generic third-party Windows automation; broad real-model quality evaluation; real organizational IdP deployment and physical multi-VM validation; general autonomous code generation; arbitrary graph-code deployment and checkpoint migration; multiworker fleet orchestration |
 
 The native adapter targets our own DemoBooks application. Generic Windows automation and real QuickBooks integration remain separate future adapters. No real accounting integration or production readiness is claimed.

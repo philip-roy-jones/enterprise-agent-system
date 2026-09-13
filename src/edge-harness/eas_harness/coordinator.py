@@ -3,7 +3,6 @@
 import contextvars
 import json
 import hashlib
-import time
 import re
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
@@ -169,8 +168,8 @@ class Coordinator:
     def __init__(self, settings, store, layer, checkpointer, workflow_checkpointer):
         self.settings, self.store, self.layer = settings, store, layer
         self.checkpointer = checkpointer
-        self.library = SkillLibrary(settings.data_dir)
-        self.memory = SessionContext(settings.data_dir)
+        self.library = getattr(layer, "library", None) or SkillLibrary(settings.data_dir)
+        self.memory = layer.memory if getattr(layer, "remote", False) else SessionContext(settings.data_dir)
         self.workflows = WorkflowTools(settings, store, layer, self.library, workflow_checkpointer)
 
     def build(self, job_id):
@@ -662,15 +661,7 @@ class Coordinator:
             return
         current = self.store.get_job(job_id)
         if current.get("record_lookup") and current["mutation"] == "not_attempted":
-            self.store.update_job(
-                job_id,
-                {
-                    "status": "completed",
-                    "execution_state": "completed",
-                    "result_kind": "record_unavailable",
-                    "elapsed_seconds": round(time.time() - job["started_at"], 2),
-                },
-            )
+            self.store.conclude(job_id)
             return
         if any(run["state"] != "completed" for run in current.get("workflow_runs", {}).values()):
             raise Stopped("Agent ended with an unfinished workflow; no verified completion")
@@ -707,16 +698,4 @@ class Coordinator:
                 self.store.update_job(job_id, {"assistant_report": review["value"]["staff_verified_outcome"]})
             except Paused:
                 return
-        self.store.update_job(
-            job_id,
-            {
-                "status": "completed",
-                "execution_state": "completed",
-                "result_kind": "verified_work"
-                if "complete" in self.store.get_job(job_id)["completed"]
-                else "reviewed_outcome"
-                if business_actions
-                else "conversation",
-                "elapsed_seconds": round(time.time() - job["started_at"], 2),
-            },
-        )
+        self.store.conclude(job_id)

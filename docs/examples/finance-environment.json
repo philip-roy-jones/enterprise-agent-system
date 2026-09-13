@@ -1,0 +1,7 @@
+{
+  "organization_id": "acme",
+  "department_id": "finance",
+  "role_id": "invoice_correction",
+  "company_id": "ACME",
+  "capabilities": ["read", "navigate", "draft"]
+}

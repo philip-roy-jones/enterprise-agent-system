@@ -4,13 +4,11 @@ Model behavior and staff decisions are simulated. Historical graph-first/Auto
 expectations are superseded by the agent-led plan; authority coverage remains.
 """
 
-import json
 import subprocess
 import sys
 import time
 import pytest
 from enterprise_dev.demo import drive
-from eas_shared.identity import canonical
 from conftest import pending
 
 pytestmark = pytest.mark.browser
@@ -237,9 +235,9 @@ def restart(ctx):
     ctx["worker"].kill()
     ctx["worker"].wait()
     with ctx["store"].db() as db:
-        lease = json.loads(db.execute("SELECT data FROM lease").fetchone()[0])
+        lease = ctx["store"]._lease(db)
         lease["expires"] = 0
-        db.execute("UPDATE lease SET data=?", (canonical(lease),))
+        ctx["store"]._set_lease(db, lease)
     ctx["worker"] = subprocess.Popen(
         [sys.executable, "-m", "eas_harness"],
         env=ctx["env"],

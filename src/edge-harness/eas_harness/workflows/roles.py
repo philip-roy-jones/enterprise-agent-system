@@ -17,6 +17,7 @@ class WorkerRole(RoleDefinition):
     graph_factory: Callable
     adapter_factory: Callable
     operations: dict
+    operation_handler: Callable | None = None
 
 
 ROLES: dict[str, WorkerRole] = {}

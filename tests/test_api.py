@@ -24,7 +24,7 @@ def test_authentication_artifacts_and_worker_role(tmp_path):
     assert client.get("/api/jobs").status_code == 401
     assert client.get("/api/mock/state").status_code == 401
     assert client.get("/api/artifacts/" + "a" * 32 + ".png").status_code == 401
-    worker = {"Authorization": "Bearer local-worker-demo"}
+    worker = {"Authorization": "Bearer local-worker-demo", "X-EAS-Protocol": "2"}
     assert client.post("/api/jobs", headers=worker, json={"invoice_id": "INV-1042"}).status_code == 403
     assert client.post("/api/worker/decide", headers=worker, json={"args": []}).status_code == 403
     assert (

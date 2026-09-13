@@ -127,3 +127,10 @@ def test_click_contract_rejects_conflicting_target_and_coordinates():
 
     with pytest.raises(ValidationError):
         ClickInputs(target="invoices", x=50, y=60)
+
+
+def test_server_contract_snapshot_matches_installed_executor():
+    """A stale shared contract must fail CI before an edge/server upgrade."""
+    from eas_server.worker_api import CONTRACTS
+
+    assert CONTRACTS == {name: operation.public() for name, operation in OPERATIONS.items()}

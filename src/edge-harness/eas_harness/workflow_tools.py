@@ -31,6 +31,8 @@ class WorkflowTools(FinanceOperations):
             lambda args: self.operation(name, {"job_id": job_id}),
             kind=kind,
         )
+        if getattr(self.layer, "remote", False):
+            return result["value"]
         job = self.store.get_job(job_id)
         trace = job.get("operation_trace", [])
         if not any(t["invocation"] == invocation for t in trace):
@@ -169,5 +171,6 @@ class WorkflowTools(FinanceOperations):
                 saved = self.layer.adapter.saved_result(job["expected"])
                 if not saved:
                     raise Recovery("ambiguous", "Uncertain Save still lacks authoritative confirmation")
-                self.store.update_job(job_id, {"mutation": "confirmed_succeeded"})
+                if not getattr(self.layer, "remote", False):
+                    self.store.update_job(job_id, {"mutation": "confirmed_succeeded"})
         return self.run(job_id, run_id)

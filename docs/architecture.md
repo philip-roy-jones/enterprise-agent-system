@@ -4,7 +4,7 @@ The accepted [agent-led plan](plans/agent-led-learning-plan.md) replaces the ori
 
 ## Three applications
 
-The server owns authenticated conversations, requests, staff decisions, evidence, maintenance scheduling and skill metadata. It runs no agent or workflow and has no desktop credentials. The edge harness owns the Deep Agent, skill loading, graph compilation, checkpoints, operation execution, desktop adapters and bounded learner. DemoBooks is an independent synthetic Windows application; its optional API may be disabled. `src/shared/` contains contracts only.
+The server owns individual identities, resource policy, authenticated conversations, requests, staff decisions, exact execution grants, evidence, maintenance scheduling and protected package distribution. It runs no agent or workflow and has no desktop credentials. The edge harness owns the Deep Agent, skill loading, graph compilation, checkpoints, operation execution, desktop adapters and bounded learner. DemoBooks is an independent synthetic Windows application; its optional API may be disabled. `src/shared/` contains contracts only.
 
 ## Durable requests and workflows
 
@@ -16,7 +16,7 @@ A completed workflow returns control to the coordinator; it does not finish the 
 
 Each child operation passes through `ExecutionLayer`; parent approval grants no child authority. A pending workflow exclusively owns its request. On recovery it returns a structured assistance state, allowing separately approved investigation before resuming the same continuation. Recovery is bounded. A confirmed save is replayed from the ledger or independently reconciled by operation identity. An uncertain write is never repeated without an authoritative determination.
 
-Both checkpoint stores live on the edge. Reconnects use backend records; they do not depend on inspecting hidden LangGraph subgraphs. A process restart invalidates the old desktop ownership epoch and requires fresh approval of unexecuted work.
+Both checkpoint stores live behind the protected edge broker. The planner serializes its own checkpoint data; privileged storage never deserializes executable checkpoint values. Reconnects use backend records; they do not depend on inspecting hidden LangGraph subgraphs. A process restart invalidates the old desktop ownership epoch and requires fresh approval of unexecuted work.
 
 ## Persistent conversation and working context
 
@@ -30,7 +30,7 @@ These are internal operations on context already held by the session, not new bu
 
 Strict is the sole execution policy. Auto API requests fail; previously queued or active Auto work is cancelled during migration, preserving its audit. Rejection, cancellation and permission denial terminate execution. Guidance cannot change authority. The backend transactionally consumes a decision bound to the request, invocation, exact arguments, current observation and ownership epoch. Duplicate or stale decisions fail. Every direct tool and graph operation uses the same path.
 
-The total request deadline includes staff waiting and takeover. The worker checks it on every polling path. Per-operation deadlines fence later effects without abandoning a thread that might still mutate the desktop. Only one worker holds the desktop lease, and handoff cannot interrupt an in-flight effect.
+The total request deadline includes staff waiting and takeover. The worker checks it on every polling path. Per-operation deadlines fence later effects without abandoning a thread that might still mutate the desktop. Each registered desktop has one exclusive lease, and handoff cannot interrupt an in-flight effect. Distinct desktops have distinct leases. Exact, short-lived signed grants are consumed once in the central ledger; service credentials cannot manufacture staff decisions.
 
 A registered operation may contain disclosed internal navigation. Arbitrary model instructions cannot define a new operation. Runtime screenshots used to prepare approvals are evidence capture; model-requested observations require approval.
 
@@ -40,7 +40,7 @@ A registered operation may contain disclosed internal navigation. Arbitrary mode
 
 An accepted, verified episode enters the server's maintenance queue once. This includes observed answers with a staff-reviewed outcome, as well as reports and saved drafts. Repeated related failures, later incorrect-action assessments, and explicit capability gaps queue bounded feedback reviews with related evidence. Failure reviews can propose investigation, consolidation, suspension or retirement; they cannot admit a successful procedure or change permissions. Low usage alone is not a retirement reason.
 
-The edge claims bounded maintenance work while idle. The learner is a model-only subprocess launched in a temporary working directory with an allowlisted environment: model credentials may be supplied, application and backend credentials are not. It has no tools or generated-code execution. This process separation is **not an operating-system sandbox**; the restriction relies on running trusted model-client code that only accepts and emits data.
+The edge claims its own bounded maintenance work while idle. In the isolated Windows deployment the learner runs under a separate non-admin, noninteractive OS account, receiving bounded JSON evidence and returning untrusted candidates. The planner uses another noninteractive account; the executor and admission runtime own privileged application access and validation. The loopback browser fixture remains a trusted integrated development mode. See the [security boundary and access matrix](security.md).
 
 The candidate can compose registered Finance operations. It cannot introduce imports, shell commands, new Python functions, scope changes or permissions. Admission independently matches successful steps to executed approvals and staff-accepted evidence, preserves prior supported steps/labels, rejects memorized record identifiers, and runs trusted synthetic cases in a credential-free process. New record amounts include positive, negative and zero discrepancies; stale comparisons and wrong current records must fail. Candidate-authored claims cannot replace these checks.
 
@@ -54,6 +54,6 @@ The optional judgment operation uses a versioned prompt, typed comparison input 
 
 ## Prototype limits
 
-This is one worker/session with configurable role scopes and local token roles, not production identity or tenant isolation. The learned surface covers reporting and correction drafts for synthetic Finance records. Automatic arbitrary-code learning, autonomy optimization, model-switch replay campaigns, general Windows application understanding and fleet orchestration remain outside the milestone. Skill text can still mislead a model; structural checks and approvals do not establish enterprise reliability.
+The deployment has one Windows desktop with isolated planner/learner accounts, individual development identities and server-enforced scoped authorization. OIDC integration is covered by a controlled provider fixture; real organizational SSO and physical multi-VM isolation have not been exercised. Distinct-worker lease tests do not establish full fleet orchestration. The learned surface covers reporting and correction drafts for synthetic Finance records. Automatic arbitrary-code learning, autonomy optimization, model-switch replay campaigns, general Windows application understanding and fleet orchestration remain outside the milestone. Skill text can still mislead a model; structural checks and approvals do not establish enterprise reliability.
 
 See [deployment setup](developer-setup.md), [legacy desktop constraints](legacy-desktop.md), [department security boundaries](departments.md) and [validation evidence](validation.md).

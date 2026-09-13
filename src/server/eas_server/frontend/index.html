@@ -25,6 +25,7 @@
           ><strong>Development worker</strong
           ><small>One worker · One desktop</small
           ><span id="model-label" class="badge">Simulated assistance</span>
+          <small id="signed-in-as"></small><button id="sign-out" type="button" hidden>Sign out</button>
         </div>
       </aside>
       <div class="workspace">
@@ -233,10 +234,10 @@
       <form id="login-form">
         <div class="brand login-brand">Enterprise Agent System</div>
         <h2>Connect to your workspace</h2>
-        <p class="muted">
+        <p class="muted" id="login-explanation">
           Enter the staff token configured for this local prototype.
         </p>
-        <label
+        <div id="development-login"><label
           >Staff token<input
             id="token"
             type="password"
@@ -247,7 +248,8 @@
         <p class="hint">
           Default local demo token is prefilled. Change it in .env for your
           environment.
-        </p>
+        </p></div>
+        <a id="oidc-login" class="primary wide" href="/api/auth/login" hidden>Sign in with your organization</a>
       </form>
     </dialog>
     <div id="toast" role="status" hidden></div>

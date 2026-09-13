@@ -1,6 +1,7 @@
 """Methods exposed by the authenticated worker RPC endpoint."""
 
 WORKER_METHODS = {
+    "planner_context",
     "learning_claim",
     "learning_finish",
     "skills_publish",
@@ -17,6 +18,7 @@ WORKER_METHODS = {
     "stale_approval",
     "begin_action",
     "begin_window_recovery",
+    "finish_window_recovery",
     "finish_action",
     "result",
     "relevant_episodes",
@@ -25,4 +27,6 @@ WORKER_METHODS = {
     "ask_staff",
     "bind_record",
     "report_capability_gap",
+    "conclude",
+    "package_access",
 }

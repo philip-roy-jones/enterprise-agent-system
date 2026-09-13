@@ -1,16 +1,11 @@
-# OpenRouter API key setup
+# Model and service credential setup
 
-1. Create a key at [OpenRouter API keys](https://openrouter.ai/settings/keys).
-2. Add the following to the ignored `.env` in the **Windows worker checkout**, updating existing settings and preserving the desktop controller settings:
+Create a restricted development key at [OpenRouter API keys](https://openrouter.ai/settings/keys). Set `OPENROUTER_API_KEY`, `EAS_MODEL_PROVIDER=openrouter`, `EAS_MODEL_ID=openai/gpt-5.6-luna` and `EAS_MODEL_MODE=live` in the protected Windows component configurations described in [developer setup](developer-setup.md). The backend needs only the model-mode label; it never needs the model key.
 
-   ```dotenv
-   OPENROUTER_API_KEY=your-key-here
-   EAS_MODEL_PROVIDER=openrouter
-   EAS_MODEL_ID=openai/gpt-5.6-luna
-   ```
+The isolated installer gives model access to the planner and learner accounts. It keeps the executor/admission and controller credentials out of those accounts' configuration. When rotating a model key, drain work, update the protected component files (including the learner's provider key), then restart their tasks. Never paste a key into chat or commit it. Use a separate key and provider usage limits for this prototype.
 
-3. Set `EAS_MODEL_MODE=live` on both machines when ready to make API calls. Restart the backend with `enterprise-server` and restart the idle Windows `EAS-Worker` task. Keep the key only on the worker. Jobs that need assistance can then call GPT 5.6 Luna through OpenRouter.
+For the optional trusted browser fixture, the project `.env` supplies its simulated/live model configuration. An ignored `.env` remains readable to development tools with filesystem access; Git ignore is not a security boundary and this project does not impose an agent-specific read ban. The deployed Windows boundary comes from separate accounts, SYSTEM ownership and ACLs. A model-provider key held by a compromised planner account can still be stolen or used; these accounts are not provider-egress sandboxes.
 
-The [LangChain OpenRouter integration](https://docs.langchain.com/oss/python/integrations/chat/openrouter) is included in the project dependencies. Adding a key alone does not switch out of simulated mode. The application consumes it through the environment; no key needs to appear in a conversation, screenshot, or source commit. Live calls are limited to 12 per job by default, with 2,048 output tokens per call, a 20-second request timeout, and no automatic provider retries. Assistant tools still require individual staff approval.
+Individual human credentials and separate planner/executor/admission credentials are provisioned by `python -m eas_server.admin`; generated secrets are written to protected files, not stdout. Only credential hashes live in the server registry. The registry, OIDC client secret and execution signing key belong to the server. The desktop controller token and application access belong only to the Windows executor environment. Rotate/revoke each according to its actual exposure rather than copying one shared token everywhere.
 
-An ignored `.env` remains readable to tools with filesystem access. This project does not enforce an agent-specific read ban. Use a separate project key, restricted permissions where supported, usage monitoring, and key rotation.
+Adding a model key alone does not switch from simulated to live mode. Provider calls are bounded by each request's configured call budget and timeout, and model provenance is reported separately from simulated staff decisions. All business operations retain individual staff approval.

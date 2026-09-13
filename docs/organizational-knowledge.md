@@ -8,13 +8,13 @@ Authorized staff can add a document with `POST /api/knowledge`. For example, fro
 import json
 from pathlib import Path
 import httpx
-from enterprise_dev.config import Settings
+from eas_server.config import Settings
 
 settings = Settings()
 document = json.loads(Path("examples/finance-knowledge.json").read_text())
 response = httpx.post(
     settings.backend_url + "/api/knowledge",
-    headers={"Authorization": "Bearer " + settings.staff_token},
+    headers={"Authorization": "Bearer " + Path("runtime/security/staff-token.txt").read_text().strip()},
     json=document,
 )
 response.raise_for_status()
@@ -23,12 +23,12 @@ print(response.json()["id"])
 
 This is an explicit staff action; importing the example is optional. Document IDs, revisions, and scope are retained with results. This prototype provides creation and retrieval, not a full document editing, deletion, or retention interface. Add only synthetic guidance to the demonstration.
 
-The Deep Agent can call `search_knowledge(query)`. Every call requires individual staff approval, even when the selected job mode is Auto. The backend checks that an executing approval covers that exact query before returning content. Search scope comes from the stored job, never from model-supplied organization or department identifiers. Permission checks and scope filtering run before ranking; search returns at most three documents of at most 12,000 characters each. Queries are bounded to 500 characters. An audit event records the query and returned source IDs/revisions, and the tool result preserves the retrieved content as episode evidence.
+The Deep Agent can call `search_knowledge(query)`. Every call requires individual staff approval; Strict is the only execution mode. The backend checks that an executing approval covers that exact query before returning content. Search scope comes from the stored job, never from model-supplied organization or department identifiers. Permission checks and scope filtering run before ranking; search returns at most three documents of at most 12,000 characters each. Queries are bounded to 500 characters. An audit event records the query and returned source IDs/revisions, and the tool result preserves the retrieved content as episode evidence.
 
 Document text is reference material. It cannot grant permissions, authorize another company's records, change approval mode, or supply arbitrary code to execute. The agent is instructed to cite document IDs/revisions when using guidance.
 
 ## Worker assignment
 
-Configure `EAS_WORKER_ORGANIZATION_ID` and `EAS_WORKER_ROLE_IDS` independently on the backend and edge worker. The defaults authorize organization `acme` and role `invoice_correction`. Additional reviewed roles can be listed as comma-separated IDs. Dispatch only claims jobs inside the backend's configured worker scope; the receiving harness independently validates organization, installed role, department, input consistency, and permitted capabilities before constructing its adapter or graph. A bad route therefore does not automatically become desktop access.
+Enroll each desktop with an explicit organization/department/role/company profile and distinct planner/executor/admission credentials. The server derives dispatch authority from that registration and the requesting person's current grants. The receiving executor checks its environment binding and exact operation grant. Local role selectors do not grant additional server rights.
 
-These checks support the prototype's single worker credential and desktop lease. They do not establish employee identity or department membership: the shared staff token remains a workspace-wide prototype credential. Production authorization would need per-person permissions, separately authenticated workers, and application credentials that enforce the same resource boundaries.
+Creating guidance requires an explicit `knowledge` grant covering its full audience. Omitting an optional document restriction requires authorization for the corresponding broader scope; a department-scoped writer cannot silently publish organization-wide guidance. Retrieval uses current request authority and an executed exact-query approval. See [security](security.md) for individual identities, protected context, worker enrollment and remaining deployment limits.

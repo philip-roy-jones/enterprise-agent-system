@@ -42,12 +42,23 @@ def run_worker(settings=None, once=False):
     log.info("Worker started on %s; desktop adapter=%s", platform.system(), settings.desktop_adapter)
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     store = RemoteStore(settings.backend_url, settings.worker_token)
+    admission_store = (
+        None if settings.executor_url else RemoteStore(settings.backend_url, settings.admission_token)
+    )
     adapter = None
     active_role = None
     graph = None
     worker_id = uid()
-    graph_db = sqlite3.connect(settings.data_dir / "worker-checkpoints.sqlite", check_same_thread=False)
-    assist_db = sqlite3.connect(settings.data_dir / "assistant-checkpoints.sqlite", check_same_thread=False)
+    graph_db = (
+        None
+        if settings.executor_url
+        else sqlite3.connect(settings.data_dir / "worker-checkpoints.sqlite", check_same_thread=False)
+    )
+    assist_db = (
+        None
+        if settings.executor_url
+        else sqlite3.connect(settings.data_dir / "assistant-checkpoints.sqlite", check_same_thread=False)
+    )
     from eas_harness.maintenance import maintain
 
     next_maintenance = 0
@@ -55,9 +66,9 @@ def run_worker(settings=None, once=False):
         while True:
             job = store.claim(worker_id)
             if not job:
-                if time.monotonic() >= next_maintenance:
+                if admission_store and time.monotonic() >= next_maintenance:
                     try:
-                        maintain(settings, store, worker_id)
+                        maintain(settings, admission_store, worker_id)
                     except Exception:
                         log.exception("Maintenance pass failed; business authority is unchanged")
                     next_maintenance = time.monotonic() + 5
@@ -77,16 +88,25 @@ def run_worker(settings=None, once=False):
                 if (role_id, engine) != active_role:
                     if adapter:
                         adapter.close()
-                    adapter = role.adapter_factory(settings, store)
-                    layer = ExecutionLayer(store, adapter, role.operations)
-                    if role_id == "invoice_correction" and engine == "agent-led-1":
-                        graph = Coordinator(
-                            settings, store, layer, SqliteSaver(assist_db), SqliteSaver(graph_db)
-                        )
+                    if settings.executor_url:
+                        from eas_harness.executor import RemoteExecutionLayer
+
+                        layer = RemoteExecutionLayer(settings, store)
+                        adapter = layer.adapter
                     else:
-                        graph = role.graph_factory(
-                            settings, store, layer, SqliteSaver(graph_db), SqliteSaver(assist_db)
-                        ).graph
+                        adapter = role.adapter_factory(settings, store)
+                        layer = ExecutionLayer(store, adapter, role.operations)
+                    if settings.executor_url:
+                        from eas_harness.context_broker import RemoteCheckpointer
+
+                        assist_saver = RemoteCheckpointer(layer, "agent")
+                        graph_saver = RemoteCheckpointer(layer, "workflow")
+                    else:
+                        assist_saver, graph_saver = SqliteSaver(assist_db), SqliteSaver(graph_db)
+                    if role_id == "invoice_correction" and engine == "agent-led-1":
+                        graph = Coordinator(settings, store, layer, assist_saver, graph_saver)
+                    else:
+                        graph = role.graph_factory(settings, store, layer, graph_saver, assist_saver).graph
                     active_role = (role_id, engine)
                 if store.lease()["owner"] == "staff":
                     time.sleep(0.5)
@@ -113,7 +133,14 @@ def run_worker(settings=None, once=False):
                 time.sleep(0.25)
             except (Stopped, PermissionError) as error:
                 log.warning("Job %s stopped: %s", job_id, error)
-                if store.get_job(job_id)["status"] not in TERMINAL:
+                try:
+                    current = store.get_job(job_id)
+                except PermissionError:
+                    # Revocation removes reads too. An operation denial for an
+                    # otherwise authorized request still needs a terminal state.
+                    active_role = None
+                    continue
+                if current["status"] not in TERMINAL:
                     store.update_job(
                         job_id,
                         {
@@ -131,5 +158,7 @@ def run_worker(settings=None, once=False):
     finally:
         if adapter:
             adapter.close()
-        graph_db.close()
-        assist_db.close()
+        if graph_db:
+            graph_db.close()
+        if assist_db:
+            assist_db.close()

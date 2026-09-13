@@ -1,0 +1,1545 @@
+{
+  "ask_staff": {
+    "conditions": "Fresh observation; authorized company and invoice",
+    "description": "Ask the staff member the disclosed question and wait for their answer",
+    "desktop": false,
+    "expected": "A durable question in this job's conversation; an answer never authorizes a desktop action",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "question": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Question",
+          "type": "string"
+        }
+      },
+      "required": [
+        "question"
+      ],
+      "title": "StaffQuestion",
+      "type": "object"
+    },
+    "mutation": false,
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "answer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Answer"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "number"
+        },
+        "message_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Message Id"
+        },
+        "question": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Question",
+          "type": "string"
+        },
+        "question_id": {
+          "title": "Question Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "answered"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "question",
+        "question_id",
+        "status",
+        "created_at"
+      ],
+      "title": "QuestionResult",
+      "type": "object"
+    },
+    "permission": "read",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 2,
+    "timeout_seconds": 10
+  },
+  "assist": {
+    "conditions": "Fresh observation; authorized company and invoice",
+    "description": "Ask the supervised assistant to investigate the interruption; every tool requires its own approval",
+    "desktop": true,
+    "expected": "A proposed resolution with separately approved tools",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "minLength": 1,
+          "title": "Company Id",
+          "type": "string"
+        },
+        "invoice_id": {
+          "pattern": "^INV-\\d{4}$",
+          "title": "Invoice Id",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "company_id",
+        "invoice_id"
+      ],
+      "title": "NodeInputs",
+      "type": "object"
+    },
+    "mutation": false,
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "supervised_assistance_authorized": {
+          "const": true,
+          "title": "Supervised Assistance Authorized",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "supervised_assistance_authorized"
+      ],
+      "title": "AssistanceAuthorized",
+      "type": "object"
+    },
+    "permission": "read",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 2,
+    "timeout_seconds": 10
+  },
+  "click": {
+    "conditions": "Fresh observation; authorized company and invoice",
+    "description": "Click the annotated control in the assigned application",
+    "desktop": true,
+    "expected": "Only the disclosed control is activated",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        }
+      },
+      "title": "ClickInputs",
+      "type": "object"
+    },
+    "mutation": true,
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "clicked": {
+          "title": "Clicked",
+          "type": "string"
+        }
+      },
+      "required": [
+        "clicked"
+      ],
+      "title": "Clicked",
+      "type": "object"
+    },
+    "permission": "navigate",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 2,
+    "timeout_seconds": 10
+  },
+  "compare": {
+    "conditions": "Fresh observation; authorized company and invoice",
+    "description": "Read the invoice and its purchase order; calculate the discrepancy",
+    "desktop": true,
+    "expected": "Verified expected correction amount",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "minLength": 1,
+          "title": "Company Id",
+          "type": "string"
+        },
+        "invoice_id": {
+          "pattern": "^INV-\\d{4}$",
+          "title": "Invoice Id",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "company_id",
+        "invoice_id"
+      ],
+      "title": "NodeInputs",
+      "type": "object"
+    },
+    "mutation": false,
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "amount": {
+          "minimum": 0,
+          "title": "Amount",
+          "type": "integer"
+        },
+        "company_id": {
+          "minLength": 1,
+          "title": "Company Id",
+          "type": "string"
+        },
+        "difference": {
+          "title": "Difference",
+          "type": "integer"
+        },
+        "invoice_id": {
+          "pattern": "^INV-\\d{4}$",
+          "title": "Invoice Id",
+          "type": "string"
+        },
+        "note": {
+          "title": "Note",
+          "type": "string"
+        },
+        "po_id": {
+          "title": "Po Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "invoice_id",
+        "company_id",
+        "amount",
+        "note",
+        "po_id",
+        "difference"
+      ],
+      "title": "ExpectedResult",
+      "type": "object"
+    },
+    "permission": "read",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 2,
+    "timeout_seconds": 10
+  },
+  "complete": {
+    "conditions": "Fresh observation; authorized company and invoice",
+    "description": "Record the verified outcome and request staff acceptance",
+    "desktop": false,
+    "expected": "Job complete with evidence",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "minLength": 1,
+          "title": "Company Id",
+          "type": "string"
+        },
+        "invoice_id": {
+          "pattern": "^INV-\\d{4}$",
+          "title": "Invoice Id",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "company_id",
+        "invoice_id"
+      ],
+      "title": "NodeInputs",
+      "type": "object"
+    },
+    "mutation": false,
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptance_required": {
+          "const": true,
+          "title": "Acceptance Required",
+          "type": "boolean"
+        },
+        "verified": {
+          "const": true,
+          "title": "Verified",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "verified",
+        "acceptance_required"
+      ],
+      "title": "Completed",
+      "type": "object"
+    },
+    "permission": "read",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 2,
+    "timeout_seconds": 10
+  },
+  "establish": {
+    "conditions": "Fresh observation; authorized company and invoice",
+    "description": "Open the assigned company and invoice. Navigation may contain several clicks",
+    "desktop": true,
+    "expected": "Correct company and invoice open",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "minLength": 1,
+          "title": "Company Id",
+          "type": "string"
+        },
+        "invoice_id": {
+          "pattern": "^INV-\\d{4}$",
+          "title": "Invoice Id",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "company_id",
+        "invoice_id"
+      ],
+      "title": "NodeInputs",
+      "type": "object"
+    },
+    "mutation": false,
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "invoice_id": {
+          "pattern": "^INV-\\d{4}$",
+          "title": "Invoice Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "invoice_id"
+      ],
+      "title": "Invoice",
+      "type": "object"
+    },
+    "permission": "navigate",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 2,
+    "timeout_seconds": 10
+  },
+  "judge": {
+    "conditions": "Fresh observation; authorized company and invoice",
+    "description": "Classify the verified comparison in an isolated model context",
+    "desktop": false,
+    "expected": "A result bound to current comparison evidence",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "minLength": 1,
+          "title": "Company Id",
+          "type": "string"
+        },
+        "invoice_id": {
+          "pattern": "^INV-\\d{4}$",
+          "title": "Invoice Id",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "company_id",
+        "invoice_id"
+      ],
+      "title": "NodeInputs",
+      "type": "object"
+    },
+    "mutation": false,
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "title": "ToolResult",
+      "type": "object"
+    },
+    "permission": "read",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 2,
+    "timeout_seconds": 45
+  },
+  "observe_app": {
+    "conditions": "Fresh observation; authorized company and invoice",
+    "description": "Read the current application state and available controls",
+    "desktop": true,
+    "expected": "Fresh application evidence",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "Empty",
+      "type": "object"
+    },
+    "mutation": false,
+    "output_schema": {
+      "properties": {
+        "height": {
+          "default": 800,
+          "title": "Height",
+          "type": "integer"
+        },
+        "revision": {
+          "title": "Revision",
+          "type": "string"
+        },
+        "screenshot": {
+          "title": "Screenshot",
+          "type": "string"
+        },
+        "state": {
+          "additionalProperties": true,
+          "title": "State",
+          "type": "object"
+        },
+        "targets": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Targets",
+          "type": "array"
+        },
+        "timestamp": {
+          "title": "Timestamp",
+          "type": "number"
+        },
+        "width": {
+          "default": 1200,
+          "title": "Width",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "revision",
+        "timestamp",
+        "screenshot",
+        "state"
+      ],
+      "title": "Observation",
+      "type": "object"
+    },
+    "permission": "read",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 2,
+    "timeout_seconds": 10
+  },
+  "prepare": {
+    "conditions": "Fresh observation; authorized company and invoice",
+    "description": "Enter the purchase order amount and a correction explanation in the draft form",
+    "desktop": true,
+    "expected": "Draft fields match the verified purchase order",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "minLength": 1,
+          "title": "Company Id",
+          "type": "string"
+        },
+        "invoice_id": {
+          "pattern": "^INV-\\d{4}$",
+          "title": "Invoice Id",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "company_id",
+        "invoice_id"
+      ],
+      "title": "NodeInputs",
+      "type": "object"
+    },
+    "mutation": true,
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "prepared": {
+          "const": true,
+          "title": "Prepared",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "prepared"
+      ],
+      "title": "Prepared",
+      "type": "object"
+    },
+    "permission": "draft",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 2,
+    "timeout_seconds": 10
+  },
+  "read_skill": {
+    "conditions": "Fresh observation; authorized company and invoice",
+    "description": "Read the disclosed version of a skill within this job's scope",
+    "desktop": false,
+    "expected": "Only this invocation and scope are authorized",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "skill_id": {
+          "title": "Skill Id",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "skill_id",
+        "version"
+      ],
+      "title": "SkillRead",
+      "type": "object"
+    },
+    "mutation": false,
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "title": "ToolResult",
+      "type": "object"
+    },
+    "permission": "read",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 2,
+    "timeout_seconds": 10
+  },
+  "read_skill_resource": {
+    "conditions": "Fresh observation; authorized company and invoice",
+    "description": "Read the disclosed supporting file from this exact skill version",
+    "desktop": false,
+    "expected": "Only this invocation and scope are authorized",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "maxLength": 180,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "skill_id": {
+          "title": "Skill Id",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "skill_id",
+        "version",
+        "path"
+      ],
+      "title": "SkillResource",
+      "type": "object"
+    },
+    "mutation": false,
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "title": "ToolResult",
+      "type": "object"
+    },
+    "permission": "read",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 2,
+    "timeout_seconds": 10
+  },
+  "recover": {
+    "conditions": "Fresh observation; authorized company and invoice",
+    "description": "Resolve a recognized informational popup or wait for application readiness",
+    "desktop": true,
+    "expected": "Known interruption resolved",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "minLength": 1,
+          "title": "Company Id",
+          "type": "string"
+        },
+        "invoice_id": {
+          "pattern": "^INV-\\d{4}$",
+          "title": "Invoice Id",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "company_id",
+        "invoice_id"
+      ],
+      "title": "NodeInputs",
+      "type": "object"
+    },
+    "mutation": false,
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "recovered": {
+          "const": true,
+          "title": "Recovered",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "recovered"
+      ],
+      "title": "Recovered",
+      "type": "object"
+    },
+    "permission": "navigate",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 2,
+    "timeout_seconds": 10
+  },
+  "report": {
+    "conditions": "Fresh observation; authorized company and invoice",
+    "description": "Verify and report the current invoice and purchase-order discrepancy without saving",
+    "desktop": true,
+    "expected": "A result bound to current comparison evidence",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "minLength": 1,
+          "title": "Company Id",
+          "type": "string"
+        },
+        "invoice_id": {
+          "pattern": "^INV-\\d{4}$",
+          "title": "Invoice Id",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "company_id",
+        "invoice_id"
+      ],
+      "title": "NodeInputs",
+      "type": "object"
+    },
+    "mutation": false,
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "title": "ToolResult",
+      "type": "object"
+    },
+    "permission": "read",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 2,
+    "timeout_seconds": 10
+  },
+  "resume": {
+    "conditions": "Fresh observation; authorized company and invoice",
+    "description": "Re-observe after assistance or handoff and reconcile saved results before resuming",
+    "desktop": true,
+    "expected": "A verified continuation point",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "minLength": 1,
+          "title": "Company Id",
+          "type": "string"
+        },
+        "invoice_id": {
+          "pattern": "^INV-\\d{4}$",
+          "title": "Invoice Id",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "company_id",
+        "invoice_id"
+      ],
+      "title": "NodeInputs",
+      "type": "object"
+    },
+    "mutation": false,
+    "output_schema": {
+      "$defs": {
+        "DraftResult": {
+          "additionalProperties": true,
+          "properties": {
+            "amount": {
+              "minimum": 0,
+              "title": "Amount",
+              "type": "integer"
+            },
+            "company_id": {
+              "minLength": 1,
+              "title": "Company Id",
+              "type": "string"
+            },
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "invoice_id": {
+              "pattern": "^INV-\\d{4}$",
+              "title": "Invoice Id",
+              "type": "string"
+            },
+            "note": {
+              "title": "Note",
+              "type": "string"
+            },
+            "operation_id": {
+              "title": "Operation Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "invoice_id",
+            "company_id",
+            "id",
+            "operation_id",
+            "amount",
+            "note"
+          ],
+          "title": "DraftResult",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "next_node": {
+          "enum": [
+            "verify",
+            "save",
+            "establish"
+          ],
+          "title": "Next Node",
+          "type": "string"
+        },
+        "prepared_by_assistance": {
+          "default": false,
+          "title": "Prepared By Assistance",
+          "type": "boolean"
+        },
+        "reconciled": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DraftResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "next_node"
+      ],
+      "title": "ResumeResult",
+      "type": "object"
+    },
+    "permission": "read",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 2,
+    "timeout_seconds": 10
+  },
+  "resume_workflow": {
+    "conditions": "Fresh observation; authorized company and invoice",
+    "description": "Resume this suspended workflow after rechecking current application state",
+    "desktop": false,
+    "expected": "Only this invocation and scope are authorized",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "title": "WorkflowResume",
+      "type": "object"
+    },
+    "mutation": false,
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "title": "ToolResult",
+      "type": "object"
+    },
+    "permission": "read",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 2,
+    "timeout_seconds": 10
+  },
+  "review_discovery": {
+    "conditions": "Fresh observation; authorized company and invoice",
+    "description": "Review the assistant's report against the requested outcome and recorded evidence. Approve only if the request is satisfied; reject otherwise.",
+    "desktop": true,
+    "expected": "Staff confirms the outcome of this unfamiliar request; no workflow is installed automatically",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "assistant_report": {
+          "minLength": 1,
+          "title": "Assistant Report",
+          "type": "string"
+        },
+        "company_id": {
+          "minLength": 1,
+          "title": "Company Id",
+          "type": "string"
+        },
+        "invoice_id": {
+          "pattern": "^INV-\\d{4}$",
+          "title": "Invoice Id",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "company_id",
+        "invoice_id",
+        "assistant_report"
+      ],
+      "title": "ReviewInputs",
+      "type": "object"
+    },
+    "mutation": false,
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptance_required": {
+          "const": true,
+          "title": "Acceptance Required",
+          "type": "boolean"
+        },
+        "staff_verified_outcome": {
+          "minLength": 1,
+          "title": "Staff Verified Outcome",
+          "type": "string"
+        }
+      },
+      "required": [
+        "staff_verified_outcome",
+        "acceptance_required"
+      ],
+      "title": "Reviewed",
+      "type": "object"
+    },
+    "permission": "read",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 2,
+    "timeout_seconds": 10
+  },
+  "run_workflow": {
+    "conditions": "Fresh observation; authorized company and invoice",
+    "description": "Start this versioned workflow; each internal operation needs separate approval",
+    "desktop": false,
+    "expected": "Only this invocation and scope are authorized",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "skill_id": {
+          "title": "Skill Id",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "skill_id",
+        "version"
+      ],
+      "title": "WorkflowCall",
+      "type": "object"
+    },
+    "mutation": false,
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "title": "ToolResult",
+      "type": "object"
+    },
+    "permission": "read",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 2,
+    "timeout_seconds": 10
+  },
+  "save": {
+    "conditions": "Fresh observation; authorized company and invoice",
+    "description": "Save one correction draft using this job's idempotency key",
+    "desktop": true,
+    "expected": "One persistent correction draft; original invoice unchanged",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "minLength": 1,
+          "title": "Company Id",
+          "type": "string"
+        },
+        "invoice_id": {
+          "pattern": "^INV-\\d{4}$",
+          "title": "Invoice Id",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "company_id",
+        "invoice_id"
+      ],
+      "title": "NodeInputs",
+      "type": "object"
+    },
+    "mutation": true,
+    "output_schema": {
+      "additionalProperties": true,
+      "properties": {
+        "amount": {
+          "minimum": 0,
+          "title": "Amount",
+          "type": "integer"
+        },
+        "company_id": {
+          "minLength": 1,
+          "title": "Company Id",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "invoice_id": {
+          "pattern": "^INV-\\d{4}$",
+          "title": "Invoice Id",
+          "type": "string"
+        },
+        "note": {
+          "title": "Note",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "invoice_id",
+        "company_id",
+        "id",
+        "operation_id",
+        "amount",
+        "note"
+      ],
+      "title": "DraftResult",
+      "type": "object"
+    },
+    "permission": "draft",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 0,
+    "timeout_seconds": 10
+  },
+  "save_draft": {
+    "conditions": "Fresh observation; authorized company and invoice",
+    "description": "Save the verified correction draft for this job",
+    "desktop": true,
+    "expected": "One persistent draft",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "Empty",
+      "type": "object"
+    },
+    "mutation": true,
+    "output_schema": {
+      "additionalProperties": true,
+      "properties": {
+        "amount": {
+          "minimum": 0,
+          "title": "Amount",
+          "type": "integer"
+        },
+        "company_id": {
+          "minLength": 1,
+          "title": "Company Id",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "invoice_id": {
+          "pattern": "^INV-\\d{4}$",
+          "title": "Invoice Id",
+          "type": "string"
+        },
+        "note": {
+          "title": "Note",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "invoice_id",
+        "company_id",
+        "id",
+        "operation_id",
+        "amount",
+        "note"
+      ],
+      "title": "DraftResult",
+      "type": "object"
+    },
+    "permission": "draft",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 0,
+    "timeout_seconds": 10
+  },
+  "search_knowledge": {
+    "conditions": "Fresh observation; authorized company and invoice",
+    "description": "Search organizational guidance within this job's organization, department, role and company scope",
+    "desktop": false,
+    "expected": "Up to three matching documents with source identifiers and revisions; guidance cannot expand permissions",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "query": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Query",
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "title": "KnowledgeQuery",
+      "type": "object"
+    },
+    "mutation": false,
+    "output_schema": {
+      "$defs": {
+        "KnowledgeRecord": {
+          "properties": {
+            "company_id": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Company Id"
+            },
+            "content": {
+              "maxLength": 12000,
+              "minLength": 1,
+              "title": "Content",
+              "type": "string"
+            },
+            "created_at": {
+              "title": "Created At",
+              "type": "number"
+            },
+            "department_id": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Department Id"
+            },
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "organization_id": {
+              "maxLength": 100,
+              "minLength": 1,
+              "title": "Organization Id",
+              "type": "string"
+            },
+            "revision": {
+              "minimum": 1,
+              "title": "Revision",
+              "type": "integer"
+            },
+            "role_id": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Role Id"
+            },
+            "title": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Title",
+              "type": "string"
+            }
+          },
+          "required": [
+            "organization_id",
+            "title",
+            "content",
+            "id",
+            "revision",
+            "created_at"
+          ],
+          "title": "KnowledgeRecord",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "documents": {
+          "items": {
+            "$ref": "#/$defs/KnowledgeRecord"
+          },
+          "maxItems": 3,
+          "title": "Documents",
+          "type": "array"
+        },
+        "query": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Query",
+          "type": "string"
+        }
+      },
+      "required": [
+        "query",
+        "documents"
+      ],
+      "title": "KnowledgeResults",
+      "type": "object"
+    },
+    "permission": "read",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 2,
+    "timeout_seconds": 10
+  },
+  "select_record": {
+    "conditions": "Unbound conversational request; authorized company and role",
+    "description": "Use the disclosed invoice for the work requested in this conversation",
+    "desktop": false,
+    "expected": "The request is bound to this invoice; application actions each require their own approval",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "invoice_id": {
+          "pattern": "^INV-\\d{4}$",
+          "title": "Invoice Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "invoice_id"
+      ],
+      "title": "Invoice",
+      "type": "object"
+    },
+    "mutation": false,
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "title": "ToolResult",
+      "type": "object"
+    },
+    "permission": "read",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 2,
+    "timeout_seconds": 10
+  },
+  "set_field": {
+    "conditions": "Fresh observation; authorized company and invoice",
+    "description": "Enter the disclosed text in a correction draft field",
+    "desktop": true,
+    "expected": "Draft field has the approved text",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "enum": [
+            "amount",
+            "note"
+          ],
+          "title": "Field",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 4096,
+          "pattern": "^[^\\r\\n]*$",
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "field",
+        "value"
+      ],
+      "title": "FieldValue",
+      "type": "object"
+    },
+    "mutation": true,
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "enum": [
+            "amount",
+            "note"
+          ],
+          "title": "Field",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 4096,
+          "pattern": "^[^\\r\\n]*$",
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "field",
+        "value"
+      ],
+      "title": "FieldValue",
+      "type": "object"
+    },
+    "permission": "draft",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 2,
+    "timeout_seconds": 10
+  },
+  "validate": {
+    "conditions": "Fresh observation; authorized company and invoice",
+    "description": "Validate the requested task, record and worker permissions",
+    "desktop": false,
+    "expected": "A supported scoped job",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "minLength": 1,
+          "title": "Company Id",
+          "type": "string"
+        },
+        "invoice_id": {
+          "pattern": "^INV-\\d{4}$",
+          "title": "Invoice Id",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "company_id",
+        "invoice_id"
+      ],
+      "title": "NodeInputs",
+      "type": "object"
+    },
+    "mutation": false,
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "validated": {
+          "const": true,
+          "title": "Validated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "validated"
+      ],
+      "title": "Validated",
+      "type": "object"
+    },
+    "permission": "read",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 2,
+    "timeout_seconds": 10
+  },
+  "verify": {
+    "conditions": "Fresh observation; authorized company and invoice",
+    "description": "Inspect the saved draft and verify its company, invoice, amount and operation ID",
+    "desktop": true,
+    "expected": "Persisted business result verified",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "minLength": 1,
+          "title": "Company Id",
+          "type": "string"
+        },
+        "invoice_id": {
+          "pattern": "^INV-\\d{4}$",
+          "title": "Invoice Id",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "company_id",
+        "invoice_id"
+      ],
+      "title": "NodeInputs",
+      "type": "object"
+    },
+    "mutation": false,
+    "output_schema": {
+      "additionalProperties": true,
+      "properties": {
+        "amount": {
+          "minimum": 0,
+          "title": "Amount",
+          "type": "integer"
+        },
+        "company_id": {
+          "minLength": 1,
+          "title": "Company Id",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "invoice_id": {
+          "pattern": "^INV-\\d{4}$",
+          "title": "Invoice Id",
+          "type": "string"
+        },
+        "note": {
+          "title": "Note",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "invoice_id",
+        "company_id",
+        "id",
+        "operation_id",
+        "amount",
+        "note"
+      ],
+      "title": "DraftResult",
+      "type": "object"
+    },
+    "permission": "read",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 2,
+    "timeout_seconds": 10
+  }
+}

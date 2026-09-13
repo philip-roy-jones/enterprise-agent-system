@@ -88,7 +88,7 @@ def test_knowledge_requires_read_permission(store):
 
 def test_worker_cannot_publish_knowledge_or_choose_another_scope(tmp_path):
     app = create_app(Settings(data_dir=tmp_path, desktop_adapter="browser"))
-    client = TestClient(app, headers={"Authorization": "Bearer local-worker-demo"})
+    client = TestClient(app, headers={"Authorization": "Bearer local-worker-demo", "X-EAS-Protocol": "2"})
     assert client.post("/api/knowledge", json=document()).status_code == 403
     foreign = app.state.store.create_job(
         JobInput(organization_id="other", invoice_id="INV-1042").model_dump()
@@ -98,18 +98,18 @@ def test_worker_cannot_publish_knowledge_or_choose_another_scope(tmp_path):
     assert claim.json()["id"] == own["id"]
     assert (
         client.post("/api/worker/search_knowledge", json={"args": [foreign["id"], "invoice"]}).status_code
-        == 403
+        == 404
     )
     assert (
         client.post("/api/worker/claim", json={"args": ["worker"], "kwargs": {"scope": None}}).status_code
-        == 409
+        == 400
     )
     assert (
         client.post(
             "/api/worker/search_knowledge",
             json={"args": [own["id"], "invoice"], "kwargs": {"organization_id": "other"}},
         ).status_code
-        == 409
+        == 400
     )
 
 

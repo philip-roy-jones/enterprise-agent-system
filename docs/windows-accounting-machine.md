@@ -1,5 +1,7 @@
 # Native Windows accounting machine
 
+For the current planner/executor/learner account boundary, use the [isolated harness setup](developer-setup.md). The application/controller details below also support the trusted development adapters; launching a combined worker does not establish OS isolation.
+
 DemoBooks Desktop is a native Windows Forms application built for this prototype. It resembles a traditional accounting package, with a menu bar, company shortcuts, vendor invoices, purchase orders, draft forms, notices, and persistent records. It is not QuickBooks, is not an Intuit product, and does not integrate with real accounting software.
 
 The native application is the source of truth for accounting records. The developer machine hosts the backend and staff console; the Windows VM runs the worker and visible accounting application. The worker reaches the application bridge over Windows loopback. See the [two-machine setup](developer-setup.md). The bridge has a separate random token and exposes only synthetic accounting state, scoped controls, screenshots, and deliberate test scenarios.

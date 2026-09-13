@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "enterprise-edge-harness"
 version = "0.1.0"
 requires-python = ">=3.11"
-dependencies = ["enterprise-agent-contracts==0.1.0", "langgraph>=1.0", "langgraph-checkpoint-sqlite>=3.0", "deepagents>=0.4", "langchain-openrouter>=0.2,<1", "httpx>=0.28", "python-dotenv>=1"]
+dependencies = ["enterprise-agent-contracts==0.1.0", "langgraph>=1.0", "langgraph-checkpoint-sqlite>=3.0", "deepagents>=0.4", "langchain-openrouter>=0.2,<1", "httpx>=0.28", "python-dotenv>=1", "PyJWT[crypto]>=2.12,<3"]
 
 [tool.setuptools]
 include-package-data = false

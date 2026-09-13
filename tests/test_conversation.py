@@ -200,10 +200,10 @@ def test_new_guidance_discards_queued_tools_and_reaches_the_next_model_turn(stor
 
 def test_worker_cannot_submit_staff_answers_or_read_another_organization(tmp_path):
     app = create_app(Settings(data_dir=tmp_path, desktop_adapter="browser"))
-    client = TestClient(app, headers={"Authorization": "Bearer local-worker-demo"})
+    client = TestClient(app, headers={"Authorization": "Bearer local-worker-demo", "X-EAS-Protocol": "2"})
     foreign = app.state.store.create_job(
         JobInput(organization_id="other", invoice_id="INV-1042").model_dump()
     )
     assert client.post(f"/api/jobs/{foreign['id']}/messages", json={"text": "approve"}).status_code == 403
-    assert client.post("/api/worker/conversation", json={"args": [foreign["id"]]}).status_code == 403
-    assert client.post("/api/worker/ask_staff", json={"args": [foreign["id"], "question"]}).status_code == 403
+    assert client.post("/api/worker/conversation", json={"args": [foreign["id"]]}).status_code == 404
+    assert client.post("/api/worker/ask_staff", json={"args": [foreign["id"], "question"]}).status_code == 404

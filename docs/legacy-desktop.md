@@ -1,5 +1,7 @@
 # Windows applications without an API
 
+For the current planner/executor/learner account boundary, use the [isolated harness setup](developer-setup.md). The application/controller details below also support the trusted development adapters; launching a combined worker does not establish OS isolation.
+
 The Windows desktop controller is a separate executable from DemoBooks. It observes Windows UI Automation controls, captures the visible application window, invokes accessibility patterns, and supplies real mouse and keyboard input. It does not reference DemoBooks' code, read its data files or process memory, or call its application API.
 
 The execution preference is an authorized application API when available, then accessibility controls, then input grounded in current evidence. The included adapter knows DemoBooks' visible labels and navigation. It supports both accessibility operations and real clicks/typing using current control geometry. Live assistance receives the latest screenshot alongside structured observations. This is not yet a general vision-only driver for arbitrary custom-drawn applications.

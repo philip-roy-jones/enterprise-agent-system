@@ -1,6 +1,5 @@
 from pathlib import Path
 import asyncio
-import hmac
 import hashlib
 import json
 import re
@@ -14,7 +13,8 @@ from eas_server.store import Store
 from eas_shared.identity import uid
 from eas_server.fixtures.mock import MockAccounting
 from eas_shared.types import JobInput, Decision, KnowledgeDocument, Stale, Stopped, TERMINAL
-from eas_shared.protocol import WORKER_METHODS
+from eas_server.security import Security, token_hash
+from eas_server.access import install_access, current as current_principal
 from eas_server.conversation import Conversation, StaffMessage
 
 
@@ -31,6 +31,12 @@ def create_app(settings=None):
 
     app = FastAPI(title="Enterprise worker prototype")
     app.state.store, app.state.settings = store, settings
+    security = Security(settings, store)
+    app.state.security = security
+    install_access(app, security)
+    from eas_server.oidc import install_oidc
+
+    install_oidc(app, security)
     static = Path(__file__).parent / "frontend"
     fixture_static = Path(__file__).parent / "fixtures" / "static"
     if mock is not None:
@@ -38,26 +44,14 @@ def create_app(settings=None):
     app.mount("/static", StaticFiles(directory=static), name="static")
 
     def principal(request: Request):
-        token = request.headers.get("Authorization", "").removeprefix("Bearer ") or request.cookies.get(
-            "eas_session", ""
-        )
-        for role, expected in [
-            ("staff", settings.staff_token),
-            ("worker", settings.worker_token),
-            ("developer", settings.developer_token),
-        ]:
-            if token and hmac.compare_digest(token, expected):
-                return role
-        raise HTTPException(401, "Sign in with your local demo token")
+        p = getattr(request.state, "principal", None) or security.principal(request)
+        return "worker" if p.kind == "executor" else p.kind
 
-    def staff(role=Depends(principal)):
-        if role not in {"staff", "developer"}:
+    def staff():
+        p = current_principal.get()
+        if p.kind != "human":
             raise HTTPException(403, "Staff access required")
-        return role
-
-    def worker(role=Depends(principal)):
-        if role != "worker":
-            raise HTTPException(403, "Worker access required")
+        return p.id
 
     @app.post("/api/knowledge", dependencies=[Depends(staff)])
     def add_knowledge(document: KnowledgeDocument):
@@ -94,31 +88,84 @@ def create_app(settings=None):
             "desktop_adapter": settings.desktop_adapter,
         }
 
+    @app.get("/api/auth/config")
+    def auth_config():
+        return {
+            "mode": settings.auth_mode,
+            "issuer": settings.oidc_issuer,
+            "audience": settings.oidc_audience,
+            "browser_login": bool(settings.oidc_authorization_url),
+        }
+
     @app.post("/api/session")
     async def session(request: Request):
-        body = await request.json()
-        token = body.get("token", "")
-        if not any(hmac.compare_digest(token, t) for t in [settings.staff_token, settings.developer_token]):
-            raise HTTPException(401, "Invalid staff token")
         from fastapi.responses import JSONResponse
 
+        if request.headers.get("content-type", "").split(";", 1)[0] != "application/json":
+            raise HTTPException(415, "JSON sign-in required")
+        p, session_id, csrf = security.session((await request.json()).get("token", ""))
+        r = JSONResponse({"ok": True, "principal": {"id": p.id, "name": p.name}, "csrf": csrf})
+        r.set_cookie(
+            "eas_session",
+            session_id,
+            httponly=True,
+            samesite="strict",
+            max_age=3600,
+            secure=settings.auth_mode == "oidc" or settings.public_url.startswith("https://"),
+        )
+        return r
+
+    @app.get("/api/me")
+    def me(request: Request):
+        p = current_principal.get()
+        with store.db() as db:
+            row = db.execute(
+                "SELECT csrf FROM security_sessions WHERE id=?",
+                (token_hash(request.cookies.get("eas_session", "")),),
+            ).fetchone()
+        return {
+            "id": p.id,
+            "name": p.name,
+            "kind": p.kind,
+            "mode": settings.auth_mode,
+            "csrf": row[0] if row else None,
+        }
+
+    @app.delete("/api/session")
+    async def logout(request: Request):
+        security.principal(request)
+        from fastapi.responses import JSONResponse
+
+        with store.db() as db:
+            db.execute(
+                "DELETE FROM security_sessions WHERE id=?",
+                (token_hash(request.cookies.get("eas_session", "")),),
+            )
         r = JSONResponse({"ok": True})
-        r.set_cookie("eas_session", token, httponly=True, samesite="strict", max_age=86400)
+        r.delete_cookie("eas_session")
         return r
 
     @app.get("/api/roles", dependencies=[Depends(staff)])
     def roles():
         from eas_server.roles import load_roles
 
-        return [role.public() for role in load_roles().values()]
+        return [
+            role.public()
+            for role in load_roles().values()
+            if any(
+                "request" in g.actions
+                and g.role_id in {"*", role.id}
+                and g.department_id in {"*", role.department_id}
+                for g in current_principal.get().grants
+            )
+        ]
 
     def chat_scope(body, actor):
         from eas_server.roles import get_role
 
         values = get_role(body.role_id).normalize(body.model_dump(), allow_unbound=True)
         key = {k: values[k] for k in ("organization_id", "department_id", "role_id", "company_id")}
-        # The prototype has one authenticated staff principal and one developer
-        # principal. Token rotation does not change their conversation identity.
+        security.request(current_principal.get(), values)
         key["staff_id"] = actor
         return "ongoing-" + hashlib.sha256(json.dumps(key, sort_keys=True).encode()).hexdigest()
 
@@ -128,7 +175,7 @@ def create_app(settings=None):
         conversation_id = chat_scope(body, actor)
         requests = [
             j
-            for j in store.list_jobs()
+            for j in security.jobs(current_principal.get())
             if j.get("conversation_id") == conversation_id and j.get("staff_id") == actor
         ]
         return {"conversation_id": conversation_id, "current": requests[0] if requests else None}
@@ -140,6 +187,7 @@ def create_app(settings=None):
         if not body.task or not body.task.strip():
             raise ValueError("A chat message is required")
         values = get_role(body.role_id).normalize(body.model_dump(), allow_unbound=True)
+        security.request(current_principal.get(), values)
         values["conversation_id"] = chat_scope(body, actor)
         values["request_id"] = values.get("request_id") or uid()
         # A retried guidance delivery stays guidance even after its request ends.
@@ -164,7 +212,7 @@ def create_app(settings=None):
             current = next(
                 (
                     j
-                    for j in store.list_jobs()
+                    for j in security.jobs(current_principal.get())
                     if j.get("conversation_id") == values["conversation_id"] and j["status"] not in TERMINAL
                 ),
                 None,
@@ -195,34 +243,63 @@ def create_app(settings=None):
     @app.get("/api/conversations", dependencies=[Depends(staff)])
     def conversations():
         groups = {}
-        for job in store.list_jobs():
+        for job in security.jobs(current_principal.get()):
             groups.setdefault(job.get("conversation_id", job["id"]), []).append(job)
         return [{"id": key, "requests": list(reversed(jobs))} for key, jobs in groups.items()]
 
     @app.get("/api/learning", dependencies=[Depends(staff)])
     def learning():
-        return store.learning_status()
+        return security.learning(current_principal.get())
 
     @app.post("/api/skills/{skill_id}/change", dependencies=[Depends(staff)])
     async def skill_change(skill_id: str, request: Request):
         body = await request.json()
-        return store.skill_command(skill_id, body.get("version"))
+        permitted = [
+            v
+            for r in security.learning(current_principal.get())["registries"]
+            for v in r["versions"]
+            if v["skill_id"] == skill_id and (body.get("version") is None or v["version"] == body["version"])
+        ]
+        if not permitted:
+            raise HTTPException(404, "Package unavailable")
+        for version in permitted:
+            security.authorize(current_principal.get(), "manage_skills", version)
+        if body.get("worker_id"):
+            permitted = [v for v in permitted if v.get("worker_id") == body["worker_id"]]
+        if not permitted or len({v.get("worker_id") for v in permitted}) != 1:
+            raise HTTPException(409, "Select one authorized worker's package")
+        return store.skill_command(skill_id, body.get("version"), selected=permitted[0])
 
     @app.get("/api/jobs", dependencies=[Depends(staff)])
     def jobs():
-        return store.list_jobs()
+        return security.jobs(current_principal.get())
 
     @app.post("/api/jobs")
     def create_job(body: JobInput, actor=Depends(staff)):
-        return store.create_job(body.model_dump(), settings.model_mode, settings.job_timeout, staff_id=actor)
+        from eas_server.roles import get_role
+
+        values = get_role(body.role_id).normalize(body.model_dump())
+        security.request(current_principal.get(), values)
+        if values.get("conversation_id"):
+            with store.db() as db:
+                existing = db.execute(
+                    "SELECT data FROM jobs WHERE json_extract(data,'$.conversation_id')=?",
+                    (values["conversation_id"],),
+                ).fetchall()
+            if any(json.loads(r[0]).get("staff_id") != actor for r in existing):
+                raise HTTPException(403, "Conversation unavailable")
+        return store.create_job(values, settings.model_mode, settings.job_timeout, staff_id=actor)
 
     @app.get("/api/jobs/{job_id}", dependencies=[Depends(staff)])
     def get_job(job_id: str):
+        lease = store.lease()
+        if lease.get("job_id") != job_id:
+            lease = {"job_id": None, "owner": None, "epoch": 0, "expires": 0, "inflight": None}
         return {
             "job": store.get_job(job_id),
             "approvals": store.approvals(job_id),
             "events": store.events(job_id),
-            "lease": store.lease(),
+            "lease": lease,
             "conversation": Conversation(store).read(job_id, require_read=False),
         }
 
@@ -231,6 +308,7 @@ def create_app(settings=None):
         async def events():
             cursor = after
             while not await request.is_disconnected():
+                security.job(current_principal.get(), job_id)
                 rows = store.events(job_id, cursor)
                 for row in rows:
                     cursor = row["seq"]
@@ -243,7 +321,7 @@ def create_app(settings=None):
 
     @app.post("/api/approvals/{approval_id}", dependencies=[Depends(staff)])
     def decision(approval_id: str, body: Decision):
-        return store.decide(approval_id, body.model_dump())
+        return store.decide(approval_id, body.model_dump(), actor=current_principal.get().id)
 
     @app.post("/api/jobs/{job_id}/mode", dependencies=[Depends(staff)])
     async def mode(job_id: str, request: Request):
@@ -293,7 +371,7 @@ def create_app(settings=None):
 
     @app.get("/api/metrics", dependencies=[Depends(staff)])
     def metrics():
-        jobs = store.list_jobs()
+        jobs = security.jobs(current_principal.get())
         results = {}
         for mode in ["simulated", "live"]:
             selected = [j for j in jobs if j["model_mode"] == mode]
@@ -301,7 +379,8 @@ def create_app(settings=None):
             assessments = [assessment_metrics(store.events(j["id"])) for j in selected]
             results[mode] = {
                 "jobs": len(selected),
-                "verified_completions": sum(j["status"] == "completed" for j in selected),
+                "completed_requests": sum(j["status"] == "completed" for j in selected),
+                "staff_accepted_completions": sum(bool(j.get("accepted")) for j in selected),
                 "completion_rate": sum(j["status"] == "completed" for j in selected) / len(selected)
                 if selected
                 else None,
@@ -347,52 +426,9 @@ def create_app(settings=None):
     async def scenario(request: Request):
         return browser_fixture().scenario(await request.json())
 
-    @app.post("/api/worker/{method}", dependencies=[Depends(worker)])
-    async def worker_rpc(method: str, request: Request):
-        if method not in WORKER_METHODS:
-            raise HTTPException(403, "Worker method not permitted")
-        body = await request.json()
-        if method in {"learning_claim", "learning_finish", "skills_publish"}:
-            body.setdefault("kwargs", {})["scope"] = {
-                "organization_id": settings.worker_organization_id,
-                "role_ids": list(settings.worker_role_ids),
-            }
-        if method == "claim":
-            args = body.get("args", [])
-            if len(args) != 1 or body.get("kwargs"):
-                raise ValueError(
-                    "Claim accepts one worker identifier; authorization is configured on the server"
-                )
-            return store.claim(
-                args[0],
-                {"organization_id": settings.worker_organization_id, "role_ids": settings.worker_role_ids},
-            )
-        if method in {
-            "search_knowledge",
-            "conversation",
-            "ask_staff",
-            "bind_record",
-            "report_capability_gap",
-        }:
-            args, kwargs = body.get("args", []), body.get("kwargs", {})
-            if len(args) != (1 if method == "conversation" else 2) or kwargs:
-                raise ValueError("Expected job identifier and only the declared tool arguments")
-            job = store.get_job(args[0])
-            if (
-                job["organization_id"] != settings.worker_organization_id
-                or job["role_id"] not in settings.worker_role_ids
-            ):
-                raise PermissionError("Job is outside the configured worker scope")
-        return getattr(store, method)(*body.get("args", []), **body.get("kwargs", {}))
+    from eas_server.worker_api import install_worker_api
 
-    @app.post("/api/worker-artifacts", dependencies=[Depends(worker)])
-    async def artifact(request: Request):
-        data = await request.body()
-        if len(data) > 5_000_000 or not data.startswith(b"\x89PNG\r\n\x1a\n"):
-            raise ValueError("A PNG below 5 MB is required")
-        name = uid() + ".png"
-        (store.root / "artifacts" / name).write_bytes(data)
-        return {"id": name}
+    install_worker_api(app, security)
 
     @app.get("/api/artifacts/{name}", dependencies=[Depends(staff)])
     def get_artifact(name: str):

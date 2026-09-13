@@ -48,7 +48,7 @@ class MockAccounting:
 
     def scenario(self, config):
         with self.store.db() as db:
-            lease = json.loads(db.execute("SELECT data FROM lease WHERE id=1").fetchone()[0])
+            lease = self.store._lease(db)
             if lease["job_id"]:
                 job = self.store._job(db, lease["job_id"])
                 if (
@@ -92,7 +92,7 @@ class MockAccounting:
     def action(self, name, args, principal):
         with self.store.db() as db:
             s = json.loads(db.execute("SELECT data FROM kv WHERE key='mock'").fetchone()[0])
-            lease = json.loads(db.execute("SELECT data FROM lease WHERE id=1").fetchone()[0])
+            lease = self.store._lease(db)
             job = self.store._job(db, lease["job_id"]) if lease["job_id"] else None
             if principal == "worker":
                 if not job or not lease["inflight"]:

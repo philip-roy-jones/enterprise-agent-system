@@ -13,7 +13,24 @@ from eas_shared.identity import canonical
 from eas_harness.skill_library import SkillLibrary, SCOPE, validate_spec
 
 
+class ScopedAdmissionLibrary(SkillLibrary):
+    def __init__(self, root, store):
+        super().__init__(root)
+        self.authority = store
+
+    def get(self, skill_id, version, job, *, active_only=False):
+        if job.get("id"):
+            # Even a maintenance learner only sees packages available to the
+            # source episode's person, in its current claimed maintenance scope.
+            self.authority.package_access(job["id"], skill_id, version)
+        return super().get(skill_id, version, job, active_only=active_only)
+
+
 def subprocess_json(module, payload, *, model_key=False):
+    if module == "eas_harness.learner_process" and os.environ.get("EAS_LEARNER_QUEUE"):
+        from eas_harness.learner_queue import propose
+
+        return propose(os.environ["EAS_LEARNER_QUEUE"], payload)
     env = {
         k: os.environ[k]
         for k in ("PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "SSL_CERT_FILE")
@@ -311,7 +328,13 @@ def admit(library, candidate, evidence, previous_version, provenance=None):
 
 
 def maintain(settings, store, worker_id, library=None):
-    library = library or SkillLibrary(settings.data_dir)
+    from eas_harness.remote import RemoteStore
+
+    library = library or (
+        ScopedAdmissionLibrary(settings.data_dir, store)
+        if isinstance(store, RemoteStore)
+        else SkillLibrary(settings.data_dir)
+    )
     item = store.learning_claim(worker_id)
     if item:
         with library.db() as db:

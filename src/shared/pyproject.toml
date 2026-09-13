@@ -15,3 +15,6 @@ include-package-data = false
 where = ["."]
 include = ["eas_shared*"]
 namespaces = false
+
+[tool.setuptools.package-data]
+eas_shared = ["finance_operations.json", "finance_seed.json"]

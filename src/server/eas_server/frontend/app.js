@@ -29,10 +29,15 @@ function toast(text) {
 async function api(path, body) {
   const r = await fetch(path, {
     method: body === undefined ? "GET" : "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "X-EAS-CSRF": sessionStorage.getItem("eas-csrf") || "" },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   if (r.status === 401) {
+    sessionStorage.removeItem("eas-csrf");
+    if (source) { source.close(); source = null; }
+    // Clear cached private content immediately on logout or policy revocation.
+    if (typeof transcriptCache !== "undefined") transcriptCache.clear();
+    $("session-messages").replaceChildren();
     if (!$("login-dialog").open) $("login-dialog").showModal();
     throw Error("Connect to your workspace to continue.");
   }
@@ -56,9 +61,23 @@ async function action(fn) {
 $("login-form").onsubmit = (e) => {
   e.preventDefault();
   action(async () => {
-    await api("/api/session", { token: $("token").value });
+    const session = await api("/api/session", { token: $("token").value });
+    sessionStorage.setItem("eas-csrf", session.csrf);
+    $("token").value = "";
     $("login-dialog").close();
+    await loadIdentity();
   });
+};
+async function loadIdentity() {
+  const me = await api("/api/me");
+  if (me.csrf) sessionStorage.setItem("eas-csrf", me.csrf);
+  $("signed-in-as").textContent = me.name;
+  $("sign-out").hidden = false;
+}
+$("sign-out").onclick = async () => {
+  await fetch("/api/session", {method: "DELETE", headers: {"X-EAS-CSRF": sessionStorage.getItem("eas-csrf") || ""}});
+  sessionStorage.clear();
+  location.reload();
 };
 for (const id of ["new-job", "first-job"])
   $(id).onclick = () => {
@@ -575,6 +594,16 @@ async function refreshLearning() {
 }
 $("activity-filter").onchange = refresh;
 $("activity-search").oninput = refresh;
-refresh();
-connectStream();
+async function start() {
+  const config = await (await fetch("/api/auth/config")).json();
+  $("development-login").hidden = config.mode !== "development";
+  $("oidc-login").hidden = !config.browser_login;
+  $("login-explanation").textContent = config.mode === "development"
+    ? "Development identities only. Enter your configured prototype token."
+    : "Use your organization's identity provider to access your authorized workspace.";
+  try { await loadIdentity(); } catch { return; }
+  await refresh();
+  connectStream();
+}
+start();
 setInterval(refresh, 2500);
