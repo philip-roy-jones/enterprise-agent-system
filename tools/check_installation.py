@@ -53,7 +53,15 @@ def check_server(folder):
                 time.sleep(0.1)
         else:
             raise AssertionError("Standalone server did not become healthy")
-        for path in ["/", "/static/app.js", "/static/style.css", "/mock", "/fixture-static/mock.js"]:
+        for path in [
+            "/",
+            "/static/app.js",
+            "/static/activity.js",
+            "/static/learning.js",
+            "/static/style.css",
+            "/mock",
+            "/fixture-static/mock.js",
+        ]:
             with urllib.request.urlopen(base + path) as response:
                 assert response.status == 200 and response.read(), path
         headers = {"Authorization": "Bearer isolation-test-staff", "Content-Type": "application/json"}
@@ -110,7 +118,11 @@ def check_harness(folder):
         server.shutdown()
         thread.join()
         server.server_close()
-    assert len(received) == 1
+    assert [r[0] for r in received] == [
+        "/api/worker/claim",
+        "/api/worker/learning_claim",
+        "/api/worker/skills_publish",
+    ]
     assert received[0][:2] == ("/api/worker/claim", "Bearer isolation-test-worker")
     assert (folder / "edge/worker-checkpoints.sqlite").is_file()
     assert (folder / "edge/assistant-checkpoints.sqlite").is_file()

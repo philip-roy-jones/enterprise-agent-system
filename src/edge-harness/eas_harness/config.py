@@ -28,4 +28,6 @@ class Settings:
     desktop_agent_token: str = os.getenv("EAS_DESKTOP_AGENT_TOKEN", "")
     desktop_input_mode: str = os.getenv("EAS_DESKTOP_INPUT_MODE", "accessibility")
     headless: bool = os.getenv("EAS_HEADLESS", "true").lower() == "true"
+    learning_enabled: bool = os.getenv("EAS_LEARNING_ENABLED", "true").lower() == "true"
+    context_max_chars: int = int(os.getenv("EAS_CONTEXT_MAX_CHARS", "96000"))
     max_model_calls: int = int(os.getenv("EAS_MAX_MODEL_CALLS", "12"))

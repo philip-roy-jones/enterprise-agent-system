@@ -1,0 +1,9 @@
+{
+  "skill_id": "invoice_correction",
+  "title": "Invoice correction",
+  "description": "Compare an invoice with its purchase order and save a verified correction draft.",
+  "task": "invoice_correction",
+  "capability_version": "finance-1",
+  "steps": ["validate", "establish", "compare", "prepare", "save", "verify", "complete"],
+  "amount_labels": ["Correction amount"]
+}

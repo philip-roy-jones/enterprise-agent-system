@@ -42,8 +42,12 @@ def inspect_library(root):
     graph_source = (root / "src/edge-harness/eas_harness/workflows/finance/graph.py").read_text()
     graph = ast.parse(graph_source)
     nodes = ast.literal_eval(assignment(graph, "NODES").value)
+    runtime_path = root / "src/edge-harness/eas_harness/workflows/finance/runtime.py"
+    runtime_source = runtime_path.read_text() if runtime_path.exists() else graph_source
+    operations_tree = ast.parse(runtime_source)
     operation = next(
-        (n for n in ast.walk(graph) if isinstance(n, ast.FunctionDef) and n.name == "operation"), None
+        (n for n in ast.walk(operations_tree) if isinstance(n, ast.FunctionDef) and n.name == "operation"),
+        None,
     )
     prepare = (
         next(
@@ -83,6 +87,9 @@ def inspect_library(root):
         "nodes": nodes,
         "reused_operation": "prepare → set_field(amount) → save → verify",
         "source_hashes": {
+            "src/edge-harness/eas_harness/workflows/finance/runtime.py": hashlib.sha256(
+                runtime_source.encode()
+            ).hexdigest(),
             "src/edge-harness/eas_harness/workflows/finance/procedures.py": hashlib.sha256(
                 source.encode()
             ).hexdigest(),

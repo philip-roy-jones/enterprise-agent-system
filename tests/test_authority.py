@@ -27,7 +27,8 @@ def test_strict_requires_approval_even_when_ui_is_bypassed(store, job):
 
 
 def test_auto_never_auto_approves_assistant_tools(store, job):
-    store.mode(job["id"], "auto")
+    with pytest.raises(ValueError, match="Auto mode has been removed"):
+        store.mode(job["id"], "auto")
     store.boundary(job["id"])
     lease = store.transfer(job["id"], "assistant")
     with pytest.raises(Stale, match="Approval required"):
@@ -35,18 +36,25 @@ def test_auto_never_auto_approves_assistant_tools(store, job):
     assert store.get_job(job["id"])["effective_mode"] == "strict"
 
 
-def test_mode_changes_apply_at_boundaries_and_restore(store, job):
-    store.mode(job["id"], "auto")
-    assert store.get_job(job["id"])["selected_mode"] == "strict"
-    store.boundary(job["id"])
+def test_strict_survives_ownership_changes(store, job):
     store.transfer(job["id"], "assistant")
-    store.mode(job["id"], "strict")
-    store.boundary(job["id"])
-    assert store.get_job(job["id"])["effective_mode"] == "strict"
-    store.mode(job["id"], "auto")
-    store.boundary(job["id"])
+    store.transfer(job["id"], "staff")
     store.transfer(job["id"], "script")
-    assert store.get_job(job["id"])["effective_mode"] == "auto"
+    assert store.boundary(job["id"])["effective_mode"] == "strict"
+
+
+@pytest.mark.parametrize("queued", [True, False])
+def test_legacy_auto_jobs_are_retired(store, job, queued):
+    with store.db() as db:
+        original = store._job(db, job["id"])
+        original.update(selected_mode="auto", effective_mode="auto", status="queued" if queued else "running")
+        store._put(db, original)
+        if queued:
+            lease = json.loads(db.execute("SELECT data FROM lease").fetchone()[0])
+            lease["job_id"] = None
+            store._set_lease(db, lease)
+    assert store.claim("test-worker") is None
+    assert store.get_job(job["id"])["status"] == "cancelled"
 
 
 @pytest.mark.parametrize("decision", ["approve", "correct", "reject"])

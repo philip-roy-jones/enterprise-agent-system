@@ -298,8 +298,10 @@ def run_assistant(agent, context, thread_id, store, job_id):
         ready = {
             item.id: True
             for item in snapshot.interrupts
-            if decisions.get(item.value.get("approval")) in {"approved", "corrected", "stale", "executing"}
+            if decisions.get(item.value.get("approval"))
+            in {"approved", "corrected", "stale", "executing", "executed"}
             or item.value.get("question") in answered
+            or (item.value.get("takeover") and store.lease()["owner"] != "staff")
         }
         if not ready:
             return {"__interrupt__": snapshot.interrupts}

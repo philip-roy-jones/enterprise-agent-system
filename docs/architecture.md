@@ -1,91 +1,59 @@
 # Architecture and trust boundaries
 
-## Processes
+The accepted [agent-led plan](plans/agent-led-learning-plan.md) replaces the original graph-first and Auto-mode design.
 
-The FastAPI backend owns job dispatch, staff decisions, conversation events, role authentication, artifacts, and the release registry. It does not run LangGraph, initialize Deep Agents, or connect to the Windows desktop. The optional browser fixture stores its synthetic application records here for tests only. SQLite uses WAL and transactional writes. The staff console uses server-sent events and periodic reconciliation so reconnecting retrieves the actual outstanding decision.
+## Three applications
 
-The Python worker runs on the edge VM/PC alongside the target application. It polls a restricted HTTP RPC boundary, claims one session, selects an installed department workflow, runs its cyclic LangGraph, and initializes Deep Agents in the same process. The shared job envelope and execution layer are independent of the Finance example. With the browser adapter, a dedicated thread owns Chromium because Playwright's synchronous API is thread-affine. With the Windows adapter, the same graph controls the native DemoBooks application through its local desktop controller or optional scoped application API. The browser reaches the mock application's authenticated HTTP interface through real buttons and form fields. Shared execution checks a fencing epoch before each desktop action.
+The server owns authenticated conversations, requests, staff decisions, evidence, maintenance scheduling and skill metadata. It runs no agent or workflow and has no desktop credentials. The edge harness owns the Deep Agent, skill loading, graph compilation, checkpoints, operation execution, desktop adapters and bounded learner. DemoBooks is an independent synthetic Windows application; its optional API may be disabled. `src/shared/` contains contracts only.
 
-The worker's two SQLite checkpoint files are on a durable volume, outside process memory. They are distinct from the accounting application state. Both graphs use synchronous checkpoint durability and a pool with room for checkpoint I/O dependencies. A lock in the shared execution layer serializes desktop observations and effects independently of graph concurrency. Moving the worker to a different machine requires moving or mounting these files and using a reachable authenticated backend URL. Backend and worker credentials are separate.
+## Durable requests and workflows
 
-The independent Windows desktop controller also supports an application with its own API disabled. It observes UI Automation controls, screenshots the assigned window, and uses accessibility patterns or real input. The application-specific adapter decodes visible business values and verifies saved drafts through a unique reference in the explanation. See [legacy desktop behavior and limits](legacy-desktop.md).
+Staff requests carry a conversation ID and idempotent request ID. A conversation does not hold the desktop between requests. The coordinator discovers scoped skill metadata, requests approval to read the exact version, then requests approval to invoke it. A stable workflow-run ID derives from the parent tool-call invocation. The child graph checkpoints its operation index independently of the agent checkpoint namespace and publishes progress to the backend.
 
-## Repository boundaries
+Model-facing skill tools accept a stable skill ID. The runtime resolves a read to its scoped active version and binds later workflow/resource requests to the exact approved read. Approval records still contain the full immutable version; retries reuse that binding. The model does not have to transcribe a cryptographic hash. Suspension and exact-version checks remain enforced independently.
 
-The prototype has three applications in one repository. Each Python application is independently packaged and installed; neither depends on the other.
+A completed workflow returns control to the coordinator; it does not finish the whole staff request or replace the model's answer with a fixed report template. The agent can perform another approved procedure within the same record and request budget. Further application work invalidates the previous completion marker, so final verification cannot be borrowed from an earlier partial result. A combined learned procedure retains the observed operations and verifies at its end; draft compositions still permit only one prepare/save/verify sequence.
 
-| Source directory | Installed component and responsibility |
-| --- | --- |
-| `src/server/` | `enterprise-agent-server`: frontend, HTTP API, dispatch, approvals, audit storage and release registry |
-| `src/edge-harness/` | `enterprise-edge-harness`: worker, Deep Agent, LangGraph workflows, execution authority and desktop adapters |
-| `src/demobooks/` | Independent .NET synthetic Windows application |
-| `src/shared/` | `enterprise-agent-contracts`: public messages, role schemas, value identifiers and RPC declarations |
+Each child operation passes through `ExecutionLayer`; parent approval grants no child authority. A pending workflow exclusively owns its request. On recovery it returns a structured assistance state, allowing separately approved investigation before resuming the same continuation. Recovery is bounded. A confirmed save is replayed from the ledger or independently reconciled by operation identity. An uncertain write is never repeated without an authoritative determination.
 
-`enterprise-server` and `enterprise-harness` are separate startup commands. The harness owns its workflow packages under `eas_harness/workflows/`; these are executable edge code. The server has a separate metadata catalog containing role input schemas, labels and allowed capabilities, so listing roles and validating requests never imports an executable graph or adapter. Both applications independently validate role permissions.
+Both checkpoint stores live on the edge. Reconnects use backend records; they do not depend on inspecting hidden LangGraph subgraphs. A process restart invalidates the old desktop ownership epoch and requires fresh approval of unexecuted work.
 
-The shared library has no environment loading, credentials, persistence, desktop operations, runtime factories or dependency on either application. Configuration belongs to each application. `tools/enterprise_dev/` is a separate development package for demonstrations, isolated learning proposals, review and release. It may depend on both applications for integration tests. The optional browser accounting fixture is owned by the server and enabled only in browser mode.
+## Persistent conversation and working context
 
-An improvement such as proposal #2 changes the workflow package's amount-label rule, rather than the LangGraph dependency or harness permission machinery. Existing checked proposals retain support for their historical source locations; new proposals target `src/edge-harness/eas_harness/workflows/finance/`. Separate repositories can follow later without changing these application boundaries. Package separation clarifies installation and ownership; operating-system isolation still determines the security boundary.
+The staff console returns to one ongoing conversation per authenticated principal and work scope. New messages during active work are guidance or answers, never action approvals. Later work receives a separate internal execution record in the same conversation. Browsing older activity does not change where the main composer sends messages.
 
-## Role graph
+The edge stores original messages/tool exchanges, model notes and context-window transitions in `session-context.sqlite`. `manage_context` lets the model save notes and request a fresh working window; scoped `search_history` and `read_history` recover older details. A character budget forces a context transition if needed. Transitions retain the current execution state and a durable completion marker, preventing repeated resets that make no progress. Cancelled tool proposals remain archived but incomplete tool/result pairs are excluded from subsequent model input.
 
-```mermaid
-flowchart TD
-    Start([Job]) --> Match{Known procedure?}
-    Match -->|yes| Validate[Validate task and permissions]
-    Match -->|no| Assist[Supervised Deep Agent]
-    Validate --> Establish[Establish company and invoice]
-    Establish --> Compare[Compare invoice and purchase order]
-    Compare --> Prepare[Prepare correction draft]
-    Prepare --> Save[Save with operation ID]
-    Save --> Verify[Verify persisted business result]
-    Verify --> Complete[Complete; request staff acceptance]
-    Establish & Prepare & Save --> Classify{Structured recovery}
-    Classify -->|known or temporary| Recover[Known recovery / bounded readiness]
-    Recover --> Establish
-    Classify -->|unfamiliar state or code failure| Assist
-    Classify -->|uncertain save| Resume[Observe and reconcile]
-    Assist -->|known procedure recovery| Resume
-    Assist -->|unmatched request| Review[Staff reviews reported outcome]
-    Review --> Accepted([Complete; request acceptance])
-    Resume -->|draft exists| Verify
-    Resume -->|fields verified| Save
-    Resume -->|navigation needed| Establish
-    Validate & Establish & Prepare & Assist -->|denied / rejected / cancelled| Stop([Stop])
-```
+These are internal operations on context already held by the session, not new business reads. They require current read permission and cannot cross principal or work-scope boundaries. Model notes cannot approve actions or become organizational policy. See the [persistent-session design and Codex references](plans/persistent-session-context.md).
 
-Each named node has an execution contract. Strict approval applies to the outer node invocation, including non-desktop nodes such as validation and completion. START and END need no approvals. In Auto, role-level nodes execute automatically under the same permissions.
+## Strict authority
 
-The outer graph checkpoints a paused continuation and ends its current scheduling tick while awaiting a decision. The worker starts the next tick from that durable continuation. It is a cyclic LangGraph, not a click-by-click script. Deep Agents uses its own durable LangGraph `interrupt()`/`Command(resume=...)` flow for tools. Its runnable context is isolated from the outer graph to prevent accidental checkpoint namespace inheritance.
+Strict is the sole execution policy. Auto API requests fail; previously queued or active Auto work is cancelled during migration, preserving its audit. Rejection, cancellation and permission denial terminate execution. Guidance cannot change authority. The backend transactionally consumes a decision bound to the request, invocation, exact arguments, current observation and ownership epoch. Duplicate or stale decisions fail. Every direct tool and graph operation uses the same path.
 
-## Approval binding
+The total request deadline includes staff waiting and takeover. The worker checks it on every polling path. Per-operation deadlines fence later effects without abandoning a thread that might still mutate the desktop. Only one worker holds the desktop lease, and handoff cannot interrupt an in-flight effect.
 
-A proposal stores its operation name, original arguments, expected result, scope, screenshot, DOM target geometry, observation revision, and ownership epoch. The revision hashes application state and relevant target geometry. The shared layer re-observes before execution. The backend checks the action name, arguments, observation revision, invocation ID, epoch, job status, and approval status transactionally before consuming the decision.
+A registered operation may contain disclosed internal navigation. Arbitrary model instructions cannot define a new operation. Runtime screenshots used to prepare approvals are evidence capture; model-requested observations require approval.
 
-The original proposal, staff decision, corrected arguments, executed action, and observed result are separate fields. Duplicate decisions conflict. Stale decisions are retained as evidence and replaced. A queued Strict decision remains required after selecting Auto. Fallback tool calls always require an individual decision, including `observe_app`.
+## Skill packages and learning
 
-Screenshots are captured automatically to prepare previews. That runtime evidence capture is distinct from an assistant-requested read tool, which is approved. A screenshot click is normalized from displayed size to the captured viewport and resolves to a scoped DOM control. The worker never executes arbitrary JavaScript, shell commands, filesystem operations, URLs, or unrestricted coordinate clicks from a model.
+`src/edge-harness/skills/` contains the bundled correction skill. Installed packages export a manifest and Markdown instructions alongside the edge's SQLite registry. Content-addressed versions bind instructions, scope and graph specifications. A separate digest binds the trusted operation/runtime code and installed graph dependencies. Retrieval checks both the registry and exported files.
 
-## Control and reconciliation
+An accepted, verified episode enters the server's maintenance queue once. This includes observed answers with a staff-reviewed outcome, as well as reports and saved drafts. Repeated related failures, later incorrect-action assessments, and explicit capability gaps queue bounded feedback reviews with related evidence. Failure reviews can propose investigation, consolidation, suspension or retirement; they cannot admit a successful procedure or change permissions. Low usage alone is not a retirement reason.
 
-A transactional lease identifies the active job, controller, worker instance, epoch, expiry, and in-flight invocation. Another worker cannot claim an unexpired active session. Handoffs refuse an in-flight operation, invalidate pending decisions, increment the epoch, and require fresh observations. The UI's direct takeover changes the same persistent application state as the worker. Automation stays paused until staff releases it.
+The edge claims bounded maintenance work while idle. The learner is a model-only subprocess launched in a temporary working directory with an allowlisted environment: model credentials may be supplied, application and backend credentials are not. It has no tools or generated-code execution. This process separation is **not an operating-system sandbox**; the restriction relies on running trusted model-client code that only accepts and emits data.
 
-Lease expiry is 30 seconds; a restarted worker reacquires after expiry. Individual browser operations time out at six seconds, model requests at twenty seconds. Job elapsed time defaults to 900 seconds and includes staff waiting. Recovery attempts and model calls are independently bounded. A late or stale command fails its next fencing check.
+The candidate can compose registered Finance operations. It cannot introduce imports, shell commands, new Python functions, scope changes or permissions. Admission independently matches successful steps to executed approvals and staff-accepted evidence, preserves prior supported steps/labels, rejects memorized record identifiers, and runs trusted synthetic cases in a credential-free process. New record amounts include positive, negative and zero discrepancies; stale comparisons and wrong current records must fail. Candidate-authored claims cannot replace these checks.
 
-The mock application supports an idempotency key equal to the job ID. A saved draft records its company, invoice, amount, note, and operation ID. If confirmation is interrupted, the graph marks the outcome uncertain and reconciles by inspecting persistent drafts. It does not automatically issue a second Save. A crash after saving uses the same business operation ID. The original invoice remains unchanged; no posting, payment, or submission operation exists.
+Guidance-only packages have no graph steps. They teach use of existing approved tools and can receive instruction-only revisions. Their admission checks validate contracts and provenance; they explicitly report that behavioral evaluation was not performed. Optional bounded text resources live under `references/`, `templates/`, `assets/` or `tests/`. Reading a resource requires a separate approval and the previously read exact package version. Resource text is hash checked and never executed. The staff learning view shows instruction diffs, changed steps/resources, evidence, checks and lifecycle suggestions.
 
-A local log and an approval do not guarantee exactly-once effects in a real application. Native adapters must inspect external results and use application-supported idempotency when available.
+An eligible package activates automatically. Activation and its processed-episode record commit together, so an acknowledgement retry does not generate another version. The server records provenance and changes but cannot execute skill code. No historical PR is automatically promoted. Suspension removes future retrieval; rollback changes the active pointer; existing runs retain the version they approved unless explicitly cancelled. Changed dependencies fail closed and require requalification.
 
-## Improvement and releases
+## Scoped model judgment
 
-The manual improvement command accepts an exported, staff-accepted episode. It creates a separate Git worktree, changes the reusable amount-label library, commits selected synthetic evidence and regression tests, and runs the full suite in a separate synthetic environment. The bounded generator is deterministic. It does not pretend to be a general code-writing agent.
+The optional judgment operation uses a versioned prompt, typed comparison input and output, an explicit evidence identifier, no coordinator transcript and no tools. Input names both invoice and purchase-order totals, the signed difference, and cents/USD units. Inputs, model/settings, output and validation failures are recorded. Invalid output has a two-attempt bound within the request's model budget; explicit insufficient evidence escalates immediately. Downstream effects still require their own approval. The example checks discrepancy classification against arithmetic; it demonstrates context separation, not an advanced accounting judgment.
 
-Subprocesses receive an allowlist of development environment variables. Runtime files, provider credentials, worker tokens, and live screenshots are not copied. A Git worktree on the same OS account is process/workspace isolation, not a hardened security sandbox; production development automation needs a separate identity/container and network restrictions.
+## Prototype limits
 
-The result includes a patch, candidate commit, check output, hashes, evidence reference, and review summary. Optional repository integration creates a draft PR. No command generating a proposal also approves or deploys it. A named developer decision and passing checks on the exact candidate are required for release.
+This is one worker/session with configurable role scopes and local token roles, not production identity or tenant isolation. The learned surface covers reporting and correction drafts for synthetic Finance records. Automatic arbitrary-code learning, autonomy optimization, model-switch replay campaigns, general Windows application understanding and fleet orchestration remain outside the milestone. Skill text can still mislead a model; structural checks and approvals do not establish enterprise reliability.
 
-The demonstrated deployment unit is the versioned resolver library, loaded from the checked candidate into the central release registry. Only idle workers receive it. New jobs copy and pin its version and labels; existing checkpoints retain their original graph topology. Rollback restores the previous registry. General Python graph-code deployment and topology migrations are deferred: retain old node definitions until their jobs finish, or implement an explicit migration rather than deleting them.
-
-## Prototype access model
-
-Three configurable bearer tokens distinguish staff, worker, and developer roles. Browser staff sessions use HttpOnly, SameSite=Strict cookies. Artifacts require staff authentication. The prototype binds to localhost and includes disclosed synthetic demo tokens. It has no SSO, tenant directory, TLS termination, tamper-proof audit log, or protection against a malicious administrator with filesystem access. Those are production requirements, not capabilities claimed by this prototype.
+See [deployment setup](developer-setup.md), [legacy desktop constraints](legacy-desktop.md), [department security boundaries](departments.md) and [validation evidence](validation.md).

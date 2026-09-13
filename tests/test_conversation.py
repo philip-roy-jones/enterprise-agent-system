@@ -134,7 +134,6 @@ class QuestionModel(BatchModel):
 
 def test_agent_question_waits_without_model_calls_then_resumes_with_staff_answer(store, job, monkeypatch):
     monkeypatch.setattr("eas_harness.assistance.SimulatedModel", QuestionModel)
-    store.mode(job["id"], "auto")
     store.transfer(job["id"], "assistant")
     checkpoint = InMemorySaver()
     adapter = ReadAdapter()

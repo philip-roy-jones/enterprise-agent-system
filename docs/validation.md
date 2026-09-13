@@ -1,6 +1,37 @@
 # Validation record
 
-Regression tests use an explicitly **simulated model**. Separate native Windows demonstrations use **GPT 5.6 Luna through OpenRouter**. Scripted staff decisions are labeled simulated in both cases; developer release approval remains a separate human step. These are bounded demonstrations, not a general assessment of model reliability.
+Regression tests use an explicitly **simulated model**. Separate native Windows demonstrations use **GPT 5.6 Luna through OpenRouter**. Scripted staff decisions are labeled simulated in both cases. Current learned packages activate after runtime-owned validation; historical developer-reviewed releases remain labeled separately. These are bounded demonstrations, not a general assessment of model reliability.
+
+## Completed agent-led learning milestone, 2026-09-12
+
+The final suite passed **214 tests**. Independent server and edge installations passed, and the native learning UI passed desktop/mobile checks. The [cumulative learning record](cumulative-learning-validation.md) covers live teaching and multiple revisions for reporting and correction, unseen records, previous layouts/requests, restart, rollback, stable version pins and guidance-only learning. Its [evidence artifact](evidence/cumulative-learning.json) retains all 22 runs, including six failed or partial development attempts. Business execution stayed under Strict approval throughout.
+
+## Lookup through existing approved tools, 2026-09-12
+
+After removing the hand-coded `read_invoice` operation, price-specific routing, and fixed answer template, one native Windows check used live GPT 5.6 Luna with explicitly simulated staff decisions. The agent selected INV-1042, used the existing `establish` operation, called `observe_app`, and answered **$1,480.00** from the current observation. The runtime required staff review of the answer. No workflow ran and no business mutation was attempted. The run used four model calls. See [recorded evidence](evidence/generic-observation-lookup.json).
+
+This demonstrates answering through existing approved tools, not a learned lookup skill. The current learner composes its existing bounded Finance operations; it does not yet distill every conversational answer or generate new application capabilities. The 21 focused regression tests passed, including observation-based answers at different amounts, missing-record reporting, record binding, approval recovery, activity filtering and existing workflow learning. Two observation-answer cases passed again after the final general completion guidance changed. Those tests use a simulated model.
+
+## Conversational invoice lookup and activity, 2026-09-12
+
+These historical checks include an experimental hand-coded `read_invoice` shortcut. That shortcut and its price-specific coordinator routing were subsequently removed; the price results below are not evidence of learned lookup behavior.
+
+Six native Windows checks used live GPT 5.6 Luna and explicitly simulated staff decisions. Every message entered chat without a structured invoice field. See [the recorded results](evidence/conversational-records.json).
+
+| Request | Observed result | Model calls |
+| --- | --- | --- |
+| Price of INV-1042 | Approved record selection and one direct `read_invoice`; answered $1,480.00, without a comparison workflow | 2 |
+| Price of INV-5783 | Reported that the record was absent from the current visible invoice list and ended the lookup | 2 |
+| Comparison request without a record | Asked for the invoice ID, with no business approvals | 1 |
+| Follow-up containing only INV-1043 | Continued the earlier comparison through the installed reporting skill and verified its result | 3 |
+| Rejected selection of INV-1044 | Ended without binding the record or operating on it | 1 |
+| Discrepancy report for INV-5799 | Ended with a visible-list lookup result when the workflow could not find the record | 3 |
+
+No business mutations were attempted in these checks. Visible-list absence is not proof that a record does not exist in the entire application. The prior lookup error conflated an absent control with general UI recovery; the new result preserves the scoped observation and stops the lookup cleanly. A malformed recovery click supplying both a target and coordinates previously terminated the request. A regression now exercises returning that validation error to the agent, which corrects its next proposal and waits for approval without losing its workflow state.
+
+Record selection and its consumed approval receipt commit atomically; a dropped response cannot lose a staff correction. Frontend checks cover the expandable call/result log, filtering, escaped text and keeping evidence expanded across refreshes. The log records public explanations and execution evidence, not private model reasoning. Earlier live follow-up attempts produced prose requesting approval without an actual tool proposal; the corrected coordinator instructions and final successful continuation are represented in the results above. These earlier failures remain in the local evaluation archive.
+
+The older sections below describe historical builds, including the retired Auto mode; current business execution requires staff approval.
 
 ## Local regression suite
 

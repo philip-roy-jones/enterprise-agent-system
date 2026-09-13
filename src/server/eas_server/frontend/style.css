@@ -270,7 +270,7 @@ textarea {
 }
 .console-grid {
   display: grid;
-  grid-template-columns: 230px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 23px;
   align-items: start;
 }
@@ -291,13 +291,6 @@ textarea {
 .panel-heading a {
   font-size: 0.8rem;
 }
-.queue-panel {
-  padding: 19px 0;
-  overflow: hidden;
-}
-.queue-panel .panel-heading {
-  padding: 0 18px;
-}
 .badge {
   font-size: 0.72rem;
   color: #487b75;
@@ -310,53 +303,6 @@ textarea {
 .badge.amber {
   background: #fff5dc;
   color: #9b7526;
-}
-.job-row {
-  width: 100%;
-  border: 0;
-  border-bottom: 1px solid #edf0f4;
-  border-radius: 0;
-  text-align: left;
-  padding: 18px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-weight: 400;
-}
-.job-row.selected {
-  background: #edf6f4;
-  border-left: 3px solid var(--accent);
-  padding-left: 17px;
-}
-.job-row-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.job-row > span:not(:first-child) {
-  text-transform: capitalize;
-  color: #6b7c8c;
-  font-size: 0.8rem;
-}
-.job-row small {
-  color: #8b98a5;
-  font-size: 0.72rem;
-}
-.status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #b9c6d2;
-}
-.status-dot.running {
-  background: #c29b3d;
-}
-.status-dot.completed {
-  background: #309b85;
-}
-.status-dot.failed,
-.status-dot.rejected {
-  background: #c46765;
 }
 .empty-state {
   text-align: center;
@@ -372,11 +318,6 @@ textarea {
   font-size: 2.8rem;
   color: #6ca69d;
   margin-bottom: 20px;
-}
-.empty-queue {
-  padding: 15px 20px;
-  color: #82909f;
-  font-size: 0.875rem;
 }
 .job-toolbar {
   display: flex;
@@ -762,7 +703,7 @@ th {
     padding-top: 45px;
   }
   .console-grid {
-    grid-template-columns: 270px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (max-width: 1150px) {
@@ -780,7 +721,7 @@ th {
     padding: 0 22px;
   }
   .console-grid {
-    grid-template-columns: 190px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     gap: 15px;
   }
   .overview-card {
@@ -788,9 +729,6 @@ th {
   }
   .panel {
     padding: 18px;
-  }
-  .queue-panel {
-    padding: 18px 0;
   }
   .environment {
     display: none;
@@ -854,13 +792,6 @@ th {
   }
   .console-grid {
     grid-template-columns: 1fr;
-  }
-  .queue-panel {
-    max-height: 230px;
-    overflow: auto;
-  }
-  .job-row {
-    padding: 12px 18px;
   }
   .overview-grid {
     gap: 10px;
@@ -928,3 +859,48 @@ th {
   line-height: 1.35;
   letter-spacing: -0.3px;
 }
+
+#chat-composer, #learning-panel { margin-bottom: 20px; }
+#chat-form { align-items: end; flex-wrap: wrap; }
+#chat-form textarea { flex: 1; min-width: 260px; margin: 0; }
+#chat-form label { min-width: 130px; margin: 0; }
+#workflow-runs { overflow-wrap: anywhere; }
+#learning-content { overflow-x: auto; }
+.session-messages { max-height: 430px; overflow-y: auto; margin-bottom: 18px; }
+.chat-message { padding: 12px 16px; margin: 10px 0; border-radius: 8px; max-width: 90%; white-space: pre-wrap; overflow-wrap: anywhere; }
+.chat-message p { margin: 6px 0 0; }
+.chat-message.staff { background: #edf6f5; margin-left: auto; }
+.chat-message.agent { background: #f5f7fa; }
+
+.chat-message-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; white-space: normal; }
+.chat-message-meta time { color: #64748b; font-size: .72rem; flex-shrink: 0; }
+.history-button { display: block; margin: 0 auto 12px; font-size: .85rem; }
+.history-button[hidden] { display: none; }
+
+
+.activity-controls { display:flex; gap:16px; align-items:end; flex-wrap:wrap; }
+.activity-controls label { flex:1; min-width:180px; }
+#timeline { max-height:650px; margin-bottom:20px; }
+.activity-event { border-bottom:1px solid #e4eaf0; padding:12px 0; }
+.activity-event > summary { display:flex; justify-content:space-between; gap:16px; cursor:pointer; list-style:none; }
+.activity-event > summary::before { content:"▸"; color:#6d7e91; }
+.activity-event[open] > summary::before { content:"▾"; }
+.activity-event > summary > span { flex:1; min-width:0; }
+.activity-event strong { font-size:.82rem; }
+.activity-summary { display:block; font-size:.8rem; color:#60758c; overflow-wrap:anywhere; margin-top:5px; }
+.activity-event time { font-size:.7rem; color:#60758c; white-space:nowrap; }
+.activity-recovery > summary strong { color:#9c493b; }
+.activity-body { padding:12px 0 0 24px; font-size:.83rem; overflow-wrap:anywhere; }
+.activity-body h4 { margin:14px 0 5px; font-size:.78rem; }
+.activity-body pre { white-space:pre-wrap; overflow-wrap:anywhere; background:#f3f6f9; padding:12px; border-radius:6px; max-height:320px; overflow:auto; font-size:.72rem; }
+.activity-id { color:#60758c; font-family:monospace; font-size:.72rem; }
+.activity-payload { margin-top:14px; }
+
+.chat-activity-link { margin-top: 8px; padding: 3px 0; border: 0; background: transparent; color: var(--accent); font-size: .78rem; text-decoration: underline; }
+.job-detail { min-width: 0; }
+
+#learning-content details { padding: 12px 0; border-bottom: 1px solid var(--line); }
+#learning-content summary { cursor: pointer; font-size: .85rem; }
+#learning-content pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #f5f7fa; padding: 12px; max-height: 300px; overflow: auto; font-size: .75rem; }
+#learning-content p, #learning-content li { font-size: .82rem; overflow-wrap: anywhere; }
+.learning-suggestion { padding: 14px; margin: 12px 0; background: #fff7e5; border-radius: 6px; }

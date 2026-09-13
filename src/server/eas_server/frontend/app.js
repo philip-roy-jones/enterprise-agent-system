@@ -15,7 +15,7 @@ const submitted = new Set();
 let roles = [];
 let desktopAdapter = "browser";
 let activeView = "jobs";
-let active = localStorage.getItem("active-job"),
+let active = null,
   selectedApproval = null,
   current = null,
   source = null,
@@ -62,7 +62,6 @@ $("login-form").onsubmit = (e) => {
 };
 for (const id of ["new-job", "first-job"])
   $(id).onclick = () => {
-    $("mode").value = "strict";
     $("job-dialog").showModal();
   };
 $("close-dialog").onclick = () => $("job-dialog").close();
@@ -114,15 +113,14 @@ $("job-form").onsubmit = (e) => {
           el.type === "number" ? Number(el.value) : el.value;
       });
     }
-    const j = await api("/api/jobs", {
+    const result = await api("/api/chat", {
       department_id: role.department_id,
       role_id: role.id,
       inputs,
       task: $("request").value.trim() || null,
-      selected_mode: $("mode").value,
+      selected_mode: "strict",
     });
-    active = j.id;
-    localStorage.setItem("active-job", active);
+    selectRequest(result.job.id);
     $("job-dialog").close();
     selectView("jobs");
     connectStream();
@@ -155,30 +153,18 @@ $("department").onchange = populateWorkflows;
 $("workflow").onchange = populateInputs;
 function connectStream() {
   source?.close();
+  source = null;
   if (!active) return;
   source = new EventSource(`/api/jobs/${active}/stream`);
   source.onmessage = () => refresh();
 }
-function showJobs(jobs) {
-  $("job-count").textContent = jobs.length;
-  $("job-list").innerHTML = jobs.length
-    ? jobs
-        .map(
-          (j) =>
-            `<button class="job-row ${j.id === active ? "selected" : ""}" data-job="${j.id}"><span class="job-row-top"><strong>${esc(j.record_id || j.invoice_id)}</strong><span class="status-dot ${esc(j.status)}"></span></span><span>${esc(j.department_name || "Finance")} · ${esc(j.status.replaceAll("_", " "))}</span><small>${j.selected_mode === "auto" ? "Auto" : "Strict"} · ${esc(j.graph_version)} · ${new Date(j.created_at * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</small></button>`,
-        )
-        .join("")
-    : '<p class="empty-queue">No jobs yet</p>';
-  document.querySelectorAll("[data-job]").forEach(
-    (el) =>
-      (el.onclick = () => {
-        active = el.dataset.job;
-        localStorage.setItem("active-job", active);
-        selectedApproval = null;
-        connectStream();
-        refresh();
-      }),
-  );
+function selectRequest(id) {
+  if (active === id) return;
+  active = id;
+  selectedApproval = null;
+  current = null;
+  lastImage = "";
+  connectStream();
 }
 const invoiceStages = {
   validate: "Validate",
@@ -188,6 +174,8 @@ const invoiceStages = {
   save: "Save",
   verify: "Verify",
   complete: "Complete",
+  report: "Report",
+  judge: "Classify",
 };
 let readable = invoiceStages;
 function renderDetail(d) {
@@ -208,18 +196,17 @@ function renderDetail(d) {
   $("active-job").hidden = false;
   $("job-id").textContent = `${j.graph_version} / ${j.id.slice(0, 8)}`;
   $("job-title").textContent =
-    `${j.role_name || "Invoice correction"} · ${j.record_id || j.invoice_id}`;
+    `${j.role_name || "Invoice correction"} · ${j.record_id || j.invoice_id || "Conversation"}`;
   $("department-label").textContent = j.department_name || "Finance";
   $("role-label").textContent =
     j.role_name || "Invoice correction · first workflow";
-  $("job-status").textContent = j.status;
-  $("job-mode").value = j.pending_mode || j.selected_mode;
-  $("job-mode").disabled = done;
+  $("job-status").textContent = (done ? j.status : j.execution_state || j.status);
+
   $("cancel-job").disabled = done;
   $("takeover").disabled = done;
   $("takeover").textContent =
     d.lease.owner === "staff" ? "Release control" : "Take control";
-  $("accept-job").hidden = j.status !== "completed" || j.accepted;
+  $("accept-job").hidden = j.status !== "completed" || j.accepted || ["conversation", "record_unavailable"].includes(j.result_kind);
   $("control-label").textContent = done
     ? "Available"
     : {
@@ -228,24 +215,23 @@ function renderDetail(d) {
         staff: "Staff",
       }[d.lease.owner] || "Waiting";
   $("control-detail").textContent = done
-    ? "Ready for the next job"
+    ? "Ready for the next request"
     : `Exclusive session · lease ${d.lease.epoch}`;
-  $("mode-label").textContent =
-    j.effective_mode === "strict" ? "Strict" : "Auto";
-  $("mode-detail").textContent =
-    j.controller === "assistant"
-      ? "Strict — staff approval required during assistance."
-      : j.effective_mode === "strict"
-        ? "Staff approval before each operation"
-        : "Procedures run with scoped permissions";
+  $("mode-label").textContent = "Strict";
+  $("mode-detail").textContent = "Staff approval before every operation";
+  // The composer always addresses the persistent staff session, even while an older activity is inspected.
+  $("conversation-label").textContent = "Your ongoing conversation · history is retained across context changes";
+  $("workflow-runs").innerHTML = Object.values(j.workflow_runs || {}).map(run => `<p><strong>${esc(run.skill_id)}</strong> · ${esc(run.state.replaceAll("_"," "))} · step ${run.index + 1}<br><small>Version ${esc(run.version.slice(0,12))} · Run ${esc(run.run_id)}</small>${run.reason ? `<br>${esc(run.reason)}` : ""}</p>`).join("");
   $("job-error").textContent = j.error || "";
   const staffQuestion = d.conversation?.questions.find(q => q.status === "pending");
   $("staff-question").hidden = !staffQuestion || done;
   $("staff-question").textContent = staffQuestion ? `The assistant needs your answer: ${staffQuestion.question}` : "";
   $("message").placeholder = staffQuestion ? "Reply to the assistant’s question…" : "Add context or a review note…";
+  $("message-form").hidden = done || j.conversation_id === conversationId;
   $("message").disabled = done;
   $("message-form").querySelector("button").disabled = done;
-  $("progress").innerHTML = Object.entries(readable)
+  const shownSteps=[...new Set([...j.completed,...(pending ? [pending.name] : [])])];
+  $("progress").innerHTML = shownSteps.map(id=>[id,readable[id] || id.replaceAll("_"," ")])
     .map(
       ([id, label], i) =>
         `<div class="step ${j.completed.includes(id) ? "finished" : ""}"><span>${j.completed.includes(id) ? "✓" : i + 1}</span><small>${label}</small></div>`,
@@ -260,31 +246,36 @@ function renderDetail(d) {
     $("screenshot").src = "/api/artifacts/" + obs.screenshot;
     lastImage = obs.screenshot;
   }
-  $("screenshot-wrap").hidden = !obs;
+  $("screenshot-wrap").hidden = !obs?.screenshot;
   $("review-controls").hidden = !pending;
   $("waiting").hidden = !!pending;
-  $("waiting").textContent = done
+  $("waiting").textContent = j.result_kind === "record_unavailable" ? j.record_lookup.message : j.result_kind === "conversation" ? "Continue in the conversation when you’re ready." : done
     ? j.accepted
       ? "Staff accepted the verified result."
       : j.status === "completed"
         ? "Outcome verified. Accept the work to make this episode available for improvement."
-        : `Job ${j.status}.`
+        : `Request ${j.status}.`
     : d.lease.owner === "staff"
       ? desktopAdapter === "browser"
         ? "You hold desktop control. Use the browser test workspace, then release control."
         : "You hold desktop control. Work in the application on the Windows machine, then release control."
       : "Worker is running or reconciling current state.";
-  if (staffQuestion && !done) $("waiting").textContent = "Waiting for your answer in the job conversation.";
+  if (staffQuestion && !done) $("waiting").textContent = "Waiting for your answer in the request conversation.";
   if (pending) {
     $("review-title").textContent =
       pending.kind === "tool"
-        ? "Assistance needs your decision"
+        ? "Agent requests your decision"
         : "Review next operation";
     $("review-kind").textContent =
       pending.kind === "tool" ? "STRICT · TOOL APPROVAL" : "NODE APPROVAL";
     $("proposal-copy").innerHTML =
       `<h3>${esc(pending.name.replaceAll("_", " "))}</h3><p>${esc(pending.description)}</p><div class="proposal-meta"><span>Target<strong>${esc(pending.inputs.department_id || "finance")} / ${esc(pending.inputs.record_id || pending.inputs.invoice_id)}</strong></span><span>Expected result<strong>${esc(pending.expected)}</strong></span></div>${pending.inputs.assistant_report ? `<p><strong>Requested outcome</strong><br>${esc(pending.inputs.request)}</p><p><strong>Assistant report</strong><br>${esc(pending.inputs.assistant_report)}</p>` : ""}`;
     const expected = pending.inputs.expected;
+    if (pending.inputs.judgment) {
+      const judgment = pending.inputs.judgment;
+      const comparison = judgment.context.comparison;
+      $("proposal-copy").innerHTML += `<p><strong>Independent model judgment</strong><br>Invoice: $${esc((comparison.invoice_amount / 100).toFixed(2))} · Purchase order: $${esc((comparison.purchase_order_amount / 100).toFixed(2))} · Difference: $${esc((comparison.difference / 100).toFixed(2))}<br>Model: ${esc(judgment.model)} · Prompt: ${esc(judgment.prompt_version)}</p><details><summary>Exact judgment inputs and prompt</summary><pre>${esc(JSON.stringify(judgment, null, 2))}</pre></details>`;
+    }
     if (["prepare", "save", "save_draft"].includes(pending.name) && expected) {
       $("proposal-copy").innerHTML += `<p><strong>Correction amount:</strong> $${esc((expected.amount / 100).toFixed(2))}<br><strong>Explanation:</strong> ${esc(expected.note)}</p>`;
     }
@@ -317,27 +308,7 @@ function renderDetail(d) {
   $("assessment-operation").innerHTML = finishedActions.map(e => `<option value="${esc(e.data.invocation)}">${esc(readable[e.data.action.name] || e.data.action.name)} · ${new Date(e.at * 1000).toLocaleTimeString()}</option>`).join("");
   if (finishedActions.some(e => e.data.invocation === oldAssessment)) $("assessment-operation").value = oldAssessment;
   $("assessment-form").querySelector("button").disabled = !finishedActions.length;
-  const visible = d.events.filter(
-    (e) => !["observation", "action_started", "action_result"].includes(e.kind),
-  );
-  $("timeline").innerHTML = visible
-    .slice(-35)
-    .reverse()
-    .map((e) => {
-      let text =
-        e.data.text ||
-        e.data.reason ||
-        e.data.message ||
-        (e.kind === "progress"
-          ? `${readable[e.data.operation] || e.data.operation} finished`
-          : "");
-      if (e.kind === "approval_requested") text = e.data.description;
-      if (e.kind === "staff_decision")
-        text = `${e.data.decision.decision}: ${e.data.name}${e.data.decision.explanation ? " — " + e.data.decision.explanation : ""}`;
-      if (e.kind === "action_assessment") text = `${e.data.outcome}: ${e.data.explanation}`;
-      return `<div class="timeline-item"><span class="timeline-mark"></span><div><strong>${esc(e.kind.replaceAll("_", " "))}</strong><p>${esc(text)}</p></div><time>${new Date(e.at * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time></div>`;
-    })
-    .join("");
+  activityView.render(d);
 }
 function drawTarget(args, obs) {
   let t = obs.targets.find((t) => t.target === args.target);
@@ -383,8 +354,6 @@ async function decide(decision) {
 $("approve").onclick = () => action(() => decide("approve"));
 $("correct").onclick = () => action(() => decide("correct"));
 $("reject").onclick = () => action(() => decide("reject"));
-$("job-mode").onchange = () =>
-  action(() => api(`/api/jobs/${active}/mode`, { mode: $("job-mode").value }));
 $("cancel-job").onclick = () =>
   action(() => api(`/api/jobs/${active}/cancel`, {}));
 $("accept-job").onclick = () =>
@@ -425,6 +394,8 @@ function selectView(view) {
   const metrics = view === "metrics";
   $("main-view").hidden = metrics;
   $("job-overview").hidden = metrics;
+  $("chat-composer").hidden = metrics;
+  $("learning-panel").hidden = metrics;
   $("metrics-view").hidden = !metrics;
   for (const name of ["jobs", "metrics"]) {
     const tab = $(name + "-tab");
@@ -436,7 +407,7 @@ function selectView(view) {
   $("page-title").textContent = metrics ? "Evaluation metrics" : "Work, with oversight.";
   $("page-description").textContent = metrics
     ? "Compare simulated and live runs. Results refresh automatically."
-    : "Run a procedure. Review the unexpected. Teach the next run.";
+    : "Describe the outcome. Approve the work. Teach the next request.";
 }
 function metricValue(name, value) {
   if (value == null) return "—";
@@ -474,14 +445,25 @@ async function refresh() {
         .join("");
       populateWorkflows();
     }
-    const jobs = await api("/api/jobs");
-    if (!active && jobs.length) {
-      active = jobs[0].id;
-      connectStream();
+    const session = await api("/api/chat");
+    // Display only this authenticated conversation. Browser storage and the
+    // all-request audit endpoint cannot select another identity's execution.
+    const jobs = (await api("/api/jobs")).filter(j => j.conversation_id === session.conversation_id);
+    const latest = session.current?.id || null;
+    if (conversationId !== session.conversation_id || latestRequestId !== latest || !jobs.some(j => j.id === active)) {
+      selectRequest(latest);
     }
-    showJobs(jobs);
-    if (active && jobs.some((j) => j.id === active))
-      renderDetail(await api("/api/jobs/" + active));
+    conversationId = session.conversation_id;
+    latestRequestId = latest;
+    let detail=null;
+    if (active && jobs.some(j => j.id === active)) {
+      detail=await api("/api/jobs/" + active);
+      renderDetail(detail);
+    } else {
+      $("empty").hidden = false;
+      $("active-job").hidden = true;
+    }
+    await renderSession(session, jobs, detail);
     const health = await api("/api/health");
     desktopAdapter = health.desktop_adapter;
     $("test-workspace").hidden = desktopAdapter !== "browser";
@@ -489,12 +471,110 @@ async function refresh() {
     $("model-label").textContent =
       health.model_mode === "simulated" ? "Simulated assistance" : "Live model";
     if (activeView === "metrics") await refreshMetrics();
+    else await refreshLearning();
   } catch (e) {
     if (!$("login-dialog").open) toast(e.message);
   } finally {
     refreshing = false;
   }
 }
+let conversationId = null;
+let latestRequestId = null;
+localStorage.removeItem("active-job");
+let requestDraft = null;
+let transcriptSession = null;
+let transcriptLimit = 20;
+let transcriptMarkup = "";
+const transcriptCache = new Map();
+$("earlier-messages").onclick = () => {
+  transcriptLimit += 20;
+  refresh();
+};
+$("chat-form").onsubmit = (e) => {
+  e.preventDefault();
+  action(async () => {
+    const task = $("chat-request").value.trim();
+    if (!requestDraft || requestDraft.task !== task || requestDraft.conversation_id !== conversationId) {
+      conversationId ||= crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+      requestDraft = {task,conversation_id:conversationId,request_id:crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`};
+    }
+    const result = await api("/api/chat",requestDraft);
+    const job = result.job;
+    selectRequest(job.id);
+    $("chat-request").value = "";
+    requestDraft = null;
+    connectStream();
+  });
+};
+$("session-messages").onclick = event => {
+  const button = event.target.closest("[data-request-activity]");
+  if (!button) return;
+  action(async () => {
+    selectRequest(button.dataset.requestActivity);
+    await refresh();
+    $("main-view").scrollIntoView({behavior: "smooth", block: "start"});
+  });
+};
+async function renderSession(session, jobs, selectedDetail) {
+  const j = session.current;
+  if (transcriptSession !== session.conversation_id) {
+    transcriptSession = session.conversation_id;
+    transcriptLimit = 20;
+    transcriptMarkup = "";
+    transcriptCache.clear();
+    $("session-messages").replaceChildren();
+  }
+  const done = !j || ["completed", "cancelled", "rejected", "failed", "denied"].includes(j.status);
+  $("chat-request").placeholder = done
+    ? "Continue the conversation or describe your next task…"
+    : "Reply, clarify, or give guidance. This does not approve an operation…";
+  const history = jobs.filter(turn => turn.conversation_id === session.conversation_id)
+    .sort((a,b) => a.created_at - b.created_at || a.id.localeCompare(b.id));
+  const visible = history.slice(-transcriptLimit);
+  $("earlier-messages").hidden = history.length <= visible.length;
+  if (selectedDetail && visible.some(turn => turn.id === selectedDetail.job.id)) {
+    transcriptCache.set(selectedDetail.job.id, selectedDetail);
+  }
+  const missing = visible.filter(turn => !transcriptCache.has(turn.id) || !["completed", "cancelled", "rejected", "failed", "denied"].includes(transcriptCache.get(turn.id).job.status));
+  // Fetch full public exchanges, not the last-reply summaries. Limit concurrent
+  // reads and cache ended requests; active requests stay fresh while polling.
+  for (let i=0; i<missing.length; i+=5) {
+    const batch = await Promise.all(missing.slice(i,i+5).map(turn => api("/api/jobs/"+turn.id)));
+    batch.forEach(data => transcriptCache.set(data.job.id, data));
+  }
+  const entries = visible.flatMap(turn => {
+    const data = transcriptCache.get(turn.id);
+    const created = data.events.find(event => event.kind === "job_created");
+    return [{id: "request-"+turn.id, requestId: turn.id, at: turn.created_at, seq: created?.seq || 0, speaker: "staff", text: turn.task, record: turn.record_id},
+      ...data.events.filter(event => ["staff_message", "assistant_message", "assistant_question"].includes(event.kind))
+        .map(event => ({id: "event-"+event.seq, at: event.at, seq: event.seq, speaker: event.kind === "staff_message" ? "staff" : "agent", text: event.data.text || event.data.question || ""}))];
+  }).sort((a,b) => a.at-b.at || a.seq-b.seq);
+  const markup = entries.map(entry => {
+    const date = new Date(entry.at*1000);
+    return `<div class="chat-message ${entry.speaker}" data-message-id="${esc(entry.id)}"><div class="chat-message-meta"><strong>${entry.speaker === "staff" ? "Staff" : "Worker"}${entry.record ? ` · ${esc(entry.record)}` : ""}</strong><time datetime="${date.toISOString()}" title="${esc(date.toLocaleString())}">${esc(date.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}))}</time></div><p>${esc(entry.text)}</p>${entry.requestId ? `<button type="button" class="chat-activity-link" data-request-activity="${esc(entry.requestId)}">View activity</button>` : ""}</div>`;
+  }).join("");
+  const transcript = $("session-messages");
+  if (markup !== transcriptMarkup) {
+    const first = transcript.firstElementChild?.dataset.messageId;
+    const oldHeight = transcript.scrollHeight, oldTop = transcript.scrollTop;
+    const atBottom = oldHeight-transcript.clientHeight-oldTop < 48;
+    const wasEmpty = !transcriptMarkup;
+    transcript.innerHTML = markup;
+    const prepended = first && first !== transcript.firstElementChild?.dataset.messageId;
+    if (prepended) transcript.scrollTop = oldTop + transcript.scrollHeight-oldHeight;
+    else if (atBottom || wasEmpty) transcript.scrollTop = transcript.scrollHeight;
+    else transcript.scrollTop = oldTop;
+    transcriptMarkup = markup;
+  }
+  $("conversation-label").textContent = "One continuous conversation · Messages stay in chronological order";
+}
+async function refreshLearning() {
+  const status = await api("/api/learning");
+  learningView.render(status);
+  document.querySelectorAll("[data-skill]").forEach(button => button.onclick=()=>action(()=>api(`/api/skills/${encodeURIComponent(button.dataset.skill)}/change`,{version:button.dataset.version || null})));
+}
+$("activity-filter").onchange = refresh;
+$("activity-search").oninput = refresh;
 refresh();
 connectStream();
 setInterval(refresh, 2500);

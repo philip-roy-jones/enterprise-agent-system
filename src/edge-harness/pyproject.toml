@@ -21,3 +21,6 @@ enterprise-harness = "eas_harness.cli:main"
 
 [project.optional-dependencies]
 browser = ["playwright>=1.50"]
+
+[tool.setuptools.data-files]
+"share/enterprise-agent-system/skills/invoice_correction" = ["skills/invoice_correction/manifest.json", "skills/invoice_correction/SKILL.md"]

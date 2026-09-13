@@ -1,3 +1,4 @@
+from eas_harness.workflows.finance.runtime import FinanceOperations
 import time
 import contextvars
 from langgraph.graph import StateGraph, START, END
@@ -32,7 +33,7 @@ NEXT = dict(
 )
 
 
-class RoleGraph:
+class RoleGraph(FinanceOperations):
     def __init__(self, settings, store, layer, checkpointer, assistant_checkpointer):
         self.settings, self.store, self.layer = settings, store, layer
         self.assistant_checkpointer = assistant_checkpointer
@@ -151,107 +152,6 @@ class RoleGraph:
             return {"turn": turn + 1, "next_node": next_node, "result": result["value"]}
 
         return execute
-
-    def operation(self, name, state):
-        job = self.store.get_job(state["job_id"])
-        adapter = self.layer.adapter
-        adapter.job = job
-        if name == "validate":
-            if not matches_invoice_procedure(job["task"]):
-                raise Recovery(
-                    "unsupported", "Unsupported task; staff must submit a supported invoice correction job"
-                )
-            if not {"read", "navigate", "draft"}.issubset(job["permissions"]):
-                raise PermissionError("Invoice correction requires read, navigate and draft permissions")
-            obs = adapter.observe()
-            if obs.state.get("record_catalog_complete", True) and not any(
-                i["id"] == job["invoice_id"] and i["company_id"] == job["company_id"]
-                for i in obs.state["invoices"]
-            ):
-                raise PermissionError("Invoice outside assigned company or missing")
-            return {"validated": True}
-        if name == "establish":
-            adapter.ensure_company(job["company_id"])
-            return adapter.ensure_invoice_open(job["invoice_id"])
-        if name == "compare":
-            s = adapter.ensure_editable()
-            inv = next(i for i in s["invoices"] if i["id"] == job["invoice_id"])
-            expected = {
-                "company_id": job["company_id"],
-                "invoice_id": job["invoice_id"],
-                "amount": inv["po_amount"],
-                "po_id": inv["po_id"],
-                "difference": inv["amount"] - inv["po_amount"],
-                "note": adapter.correction_note(
-                    f"Align correction draft with approved purchase order {inv['po_id']}."
-                ),
-            }
-            self.store.update_job(job["id"], {"expected": expected})
-            return expected
-        if name == "prepare":
-            adapter.ensure_editable()
-            labels = [t["label"] for t in adapter.observe().targets]
-            if not any(label in labels for label in job["amount_labels"]):
-                raise Recovery("unfamiliar", "The correction amount field label changed")
-            adapter.set_field("amount", f"{job['expected']['amount'] / 100:.2f}")
-            adapter.set_field("note", job["expected"]["note"])
-            return {"prepared": True}
-        if name == "save":
-            self.store.update_job(job["id"], {"mutation": "attempted_uncertain"})
-            result = adapter.save_and_verify(job["expected"])
-            return result
-        if name == "verify":
-            result = adapter.saved_result(job["expected"])
-            if not result:
-                raise Recovery("ambiguous", "Saved correction is not visible; reconciliation required")
-            return result
-        if name == "recover":
-            if "info" in state["reason"]:
-                adapter.click_target("dialog-acknowledge")
-            else:
-                adapter.ready()
-            return {"recovered": True}
-        if name == "assist":
-            return {"supervised_assistance_authorized": True}
-        if name == "resume":
-            obs = adapter.observe()
-            if job["expected"]:
-                saved = adapter.saved_result(job["expected"])
-                if saved:
-                    self.store.update_job(job["id"], {"mutation": "confirmed_succeeded"})
-                    return {"next_node": "verify", "reconciled": saved}
-                if job["mutation"] == "attempted_uncertain":
-                    raise Recovery(
-                        "unfamiliar", "Uncertain save has no verified result; staff must reconcile"
-                    )
-                if job["mutation"] == "confirmed_failed":
-                    raise Recovery(
-                        "unfamiliar",
-                        "Application rejected Save; retry requires an individually approved save_draft tool call",
-                    )
-                fields = obs.state["fields"]
-                if (
-                    obs.state["company_id"] == job["company_id"]
-                    and obs.state["invoice_id"] == job["invoice_id"]
-                    and not obs.state["dialog"]
-                    and fields["amount"] == f"{job['expected']['amount'] / 100:.2f}"
-                    and fields["note"] == job["expected"]["note"]
-                ):
-                    return {"next_node": "save", "prepared_by_assistance": True}
-            if obs.state["dialog"]:
-                raise Recovery("unfamiliar", "Dialog still requires supervised resolution")
-            return {"next_node": "establish"}
-        if name == "complete":
-            if job["mutation"] != "confirmed_succeeded":
-                raise Recovery("ambiguous", "Completion requires a verified saved result")
-            return {"verified": True, "acceptance_required": True}
-        if name == "review_discovery":
-            # The controller remains assistant, so even an Auto job requires
-            # explicit staff approval of this outcome. No scripted save follows.
-            if not job.get("assistant_report"):
-                raise Recovery("unfamiliar", "The assistant has not supplied an outcome to review")
-            return {"staff_verified_outcome": job["assistant_report"], "acceptance_required": True}
-        raise ValueError(name)
 
     def assist(self, state):
         job_id = state["job_id"]

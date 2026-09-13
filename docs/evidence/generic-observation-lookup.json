@@ -1,0 +1,40 @@
+{
+  "id": "244b7f5a60704022860024619c2a5f15",
+  "task": "How much does invoice INV-1042 cost? Please check its current value.",
+  "status": "completed",
+  "result_kind": "reviewed_outcome",
+  "model_mode": "live",
+  "model_binding": {
+    "max_retries": 0,
+    "max_tokens": 2048,
+    "mode": "live",
+    "model": "openai/gpt-5.6-luna",
+    "prompt_hash": "e9472aecf09566248cef973c9512544a8b143231d7d35f32f93cc7d67ee7fc9d",
+    "prompt_revision": "agent-coordinator-4-capability-selection",
+    "provider": "openrouter",
+    "temperature": "provider default",
+    "timeout_seconds": 20
+  },
+  "model_calls": 4,
+  "tokens": 28547,
+  "mutation": "not_attempted",
+  "staff_mode": "simulated decisions and synthetic message",
+  "decisions": [
+    "select_record",
+    "establish",
+    "observe_app",
+    "review_discovery"
+  ],
+  "assistant_report": "Invoice INV-1042 currently costs **$1,480.00**.",
+  "observed_invoice": {
+    "amount": 148000,
+    "company_id": "ACME",
+    "id": "INV-1042",
+    "po_amount": 128000,
+    "po_id": "PO-1042"
+  },
+  "observation_revision": "62A2CEC9DD8F6952E90227778931C34FB69A71D3DA9FA47F9B9609D209EBC867",
+  "observed_at": 1789258715.0389283,
+  "workflow_runs": null,
+  "limits": "One live model lookup against synthetic DemoBooks, with simulated staff approvals. No learned lookup skill, application capability generation, or general reliability claim."
+}

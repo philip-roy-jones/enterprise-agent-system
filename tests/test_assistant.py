@@ -51,7 +51,6 @@ class ReadAdapter:
 
 def test_batched_model_tools_each_require_their_own_approval(store, job, monkeypatch):
     monkeypatch.setattr("eas_harness.assistance.SimulatedModel", BatchModel)
-    store.mode(job["id"], "auto")
     store.boundary(job["id"])
     store.transfer(job["id"], "assistant")
     adapter = ReadAdapter()

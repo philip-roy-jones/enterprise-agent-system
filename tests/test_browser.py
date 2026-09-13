@@ -1,52 +1,72 @@
+"""Strict coordinator and workflow recovery through real browser processes.
+
+Model behavior and staff decisions are simulated. Historical graph-first/Auto
+expectations are superseded by the agent-led plan; authority coverage remains.
+"""
+
+import json
 import subprocess
 import sys
 import time
 import pytest
 from enterprise_dev.demo import drive
 from eas_shared.identity import canonical
-from eas_harness.workflows.finance.procedures import AMOUNT_LABELS
-from conftest import pending, wait_for
+from conftest import pending
 
 pytestmark = pytest.mark.browser
 
 
-def create(client, mode="auto", invoice="INV-1042", **extra):
-    r = client.post("/api/jobs", json={"invoice_id": invoice, "selected_mode": mode, **extra})
-    r.raise_for_status()
-    return r.json()["id"]
+def create(client, mode="strict", invoice="INV-1042", **extra):
+    response = client.post("/api/jobs", json={"invoice_id": invoice, "selected_mode": mode, **extra})
+    response.raise_for_status()
+    return response.json()["id"]
+
+
+def until(client, job, name=None, status=None):
+    end = time.monotonic() + 75
+    while time.monotonic() < end:
+        data = client.get("/api/jobs/" + job).json()
+        if data["job"]["status"] == status:
+            return data
+        for approval in data["approvals"]:
+            if approval["status"] == "pending":
+                if approval["name"] == name:
+                    return approval
+                client.post(
+                    "/api/approvals/" + approval["id"],
+                    json={"decision": "approve", "explanation": "Simulated staff"},
+                ).raise_for_status()
+        assert data["job"]["status"] not in {"failed", "denied", "cancelled", "completed", "rejected"}, data[
+            "job"
+        ]
+        time.sleep(0.1)
+    raise AssertionError(data["job"])
 
 
 def test_explicit_save_rejection_requires_approved_retry(browser_server):
     c = browser_server["client"]
     c.post("/api/mock/scenario", json={"reject_save": True}).raise_for_status()
     job = create(c)
-    approval = pending(c, job)
-    assert approval["name"] == "observe_app"
-    data = c.get(f"/api/jobs/{job}").json()
-    assert data["job"]["mutation"] == "confirmed_failed"
+    approval = until(c, job, "resume_workflow")
+    assert c.get("/api/jobs/" + job).json()["job"]["mutation"] == "confirmed_failed"
     assert not any(d["operation_id"] == job for d in c.get("/api/mock/state").json()["drafts"])
-    c.post(f"/api/approvals/{approval['id']}", json={"decision": "approve"}).raise_for_status()
-    approval = pending(c, job)
-    assert approval["name"] == "save_draft"
-    time.sleep(0.3)
-    assert c.get(f"/api/jobs/{job}").json()["job"]["mutation"] == "confirmed_failed"
     result = drive(c, job)
     assert result["job"]["mutation"] == "confirmed_succeeded"
-    assert result["job"]["effective_mode"] == "auto"
-    assert len([d for d in c.get("/api/mock/state").json()["drafts"] if d["operation_id"] == job]) == 1
-    assert sum(e["kind"] == "mutation_failed" for e in result["events"]) == 1
+    assert len([a for a in result["approvals"] if a["name"] == "save"]) == 2
+    assert approval["decision"] is None
 
 
 def test_strict_gates_every_executable_node(browser_server):
     c = browser_server["client"]
-    job = create(c, "strict")
+    job = create(c)
     a = pending(c, job)
     time.sleep(0.4)
-    data = c.get("/api/jobs/" + job).json()
-    assert not any(e["kind"] == "action_started" for e in data["events"])
-    assert a["name"] == "validate"
+    assert not any(e["kind"] == "action_started" for e in c.get("/api/jobs/" + job).json()["events"])
+    assert a["name"] == "read_skill"
     result = drive(c, job)
     assert [a["name"] for a in result["approvals"] if a["status"] == "executed"] == [
+        "read_skill",
+        "run_workflow",
         "validate",
         "establish",
         "compare",
@@ -55,33 +75,24 @@ def test_strict_gates_every_executable_node(browser_server):
         "verify",
         "complete",
     ]
-    assert result["job"]["model_calls"] == 0
+    assert result["job"]["model_calls"] > 0
 
 
-def test_unmatched_request_enters_fallback_without_a_create_workflow_step(browser_server):
+def test_unmatched_request_stays_supervised_without_workflow_creation(browser_server):
     c = browser_server["client"]
-    job = create(c, "auto", task="Inspect this invoice and explain what needs attention without saving")
-    approval = pending(c, job)
-    assert approval["kind"] == "tool" and approval["name"] == "observe_app"
-    data = c.get("/api/jobs/" + job).json()
-    assert data["job"]["effective_mode"] == "strict"
-    assert not data["job"]["completed"]
-    trigger = next(e["data"]["trigger"] for e in data["events"] if e["kind"] == "fallback_started")
-    assert trigger == "missing_procedure"
+    job = create(c, task="Inspect this invoice and explain what needs attention without saving")
+    assert pending(c, job)["name"] == "validate"
     result = drive(c, job)
+    assert result["job"]["verified_report"]
     assert result["job"]["mutation"] == "not_attempted"
-    assert result["job"]["effective_mode"] == "auto"
-    assert result["job"]["assistant_report"]
-    assert result["approvals"][-1]["name"] == "review_discovery"
-    assert not any(d["operation_id"] == job for d in c.get("/api/mock/state").json()["drafts"])
+    assert not result["job"].get("workflow_runs")
+    assert all(a["decision"] for a in result["approvals"])
 
 
-def test_staff_conversation_replans_pending_assistance_without_releasing_old_tool(browser_server):
+def test_guidance_does_not_release_pending_action(browser_server):
     c = browser_server["client"]
-    c.post("/api/mock/scenario", json={"variant": "renamed"}).raise_for_status()
     job = create(c)
     first = pending(c, job)
-    assert first["name"] == "observe_app"
     c.post(
         f"/api/jobs/{job}/messages",
         json={
@@ -89,13 +100,13 @@ def test_staff_conversation_replans_pending_assistance_without_releasing_old_too
             "message_id": "browser-guidance",
         },
     ).raise_for_status()
+    data = c.get("/api/jobs/" + job).json()
+    assert not any(e["kind"] == "action_started" for e in data["events"])
     result = drive(c, job)
-    old = next(a for a in result["approvals"] if a["id"] == first["id"])
-    assert old["status"] == "stale" and old["executed_action"] is None
     assert any(
         e["kind"] == "conversation_context" and e["data"]["message_sequences"] for e in result["events"]
     )
-    assert result["job"]["mutation"] == "confirmed_succeeded"
+    assert next(a for a in result["approvals"] if a["id"] == first["id"])["status"] == "stale"
 
 
 @pytest.mark.parametrize(
@@ -111,18 +122,16 @@ def test_staff_conversation_replans_pending_assistance_without_releasing_old_too
         {"variant": "layout"},
     ],
 )
-def test_auto_navigation_and_known_recovery(browser_server, scenario):
+def test_navigation_and_recovery_remain_strict(browser_server, scenario):
     c = browser_server["client"]
     c.post("/api/mock/scenario", json=scenario).raise_for_status()
     job = create(c)
     result = drive(c, job)
-    assert result["approvals"] == []
-    assert result["job"]["fallback_count"] == 0
+    assert all(a.get("decision") for a in result["approvals"] if a["status"] == "executed")
     draft = next(d for d in c.get("/api/mock/state").json()["drafts"] if d["operation_id"] == job)
     assert draft["invoice_id"] == "INV-1042" and draft["amount"] == 128000
 
 
-@pytest.mark.parametrize("mode", ["auto", "strict"])
 @pytest.mark.parametrize(
     "scenario",
     [
@@ -131,117 +140,103 @@ def test_auto_navigation_and_known_recovery(browser_server, scenario):
         {"variant": "renamed"},
     ],
 )
-def test_fallback_strict_tools_and_mode_restoration(browser_server, mode, scenario):
+def test_workflow_recovery_tools_need_separate_approvals(browser_server, scenario):
     c = browser_server["client"]
     c.post("/api/mock/scenario", json=scenario).raise_for_status()
-    job = create(c, mode)
+    job = create(c)
     result = drive(c, job, correction=True)
-    tool_approvals = [a for a in result["approvals"] if a["kind"] == "tool" and a["status"] == "executed"]
-    assert tool_approvals and tool_approvals[0]["name"] == "observe_app"
-    assert all(a["decision"] for a in tool_approvals)
-    assert result["job"]["effective_mode"] == mode
-    assert result["job"]["fallback_count"] == 1
+    names = [a["name"] for a in result["approvals"] if a["status"] == "executed"]
+    assert "observe_app" in names and "resume_workflow" in names
+    assert result["job"]["effective_mode"] == "strict"
     assert len([d for d in c.get("/api/mock/state").json()["drafts"] if d["operation_id"] == job]) == 1
 
 
-def test_mode_switch_does_not_release_pending_tool(browser_server):
+def test_auto_request_does_not_release_pending_tool(browser_server):
     c = browser_server["client"]
-    c.post("/api/mock/scenario", json={"dialog": "unfamiliar"})
     job = create(c)
     a = pending(c, job)
-    assert a["kind"] == "tool" and a["name"] == "observe_app"
-    c.post(f"/api/jobs/{job}/mode", json={"mode": "auto"})
-    time.sleep(0.7)
-    d = c.get("/api/jobs/" + job).json()
-    assert next(x for x in d["approvals"] if x["id"] == a["id"])["status"] == "pending"
-    assert d["job"]["effective_mode"] == "strict"
-    drive(c, job)
-
-
-def test_screenshot_target_correction_and_separate_audit(browser_server):
-    c = browser_server["client"]
-    c.post("/api/mock/scenario", json={"dialog": "unfamiliar"})
-    job = create(c)
-    a = pending(c, job)
-    c.post("/api/approvals/" + a["id"], json={"decision": "approve"}).raise_for_status()
-    data = wait_for(
-        c, job, lambda d: any(a["status"] == "pending" and a["name"] == "click" for a in d["approvals"])
+    assert c.post(f"/api/jobs/{job}/mode", json={"mode": "auto"}).status_code == 409
+    time.sleep(0.3)
+    assert (
+        next(x for x in c.get("/api/jobs/" + job).json()["approvals"] if x["id"] == a["id"])["status"]
+        == "pending"
     )
-    a = next(a for a in data["approvals"] if a["status"] == "pending")
+
+
+def test_screenshot_target_correction_has_separate_audit(browser_server):
+    c = browser_server["client"]
+    c.post("/api/mock/scenario", json={"dialog": "unfamiliar"})
+    job = create(c)
+    a = until(c, job, "click")
     target = next(t for t in a["observation"]["targets"] if t["target"] == "dialog-review")
     args = {"x": target["x"], "y": target["y"]}
     c.post(
         "/api/approvals/" + a["id"],
-        json={"decision": "correct", "arguments": args, "explanation": "Staff selected the reviewed control"},
+        json={
+            "decision": "correct",
+            "arguments": args,
+            "explanation": "Simulated staff selected the reviewed control",
+        },
     ).raise_for_status()
     result = drive(c, job)
     executed = next(x for x in result["approvals"] if x["id"] == a["id"])
     assert executed["arguments"] != args
-    assert executed["corrected_arguments"] == args
     assert executed["executed_action"]["arguments"] == args
     assert executed["observed_result"]["value"]["clicked"] == "dialog-review"
 
 
-def test_stale_observation_after_staff_takeover_needs_new_approval(browser_server):
+def test_stale_observation_after_takeover_needs_new_approval(browser_server):
     c = browser_server["client"]
-    job = create(c, "strict")
+    job = create(c)
     a = pending(c, job)
     c.post(f"/api/jobs/{job}/takeover").raise_for_status()
     c.post("/api/mock/scenario", json={"view": "invoices", "reordered": True}).raise_for_status()
     assert c.post("/api/approvals/" + a["id"], json={"decision": "approve"}).status_code == 409
     c.post(f"/api/jobs/{job}/release").raise_for_status()
-    fresh = pending(c, job)
-    assert fresh["id"] != a["id"]
+    assert pending(c, job)["id"] != a["id"]
     drive(c, job)
 
 
-@pytest.mark.parametrize("mode", ["strict", "auto"])
-def test_permission_denial_has_no_assistant_escape(browser_server, mode):
+def test_permission_denial_has_no_agent_escape(browser_server):
     c = browser_server["client"]
-    job = create(c, mode, permissions=["read", "navigate"])
-    if mode == "strict":
-        a = pending(c, job)
-        c.post("/api/approvals/" + a["id"], json={"decision": "approve"})
-    d = wait_for(c, job, lambda d: d["job"]["status"] == "denied")
-    assert d["job"]["fallback_count"] == 0
+    job = create(c, permissions=["read", "navigate"])
+    d = until(c, job, status="denied")
+    assert d["job"]["mutation"] == "not_attempted"
+    assert not any(a["name"] == "save" for a in d["approvals"])
 
 
-def test_assistant_cannot_correct_to_out_of_scope_action(browser_server):
+def test_rejection_terminates_nested_workflow(browser_server):
+    c = browser_server["client"]
+    job = create(c)
+    a = until(c, job, "prepare")
+    c.post("/api/approvals/" + a["id"], json={"decision": "reject"}).raise_for_status()
+    d = c.get("/api/jobs/" + job).json()
+    assert d["job"]["status"] == "rejected"
+    time.sleep(0.5)
+    assert not any(a["name"] == "save" for a in c.get("/api/jobs/" + job).json()["approvals"])
+
+
+def test_correction_cannot_expand_scope(browser_server):
     c = browser_server["client"]
     c.post("/api/mock/scenario", json={"variant": "renamed"})
     job = create(c)
-    a = pending(c, job)
-    c.post("/api/approvals/" + a["id"], json={"decision": "approve"})
-    d = wait_for(
-        c, job, lambda d: any(a["status"] == "pending" and a["name"] == "set_field" for a in d["approvals"])
-    )
-    a = next(a for a in d["approvals"] if a["status"] == "pending")
-    c.post(
+    a = until(c, job, "set_field")
+    response = c.post(
         "/api/approvals/" + a["id"],
         json={"decision": "correct", "arguments": {"field": "bank_account", "value": "hijack"}},
     )
-    d = wait_for(c, job, lambda d: d["job"]["status"] == "denied")
-    assert d["job"]["mutation"] == "not_attempted"
+    assert response.status_code == 200  # Preserve the attempted correction in the audit.
+    data = until(c, job, status="denied")
+    assert data["job"]["mutation"] == "not_attempted"
+    assert not any(
+        e["kind"] == "action_started" and e["data"]["invocation"] == a["invocation"] for e in data["events"]
+    )
 
 
-def test_restart_after_ambiguous_save_reconciles_without_second_save(browser_server):
-    ctx = browser_server
-    c = ctx["client"]
-    c.post("/api/mock/scenario", json={"interrupt_save": True})
-    job = create(c, "strict")
-    while True:
-        a = pending(c, job)
-        if a["name"] == "resume":
-            break
-        c.post("/api/approvals/" + a["id"], json={"decision": "approve"}).raise_for_status()
-    before = c.get("/api/mock/state").json()["save_requests"]
-    assert c.get("/api/jobs/" + job).json()["job"]["mutation"] == "attempted_uncertain"
+def restart(ctx):
     ctx["worker"].kill()
     ctx["worker"].wait()
-    # Advance only the synthetic lease clock, equivalent to waiting for the crash lease to expire.
     with ctx["store"].db() as db:
-        import json
-
         lease = json.loads(db.execute("SELECT data FROM lease").fetchone()[0])
         lease["expires"] = 0
         db.execute("UPDATE lease SET data=?", (canonical(lease),))
@@ -252,42 +247,16 @@ def test_restart_after_ambiguous_save_reconciles_without_second_save(browser_ser
         stdout=ctx["worker_log"],
         stderr=ctx["worker_log"],
     )
+
+
+def test_restart_after_ambiguous_save_never_saves_twice(browser_server):
+    c = browser_server["client"]
+    c.post("/api/mock/scenario", json={"interrupt_save": True})
+    job = create(c)
+    until(c, job, "resume_workflow")
+    before = c.get("/api/mock/state").json()["save_requests"]
+    assert c.get("/api/jobs/" + job).json()["job"]["mutation"] == "attempted_uncertain"
+    restart(browser_server)
     result = drive(c, job)
     assert result["job"]["mutation"] == "confirmed_succeeded"
     assert c.get("/api/mock/state").json()["save_requests"] == before
-
-
-@pytest.mark.parametrize("invoice,variant", [("INV-1043", "renamed"), ("INV-1044", "layout")])
-def test_improved_library_on_new_record(browser_server, invoice, variant):
-    if len(AMOUNT_LABELS) < 2:
-        pytest.skip("Candidate-only regression; improvement checkout enables reviewed labels")
-    ctx = browser_server
-    c = ctx["client"]
-    ctx["store"].put_value("release", {"version": "v2", "labels": list(AMOUNT_LABELS), "previous": None})
-    c.post("/api/mock/scenario", json={"variant": variant, "view": "invoices", "reordered": True})
-    result = drive(c, create(c, invoice=invoice))
-    assert result["job"]["fallback_count"] == 0
-    assert result["job"]["graph_version"] == "v2"
-
-
-def test_review_release_new_instance_and_rollback_in_isolated_demo(browser_server, candidate):
-    from enterprise_dev.improve import deploy, review, rollback
-
-    c, settings = browser_server["client"], browser_server["settings"]
-    c.post("/api/mock/scenario", json={"variant": "renamed"}).raise_for_status()
-    original = drive(c, create(c))
-    assert original["job"]["fallback_count"] > 0
-    with pytest.raises(PermissionError, match="approval"):
-        deploy(candidate, settings, settings.developer_token)
-    # Fixture-only developer decisions exercise the gate; no real PR is approved.
-    review(candidate, "approve", "Simulated isolated-test reviewer", settings.developer_token, settings)
-    assert deploy(candidate, settings, settings.developer_token)["version"] == "v2"
-    c.post(
-        "/api/mock/scenario", json={"variant": "layout", "view": "invoices", "reordered": True}
-    ).raise_for_status()
-    improved = drive(c, create(c, invoice="INV-1044"))
-    assert improved["job"]["fallback_count"] == improved["job"]["model_calls"] == 0
-    assert improved["job"]["graph_version"] == "v2"
-    assert c.get("/api/jobs/" + original["job"]["id"]).json()["job"]["graph_version"] == "v1"
-    assert rollback(settings, settings.developer_token)["version"] == "v1"
-    assert browser_server["store"].get_value("release")["version"] == "v1"

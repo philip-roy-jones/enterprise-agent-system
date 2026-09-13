@@ -132,7 +132,10 @@ def test_analysis_refuses_changed_graph_consumer(episode, tmp_path):
         (ROOT / "src/edge-harness/eas_harness/workflows/finance/procedures.py").read_text()
     )
     (tmp_path / "src/edge-harness/eas_harness/workflows/finance/graph.py").write_text(
-        (ROOT / "src/edge-harness/eas_harness/workflows/finance/graph.py")
+        (ROOT / "src/edge-harness/eas_harness/workflows/finance/graph.py").read_text()
+    )
+    (tmp_path / "src/edge-harness/eas_harness/workflows/finance/runtime.py").write_text(
+        (ROOT / "src/edge-harness/eas_harness/workflows/finance/runtime.py")
         .read_text()
         .replace('job["amount_labels"]', 'job["unrelated_labels"]')
     )
@@ -155,7 +158,7 @@ def test_analysis_uses_real_recorded_browser_correction(browser_server):
 
     c = browser_server["client"]
     c.post("/api/mock/scenario", json={"amount_label": LABEL}).raise_for_status()
-    response = c.post("/api/jobs", json={"invoice_id": "INV-1042", "selected_mode": "auto"})
+    response = c.post("/api/jobs", json={"invoice_id": "INV-1042", "selected_mode": "strict"})
     response.raise_for_status()
     job_id = response.json()["id"]
     drive(c, job_id, correction=True)

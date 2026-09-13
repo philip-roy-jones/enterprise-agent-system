@@ -33,4 +33,5 @@ class Settings:
     desktop_input_mode: str = os.getenv("EAS_DESKTOP_INPUT_MODE", "accessibility")
     headless: bool = os.getenv("EAS_HEADLESS", "true").lower() == "true"
     job_timeout: int = int(os.getenv("EAS_JOB_TIMEOUT_SECONDS", "900"))
+    learning_enabled: bool = os.getenv("EAS_LEARNING_ENABLED", "true").lower() == "true"
     max_model_calls: int = int(os.getenv("EAS_MAX_MODEL_CALLS", "12"))

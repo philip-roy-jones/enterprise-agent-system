@@ -26,15 +26,16 @@ def test_failed_refresh_never_relabels_historical_state_as_fresh(browser_server,
 
 def test_staff_assessment_updates_metrics_in_rendered_console(browser_server):
     c = browser_server["client"]
-    response = c.post("/api/jobs", json={"invoice_id": "INV-1042", "selected_mode": "auto"})
+    response = c.post(
+        "/api/chat", json={"invoice_id": "INV-1042", "task": "invoice_correction", "selected_mode": "strict"}
+    )
     response.raise_for_status()
-    job_id = response.json()["id"]
+    job_id = response.json()["job"]["id"]
     drive(c, job_id)
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(extra_http_headers={"Authorization": "Bearer test-staff"})
         page = context.new_page()
-        page.add_init_script(f"localStorage.setItem('active-job', '{job_id}')")
         page.goto(browser_server["url"])
         page.locator("#assessment-operation option").first.wait_for(state="attached")
         page.get_by_text("Assess an executed operation", exact=True).click()

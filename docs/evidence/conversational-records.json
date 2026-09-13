@@ -1,0 +1,261 @@
+[
+  {
+    "id": "2c26f4ce4c58441ca7967146bc7ed1c1",
+    "task": "How much does invoice INV-1042 cost?",
+    "status": "completed",
+    "result_kind": "verified_lookup",
+    "invoice_id": "INV-1042",
+    "model_mode": "live",
+    "model_binding": {
+      "max_retries": 0,
+      "max_tokens": 2048,
+      "mode": "live",
+      "model": "openai/gpt-5.6-luna",
+      "prompt_hash": "49cfb128b96232e615c8938710d976e510ab47a8c628b729375041e90a6c12f2",
+      "prompt_revision": "agent-coordinator-3-conversational-records",
+      "provider": "openrouter",
+      "temperature": "provider default",
+      "timeout_seconds": 20
+    },
+    "model_calls": 2,
+    "tokens": 3267,
+    "mutation": "not_attempted",
+    "staff_mode": "simulated decisions and synthetic messages",
+    "decisions": [
+      "select_record",
+      "read_invoice"
+    ],
+    "error": null,
+    "answers": [
+      "I\u2019ll identify invoice INV-1042 so I can check its current amount.",
+      "I\u2019ll read the bound invoice record to verify the amount shown for INV-1042.",
+      "Invoice INV-1042 totals $1,480.00."
+    ],
+    "workflow_states": [],
+    "lookup_evidence": {},
+    "invoice_evidence": {
+      "company_id": "ACME",
+      "invoice_amount": 148000,
+      "invoice_id": "INV-1042",
+      "observation_revision": "46D7B3021AE84E0714288A04CF67F84568C94A6F4AF73BAFF160D6EAFBB4C294",
+      "observed_at": 1789257704.988089
+    }
+  },
+  {
+    "id": "9c1cf9923c8549e6835821cf3a5955dd",
+    "task": "How much does invoice INV-5783 cost?",
+    "status": "completed",
+    "result_kind": "record_unavailable",
+    "invoice_id": "INV-5783",
+    "model_mode": "live",
+    "model_binding": {
+      "max_retries": 0,
+      "max_tokens": 2048,
+      "mode": "live",
+      "model": "openai/gpt-5.6-luna",
+      "prompt_hash": "49cfb128b96232e615c8938710d976e510ab47a8c628b729375041e90a6c12f2",
+      "prompt_revision": "agent-coordinator-3-conversational-records",
+      "provider": "openrouter",
+      "temperature": "provider default",
+      "timeout_seconds": 20
+    },
+    "model_calls": 2,
+    "tokens": 4622,
+    "mutation": "not_attempted",
+    "staff_mode": "simulated decisions and synthetic messages",
+    "decisions": [
+      "select_record",
+      "read_invoice"
+    ],
+    "error": null,
+    "answers": [
+      "I\u2019ll identify invoice INV-5783 so I can check its current cost.",
+      "I\u2019ll read the bound invoice record to verify the amount for INV-5783.",
+      "I couldn't find INV-5783 in the current invoice list. Please check the invoice number."
+    ],
+    "workflow_states": [],
+    "lookup_evidence": {
+      "company_id": "ACME",
+      "invoice_id": "INV-5783",
+      "observation_revision": "7E87CA4C3AE81DEB2D9D35F2117262EBFF5B712F9C01AA69E32A559286B70F82",
+      "observed_at": 1789257716.3886065,
+      "scope": "currently visible invoice list",
+      "visible_records": [
+        "INV-1042",
+        "INV-1043",
+        "INV-1044"
+      ]
+    },
+    "invoice_evidence": {}
+  },
+  {
+    "id": "d12d780eac574e67959f90ffaddc0300",
+    "task": "I want to compare an invoice with its purchase order without saving anything.",
+    "status": "completed",
+    "result_kind": "conversation",
+    "invoice_id": null,
+    "model_mode": "live",
+    "model_binding": {
+      "max_retries": 0,
+      "max_tokens": 2048,
+      "mode": "live",
+      "model": "openai/gpt-5.6-luna",
+      "prompt_hash": "49cfb128b96232e615c8938710d976e510ab47a8c628b729375041e90a6c12f2",
+      "prompt_revision": "agent-coordinator-3-conversational-records",
+      "provider": "openrouter",
+      "temperature": "provider default",
+      "timeout_seconds": 20
+    },
+    "model_calls": 1,
+    "tokens": 2641,
+    "mutation": "not_attempted",
+    "staff_mode": "simulated decisions and synthetic messages",
+    "decisions": [],
+    "error": null,
+    "answers": [
+      "Which invoice number should I compare with its purchase order?"
+    ],
+    "workflow_states": [],
+    "lookup_evidence": {},
+    "invoice_evidence": {}
+  },
+  {
+    "id": "5befa150d1524f70afb3e46f5b17e99b",
+    "task": "INV-1043",
+    "status": "completed",
+    "result_kind": "verified_work",
+    "invoice_id": "INV-1043",
+    "model_mode": "live",
+    "model_binding": {
+      "max_retries": 0,
+      "max_tokens": 2048,
+      "mode": "live",
+      "model": "openai/gpt-5.6-luna",
+      "prompt_hash": "49cfb128b96232e615c8938710d976e510ab47a8c628b729375041e90a6c12f2",
+      "prompt_revision": "agent-coordinator-3-conversational-records",
+      "provider": "openrouter",
+      "temperature": "provider default",
+      "timeout_seconds": 20
+    },
+    "model_calls": 3,
+    "tokens": 10914,
+    "mutation": "not_attempted",
+    "staff_mode": "simulated decisions and synthetic messages",
+    "decisions": [
+      "select_record",
+      "read_skill",
+      "run_workflow",
+      "validate",
+      "establish",
+      "compare",
+      "report",
+      "complete"
+    ],
+    "error": null,
+    "answers": [
+      "I\u2019ll identify invoice INV-1043 so I can compare it with its purchase order without saving a draft.",
+      "I\u2019ll load the reporting workflow that compares INV-1043 with its purchase order and reports the difference without saving.",
+      "The comparison workflow is applicable, so I\u2019ll start its approved validation-and-report sequence for INV-1043; it will not save a draft.",
+      "Verified INV-1043: invoice $2,640.00, purchase order $2,400.00, difference $240.00. No draft was saved. Ready for your acceptance."
+    ],
+    "workflow_states": [
+      {
+        "skill_id": "invoice_amount_difference_reporting",
+        "state": "completed",
+        "reason": ""
+      }
+    ],
+    "lookup_evidence": {},
+    "invoice_evidence": {}
+  },
+  {
+    "id": "f351b305be0c454d9dc7fd94676b6499",
+    "task": "How much does invoice INV-1044 cost?",
+    "status": "rejected",
+    "result_kind": null,
+    "invoice_id": null,
+    "model_mode": "live",
+    "model_binding": {
+      "max_retries": 0,
+      "max_tokens": 2048,
+      "mode": "live",
+      "model": "openai/gpt-5.6-luna",
+      "prompt_hash": "49cfb128b96232e615c8938710d976e510ab47a8c628b729375041e90a6c12f2",
+      "prompt_revision": "agent-coordinator-3-conversational-records",
+      "provider": "openrouter",
+      "temperature": "provider default",
+      "timeout_seconds": 20
+    },
+    "model_calls": 1,
+    "tokens": 4413,
+    "mutation": "not_attempted",
+    "staff_mode": "simulated decisions and synthetic messages",
+    "decisions": [
+      "select_record"
+    ],
+    "error": null,
+    "answers": [
+      "I\u2019ll identify invoice INV-1044 so I can check its current cost."
+    ],
+    "workflow_states": [],
+    "lookup_evidence": {},
+    "invoice_evidence": {}
+  },
+  {
+    "id": "eee8718b0c7244f2b6fbcf86c39f8919",
+    "task": "Report the discrepancy for invoice INV-5799 without saving.",
+    "status": "completed",
+    "result_kind": "record_unavailable",
+    "invoice_id": "INV-5799",
+    "model_mode": "live",
+    "model_binding": {
+      "max_retries": 0,
+      "max_tokens": 2048,
+      "mode": "live",
+      "model": "openai/gpt-5.6-luna",
+      "prompt_hash": "49cfb128b96232e615c8938710d976e510ab47a8c628b729375041e90a6c12f2",
+      "prompt_revision": "agent-coordinator-3-conversational-records",
+      "provider": "openrouter",
+      "temperature": "provider default",
+      "timeout_seconds": 20
+    },
+    "model_calls": 3,
+    "tokens": 16260,
+    "mutation": "not_attempted",
+    "staff_mode": "simulated decisions and synthetic messages",
+    "decisions": [
+      "select_record",
+      "read_skill",
+      "run_workflow",
+      "validate",
+      "establish"
+    ],
+    "error": null,
+    "answers": [
+      "I\u2019ll identify invoice INV-5799 so I can report its discrepancy against the purchase order without saving a draft.",
+      "I\u2019ll load the reporting workflow for INV-5799, which reports the invoice amount, purchase-order amount, and arithmetic difference without saving.",
+      "The reporting workflow is loaded; I\u2019ll run its validation, comparison, and reporting steps for INV-5799 without saving.",
+      "I couldn't find INV-5799 in the current invoice list. Please check the invoice number."
+    ],
+    "workflow_states": [
+      {
+        "skill_id": "invoice_amount_difference_reporting",
+        "state": "record_unavailable",
+        "reason": "I couldn't find INV-5799 in the current invoice list. Please check the invoice number."
+      }
+    ],
+    "lookup_evidence": {
+      "company_id": "ACME",
+      "invoice_id": "INV-5799",
+      "observation_revision": "F7B9C6D3E3C1BB6EFB87168BA15634BB751129D74500579CDFEADDF30D696FA5",
+      "observed_at": 1789257770.9826403,
+      "scope": "currently visible invoice list",
+      "visible_records": [
+        "INV-1042",
+        "INV-1043",
+        "INV-1044"
+      ]
+    },
+    "invoice_evidence": {}
+  }
+]

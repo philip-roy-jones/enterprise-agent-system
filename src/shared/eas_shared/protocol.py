@@ -1,6 +1,9 @@
 """Methods exposed by the authenticated worker RPC endpoint."""
 
 WORKER_METHODS = {
+    "learning_claim",
+    "learning_finish",
+    "skills_publish",
     "get_job",
     "update_job",
     "event",
@@ -20,4 +23,6 @@ WORKER_METHODS = {
     "search_knowledge",
     "conversation",
     "ask_staff",
+    "bind_record",
+    "report_capability_gap",
 }

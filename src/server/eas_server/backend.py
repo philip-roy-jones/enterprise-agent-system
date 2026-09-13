@@ -1,6 +1,7 @@
 from pathlib import Path
 import asyncio
 import hmac
+import hashlib
 import json
 import re
 import time
@@ -111,13 +112,109 @@ def create_app(settings=None):
 
         return [role.public() for role in load_roles().values()]
 
+    def chat_scope(body, actor):
+        from eas_server.roles import get_role
+
+        values = get_role(body.role_id).normalize(body.model_dump(), allow_unbound=True)
+        key = {k: values[k] for k in ("organization_id", "department_id", "role_id", "company_id")}
+        # The prototype has one authenticated staff principal and one developer
+        # principal. Token rotation does not change their conversation identity.
+        key["staff_id"] = actor
+        return "ongoing-" + hashlib.sha256(json.dumps(key, sort_keys=True).encode()).hexdigest()
+
+    @app.get("/api/chat")
+    def current_chat(role_id: str = "invoice_correction", company_id: str = "ACME", actor=Depends(staff)):
+        body = JobInput(role_id=role_id, company_id=company_id)
+        conversation_id = chat_scope(body, actor)
+        requests = [
+            j
+            for j in store.list_jobs()
+            if j.get("conversation_id") == conversation_id and j.get("staff_id") == actor
+        ]
+        return {"conversation_id": conversation_id, "current": requests[0] if requests else None}
+
+    @app.post("/api/chat")
+    def send_chat(body: JobInput, actor=Depends(staff)):
+        from eas_server.roles import get_role
+
+        if not body.task or not body.task.strip():
+            raise ValueError("A chat message is required")
+        values = get_role(body.role_id).normalize(body.model_dump(), allow_unbound=True)
+        values["conversation_id"] = chat_scope(body, actor)
+        values["request_id"] = values.get("request_id") or uid()
+        # A retried guidance delivery stays guidance even after its request ends.
+        with store.db() as db:
+            delivered = db.execute(
+                "SELECT e.data,j.data FROM events e JOIN jobs j ON j.id=e.job_id WHERE e.kind='staff_message' AND json_extract(e.data,'$.message_id')=? AND json_extract(j.data,'$.conversation_id')=?",
+                (values["request_id"], values["conversation_id"]),
+            ).fetchone()
+            if delivered:
+                message, previous = json.loads(delivered[0]), json.loads(delivered[1])
+                if message["text"] != body.task or (
+                    values.get("invoice_id") is not None and previous["invoice_id"] != values["invoice_id"]
+                ):
+                    raise ValueError("Message identity reused with different inputs")
+                return {"job": previous, "kind": "guidance"}
+        try:
+            result = store.create_job(
+                values, settings.model_mode, settings.job_timeout, staff_id=actor, ongoing=True
+            )
+            return {"job": result, "kind": "request"}
+        except Stale:
+            current = next(
+                (
+                    j
+                    for j in store.list_jobs()
+                    if j.get("conversation_id") == values["conversation_id"] and j["status"] not in TERMINAL
+                ),
+                None,
+            )
+            if not current:
+                raise
+            if values.get("invoice_id") is not None and current["invoice_id"] != values["invoice_id"]:
+                raise Stale("Finish or cancel the current request before changing its record")
+            conversation = Conversation(store)
+            question = next(
+                (
+                    q
+                    for q in conversation.read(current["id"], require_read=False)["questions"]
+                    if q["status"] == "pending"
+                ),
+                None,
+            )
+            conversation.message(
+                current["id"],
+                {
+                    "text": body.task or "",
+                    "message_id": values["request_id"],
+                    "reply_to": question["question_id"] if question else None,
+                },
+            )
+            return {"job": store.get_job(current["id"]), "kind": "guidance"}
+
+    @app.get("/api/conversations", dependencies=[Depends(staff)])
+    def conversations():
+        groups = {}
+        for job in store.list_jobs():
+            groups.setdefault(job.get("conversation_id", job["id"]), []).append(job)
+        return [{"id": key, "requests": list(reversed(jobs))} for key, jobs in groups.items()]
+
+    @app.get("/api/learning", dependencies=[Depends(staff)])
+    def learning():
+        return store.learning_status()
+
+    @app.post("/api/skills/{skill_id}/change", dependencies=[Depends(staff)])
+    async def skill_change(skill_id: str, request: Request):
+        body = await request.json()
+        return store.skill_command(skill_id, body.get("version"))
+
     @app.get("/api/jobs", dependencies=[Depends(staff)])
     def jobs():
         return store.list_jobs()
 
-    @app.post("/api/jobs", dependencies=[Depends(staff)])
-    def create_job(body: JobInput):
-        return store.create_job(body.model_dump(), settings.model_mode, settings.job_timeout)
+    @app.post("/api/jobs")
+    def create_job(body: JobInput, actor=Depends(staff)):
+        return store.create_job(body.model_dump(), settings.model_mode, settings.job_timeout, staff_id=actor)
 
     @app.get("/api/jobs/{job_id}", dependencies=[Depends(staff)])
     def get_job(job_id: str):
@@ -255,6 +352,11 @@ def create_app(settings=None):
         if method not in WORKER_METHODS:
             raise HTTPException(403, "Worker method not permitted")
         body = await request.json()
+        if method in {"learning_claim", "learning_finish", "skills_publish"}:
+            body.setdefault("kwargs", {})["scope"] = {
+                "organization_id": settings.worker_organization_id,
+                "role_ids": list(settings.worker_role_ids),
+            }
         if method == "claim":
             args = body.get("args", [])
             if len(args) != 1 or body.get("kwargs"):
@@ -265,7 +367,13 @@ def create_app(settings=None):
                 args[0],
                 {"organization_id": settings.worker_organization_id, "role_ids": settings.worker_role_ids},
             )
-        if method in {"search_knowledge", "conversation", "ask_staff"}:
+        if method in {
+            "search_knowledge",
+            "conversation",
+            "ask_staff",
+            "bind_record",
+            "report_capability_gap",
+        }:
             args, kwargs = body.get("args", []), body.get("kwargs", {})
             if len(args) != (1 if method == "conversation" else 2) or kwargs:
                 raise ValueError("Expected job identifier and only the declared tool arguments")

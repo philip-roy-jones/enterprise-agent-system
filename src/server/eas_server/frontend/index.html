@@ -40,10 +40,10 @@
               <div class="eyebrow" id="page-eyebrow">WORKER CONSOLE</div>
               <h1 id="page-title">Work, with oversight.</h1>
               <p class="muted" id="page-description">
-                Run a procedure. Review the unexpected. Teach the next run.
+                Describe the outcome. Approve the work. Teach the next request.
               </p>
             </div>
-            <button class="primary" id="new-job">＋ New job</button>
+            <button class="primary" id="new-job">＋ New request</button>
           </div>
           <section class="overview-grid" id="job-overview">
             <div class="overview-card">
@@ -56,7 +56,7 @@
             <div class="overview-card">
               <span>Desktop control</span
               ><strong id="control-label">Available</strong
-              ><small id="control-detail">Waiting for a job</small>
+              ><small id="control-detail">Waiting for a request</small>
             </div>
             <div class="overview-card">
               <span>Effective approval mode</span
@@ -66,23 +66,27 @@
               >
             </div>
           </section>
+          <section class="panel" id="chat-composer">
+            <h2>Talk to your worker</h2>
+            <p class="muted">Describe the work in your own words, including any relevant records. Your worker will ask when something is unclear and request approval before acting.</p>
+            <button type="button" id="earlier-messages" class="history-button" hidden>Load earlier messages</button>
+            <div id="session-messages" class="session-messages" role="log" aria-label="Conversation history" aria-live="polite" aria-relevant="additions text"></div><form id="chat-form" class="message-form">
+              <textarea id="chat-request" required maxlength="2000" rows="2" placeholder="For example: compare invoice INV-1043 with its purchase order without saving…" aria-label="New work request"></textarea>
+              <button class="primary">Send</button>
+
+            </form>
+            <p id="conversation-label" class="hint"></p>
+          </section>
+          <section class="panel" id="learning-panel"><details><summary>Accumulated skills & learning</summary><div id="learning-content"></div></details></section>
           <div id="main-view" class="console-grid">
-            <section class="panel queue-panel">
-              <div class="panel-heading">
-                <h2>Jobs</h2>
-                <span id="job-count" class="badge">0</span>
-              </div>
-              <div id="job-list"></div>
-            </section>
             <section class="job-detail">
               <div id="empty" class="panel empty-state">
                 <div class="empty-icon">◫</div>
                 <h2>Your worker is ready.</h2>
                 <p>
-                  Choose a department workflow to begin.<br />Every new job
-                  starts in Strict mode.
+                  Describe a task in the conversation above. Every operation requires your approval.
                 </p>
-                <button class="primary" id="first-job">Create a job</button>
+                <button class="primary" id="first-job">Create a request</button>
               </div>
               <div id="active-job" hidden>
                 <section class="panel">
@@ -94,20 +98,14 @@
                     <span class="badge" id="job-status"></span>
                   </div>
                   <div class="job-toolbar">
-                    <label
-                      >Selected mode
-                      <select id="job-mode">
-                        <option value="strict">Strict</option>
-                        <option value="auto">Auto</option>
-                      </select></label
-                    ><button id="takeover">Take control</button
+                    <button id="takeover">Take control</button
                     ><button id="cancel-job" class="danger-text">
-                      Cancel job</button
+                      Cancel request</button
                     ><button id="accept-job" class="primary" hidden>
                       Accept completed work
                     </button>
                   </div>
-                  <div id="progress" class="progress-track"></div>
+                  <div id="workflow-runs"></div><div id="progress" class="progress-track"></div>
                   <p id="job-error" role="alert"></p>
                 </section>
                 <section class="panel review-panel" id="review-panel">
@@ -151,15 +149,18 @@
                 </section>
                 <section class="panel">
                   <div class="panel-heading">
-                    <h2>Activity & conversation</h2>
+                    <h2>Agent decisions & tool activity</h2>
                     <a id="episode-link" target="_blank">Export episode ↗</a>
                   </div>
-                  <div id="timeline" class="timeline"></div>
+                  <p class="hint">Expand a call to inspect its purpose, arguments, results and evidence. Agent tools and internal workflow steps are shown separately.</p>
+                  <div class="activity-controls"><label>Show<select id="activity-filter"><option value="all">All activity</option><option value="decisions">Agent decisions</option><option value="tools">Tools & operations</option><option value="approvals">Approvals</option><option value="recovery">Errors & recovery</option><option value="evidence">Observations</option><option value="session">Session & context</option></select></label><label>Find<input id="activity-search" type="search" placeholder="Tool, record, run ID, or error…" /></label></div>
+                  <p id="activity-counts" class="hint"></p>
+                  <div id="timeline" class="timeline" aria-label="Detailed agent activity"></div>
                   <p id="staff-question" role="status" hidden></p>
                   <form id="message-form" class="message-form">
                     <input
                       id="message"
-                      aria-label="Message to the job conversation"
+                      aria-label="Message to the request conversation"
                       placeholder="Add context or a review note…"
                       required
                     /><button type="submit">Send</button>
@@ -183,8 +184,7 @@
         <footer class="app-footer">
           Enterprise Agent System prototype
           <span
-            >Verified procedures. Supervised assistance. Developer-reviewed
-            improvements.</span
+            >Verified procedures. Supervised assistance. Automatically tested learning.</span
           >
         </footer>
       </div>
@@ -192,7 +192,7 @@
     <dialog id="job-dialog">
       <form id="job-form">
         <div class="title-row">
-          <h2>New job</h2>
+          <h2>New request</h2>
           <button type="button" id="close-dialog" aria-label="Close">×</button>
         </div>
         <p class="muted">Choose a worker and describe the outcome. Unfamiliar requests go to supervised assistance.</p>
@@ -205,11 +205,6 @@
             <option value="INV-1042">INV-1042 · Northstar Office Supply</option>
             <option value="INV-1043">INV-1043 · Cedar IT Services</option>
             <option value="INV-1044">INV-1044 · Atlas Packaging</option>
-          </select></label
-        ><label
-          >Approval mode<select id="mode">
-            <option value="strict">Strict — approve every operation</option>
-            <option value="auto">Auto — approve only assistance tools</option>
           </select></label
         ><label id="scenario-input"
           >Demonstration condition<select id="scenario">
@@ -229,10 +224,9 @@
           </select></label
         >
         <p class="hint">
-          Assistance always requires individual tool approvals, even in Auto
-          mode.
+          Every tool and workflow operation requires your approval.
         </p>
-        <button class="primary wide" type="submit">Create job</button>
+        <button class="primary wide" type="submit">Send request</button>
       </form>
     </dialog>
     <dialog id="login-dialog">
@@ -257,6 +251,8 @@
       </form>
     </dialog>
     <div id="toast" role="status" hidden></div>
+    <script src="/static/activity.js"></script>
+    <script src="/static/learning.js"></script>
     <script src="/static/app.js"></script>
   </body>
 </html>

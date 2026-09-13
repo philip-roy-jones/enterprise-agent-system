@@ -1,7 +1,21 @@
 """Public workflow descriptions and job input validation, with no runtime factories."""
 
 from dataclasses import dataclass
-from pydantic import BaseModel, Field
+from copy import deepcopy
+from functools import lru_cache
+from pydantic import BaseModel, Field, create_model
+
+
+@lru_cache
+def conversation_inputs(model, record_field):
+    """Defer only the record; all other role validation still applies."""
+    field = deepcopy(model.model_fields[record_field])
+    field.default = None
+    return create_model(
+        f"{model.__name__}Conversation",
+        __base__=model,
+        **{record_field: (field.annotation | None, field)},
+    )
 
 
 class InvoiceCorrectionInputs(BaseModel):
@@ -21,13 +35,16 @@ class RoleDefinition:
     record_field: str
     stages: tuple[str, ...] = ()
 
-    def normalize(self, job):
+    def normalize(self, job, *, allow_unbound=False):
         values = dict(job.get("inputs", {}))
         # Compatibility with the original invoice-demo API, confined to this role's schema.
         for field in self.input_model.model_fields:
             if job.get(field) is not None and field not in values:
                 values[field] = job[field]
-        inputs = self.input_model.model_validate(values).model_dump()
+        model = (
+            conversation_inputs(self.input_model, self.record_field) if allow_unbound else self.input_model
+        )
+        inputs = model.model_validate(values).model_dump()
         if job["department_id"] != self.department_id:
             raise PermissionError("Workflow does not belong to the requested department")
         permissions = job.get("permissions") if job.get("permissions") is not None else list(self.permissions)
@@ -38,7 +55,7 @@ class RoleDefinition:
             inputs=inputs,
             permissions=permissions,
             task=job.get("task") or self.id,
-            record_id=str(inputs[self.record_field]),
+            record_id=str(inputs[self.record_field]) if inputs[self.record_field] is not None else None,
             role_name=self.name,
             department_name=self.department_name,
             application=self.application,

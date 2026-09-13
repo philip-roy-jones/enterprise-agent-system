@@ -41,6 +41,7 @@ def server(tmp_path_factory):
         EAS_HEADLESS="true",
         EAS_DESKTOP_ADAPTER="browser",
         EAS_JOB_TIMEOUT_SECONDS="120",
+        EAS_MAX_MODEL_CALLS="32",
     )
     root = Path(__file__).resolve().parents[1]
     backend_log = open(data_dir / "backend.log", "w")
@@ -125,6 +126,21 @@ def browser_server(server):
     for job in client.get("/api/jobs").json():
         if job["status"] not in {"completed", "failed", "denied", "rejected", "cancelled"}:
             client.post(f"/api/jobs/{job['id']}/cancel")
+    # Each test owns its skill catalog; multi-session learning stays within a test.
+    deadline = time.monotonic() + 15
+    while (
+        any(i["status"] == "running" for i in server["store"].learning_status()["queue"])
+        and time.monotonic() < deadline
+    ):
+        time.sleep(0.1)
+    with server["store"].db() as db:
+        db.execute("DELETE FROM maintenance")
+    from eas_harness.skill_library import SkillLibrary
+
+    library = SkillLibrary(server["data_dir"])
+    with library.db() as db:
+        for table in ("versions", "active", "changes", "processed", "dependencies"):
+            db.execute("DELETE FROM " + table)
     server["store"].put_value("release", {"version": "v1", "labels": ["Correction amount"], "previous": None})
     client.post(
         "/api/mock/scenario",
@@ -221,3 +237,19 @@ def candidate(tmp_path, request):
     }
     (folder / "manifest.json").write_text(json.dumps(manifest))
     return folder
+
+
+def approve_operation(layer, *args, **kwargs):
+    """Explicit simulated staff decision through the real approval ledger."""
+    from eas_harness.errors import Paused
+
+    try:
+        return layer.run(*args, **kwargs)
+    except Paused:
+        approval = next(
+            a
+            for a in layer.store.approvals(args[0])
+            if a["status"] == "pending" and a["invocation"] == args[1]
+        )
+        layer.store.decide(approval["id"], {"decision": "approve"}, actor="simulated-staff")
+        return layer.run(*args, **kwargs)

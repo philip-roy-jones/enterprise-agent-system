@@ -10,7 +10,10 @@ from eas_shared.identity import canonical, uid
 from eas_shared.types import TERMINAL, Stale, Stopped
 
 
-class Store:
+from eas_server.learning import LearningStore
+
+
+class Store(LearningStore):
     def __init__(self, data_dir: Path):
         self.root = Path(data_dir)
         self.root.mkdir(parents=True, exist_ok=True)
@@ -23,6 +26,7 @@ class Store:
             CREATE TABLE IF NOT EXISTS invocations(id TEXT PRIMARY KEY, job_id TEXT, result TEXT);
             CREATE TABLE IF NOT EXISTS lease(id INTEGER PRIMARY KEY CHECK(id=1), data TEXT);
             CREATE TABLE IF NOT EXISTS kv(key TEXT PRIMARY KEY, data TEXT);
+            CREATE TABLE IF NOT EXISTS maintenance(id TEXT PRIMARY KEY, data TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS knowledge(id TEXT PRIMARY KEY, data TEXT NOT NULL);
             """)
             db.execute(
@@ -56,14 +60,18 @@ class Store:
         return json.loads(row[0])
 
     def _put(self, db, job):
+        newly_terminal = False
         if job["status"] in TERMINAL and not job.get("ended_at"):
             previous = db.execute("SELECT data FROM jobs WHERE id=?", (job["id"],)).fetchone()
             if not previous or json.loads(previous[0])["status"] not in TERMINAL:
                 job["ended_at"] = time.time()
+                newly_terminal = True
                 job["elapsed_seconds"] = (
                     round(max(0, job["ended_at"] - job["started_at"]), 2) if job.get("started_at") else 0
                 )
         db.execute("INSERT OR REPLACE INTO jobs VALUES(?,?)", (job["id"], canonical(job)))
+        if newly_terminal:
+            self.learning_terminal(db, job)
 
     def _event(self, db, job_id, kind, data):
         db.execute(
@@ -71,11 +79,48 @@ class Store:
             (job_id, kind, time.time(), canonical(data)),
         )
 
-    def create_job(self, inputs, model_mode="simulated", timeout=900):
+    def create_job(self, inputs, model_mode="simulated", timeout=900, *, staff_id="staff", ongoing=False):
         from eas_server.roles import get_role
 
-        inputs = get_role(inputs.get("role_id", "invoice_correction")).normalize(inputs)
+        role = get_role(inputs.get("role_id", "invoice_correction"))
+        inputs = role.normalize(inputs, allow_unbound=ongoing and role.id == "invoice_correction")
+        if inputs.get("selected_mode", "strict") != "strict":
+            raise ValueError("Auto mode has been removed; staff approval is required")
+        inputs["selected_mode"] = "strict"
+        inputs["staff_id"] = staff_id
+        request_fields = (
+            "conversation_id",
+            "staff_id",
+            "task",
+            "organization_id",
+            "role_id",
+            "inputs",
+            "permissions",
+        )
+        request_payload = {k: inputs.get(k) for k in request_fields}
         with self.db() as db:
+            if inputs.get("request_id"):
+                for row in db.execute(
+                    "SELECT data FROM jobs WHERE json_extract(data,'$.request_id')=?", (inputs["request_id"],)
+                ):
+                    previous = json.loads(row[0])
+                    if any(
+                        previous.get("request_payload", previous).get(k) != inputs.get(k)
+                        for k in request_fields
+                    ):
+                        raise ValueError("Request identity reused with different inputs")
+                    return previous
+            if (
+                ongoing
+                and db.execute(
+                    "SELECT 1 FROM jobs WHERE json_extract(data,'$.conversation_id')=? AND json_extract(data,'$.status') NOT IN ('completed','failed','denied','cancelled','rejected')",
+                    (inputs["conversation_id"],),
+                ).fetchone()
+            ):
+                raise Stale("A request is already active in this conversation")
+            if not inputs.get("conversation_id"):
+                inputs["conversation_id"] = uid()
+            inputs["request_id"] = inputs.get("request_id") or uid()
             release = json.loads(db.execute("SELECT data FROM kv WHERE key='release'").fetchone()[0])
             job = dict(
                 inputs,
@@ -83,6 +128,9 @@ class Store:
                 status="queued",
                 effective_mode=inputs["selected_mode"],
                 controller="script",
+                execution_engine="agent-led-1",
+                conversation_request=ongoing,
+                request_payload=request_payload,
                 created_at=time.time(),
                 started_at=None,
                 timeout=timeout,
@@ -107,6 +155,57 @@ class Store:
             self._put(db, job)
             self._event(db, job["id"], "job_created", job)
             return job
+
+    def bind_record(self, job_id, invoice_id):
+        """Resolve an unbound chat request only inside its exact approved tool call."""
+        from eas_server.roles import get_role
+
+        with self.db() as db:
+            job = self._job(db, job_id)
+            lease = json.loads(db.execute("SELECT data FROM lease WHERE id=1").fetchone()[0])
+            self._check(job, lease, "assistant", lease["epoch"])
+            row = db.execute(
+                "SELECT data FROM approvals WHERE job_id=? AND invocation=? ORDER BY rowid DESC LIMIT 1",
+                (job_id, lease["inflight"]),
+            ).fetchone()
+            approval = json.loads(row[0]) if row else {}
+            if (
+                not job.get("conversation_request")
+                or job["role_id"] != "invoice_correction"
+                or "read" not in job["permissions"]
+                or approval.get("status") != "executing"
+                or approval.get("name") != "select_record"
+                or approval.get("epoch") != lease["epoch"]
+                or approval.get("corrected_arguments", approval.get("arguments"))
+                != {"invoice_id": invoice_id}
+            ):
+                raise PermissionError("Selecting a record requires approval of that exact tool call")
+            if job.get("record_id") is not None and job["record_id"] != invoice_id:
+                raise PermissionError("An active request cannot switch records")
+            if job.get("record_id") is None:
+                normalized = get_role(job["role_id"]).normalize(
+                    {
+                        **job,
+                        "invoice_id": invoice_id,
+                        "inputs": {**job["inputs"], "invoice_id": invoice_id},
+                    }
+                )
+                job.update({k: normalized[k] for k in ("inputs", "invoice_id", "record_id")})
+                self._put(db, job)
+                self._event(
+                    db, job_id, "record_selected", {"invoice_id": invoice_id, "invocation": lease["inflight"]}
+                )
+            value = {"data": {"company_id": job["company_id"], "invoice_id": job["invoice_id"]}}
+            # Scope and the consumed approval/result are one commit. Losing the
+            # RPC response cannot lose a staff correction or strand the lease.
+            self._finish_action(
+                db,
+                job_id,
+                lease["inflight"],
+                {"value": value, "after": approval["observation"]},
+                approval["id"],
+            )
+            return value
 
     def get_job(self, job_id):
         with self.db() as db:
@@ -135,6 +234,14 @@ class Store:
             "assistant_report",
             "operation_failures",
             "model_guidance_revision",
+            "model_binding",
+            "result_kind",
+            "workflow_runs",
+            "execution_state",
+            "verified_report",
+            "skill_reads",
+            "operation_trace",
+            "record_lookup",
         }
         if set(updates) - allowed:
             raise ValueError("Worker cannot change authorization or pinned version")
@@ -142,6 +249,8 @@ class Store:
             job = self._job(db, job_id)
             if job["status"] in TERMINAL:
                 raise Stopped(job["status"])
+            if "effective_mode" in updates and updates["effective_mode"] != "strict":
+                raise ValueError("Only Strict approval is supported")
             job.update(updates)
             if job["status"] in TERMINAL:
                 self._invalidate(db, job_id)
@@ -196,6 +305,16 @@ class Store:
             if lease["job_id"]:
                 job = self._job(db, lease["job_id"])
                 if job["status"] not in TERMINAL:
+                    if (
+                        job.get("selected_mode") != "strict"
+                        or job.get("effective_mode") != "strict"
+                        or job.get("pending_mode") == "auto"
+                    ):
+                        job.update(status="cancelled", error="Auto mode retired; submit a new Strict request")
+                        self._invalidate(db, job["id"])
+                        self._put(db, job)
+                        self._event(db, job["id"], "approval_policy_migrated", {"policy": "strict"})
+                        return None
                     if not authorized(job):
                         return None
                     if lease.get("worker_id") != worker_id and lease["expires"] > time.time():
@@ -221,7 +340,16 @@ class Store:
             job = next((job for job in jobs if authorized(job)), None)
             if job is None:
                 return None
-            job.update(status="running", started_at=time.time())
+            if (
+                job.get("selected_mode") != "strict"
+                or job.get("effective_mode") != "strict"
+                or job.get("pending_mode") == "auto"
+            ):
+                job.update(status="cancelled", error="Auto mode retired; submit a new Strict request")
+                self._put(db, job)
+                self._event(db, job["id"], "approval_policy_migrated", {"policy": "strict"})
+                return None
+            job.update(status="running", execution_state="running", started_at=time.time())
             lease.update(
                 job_id=job["id"],
                 owner="script",
@@ -335,16 +463,14 @@ class Store:
             self._invalidate(db, job_id)
             lease.update(owner=owner, epoch=lease["epoch"] + 1, expires=time.time() + 30)
             self._set_lease(db, lease)
-            job.update(
-                controller=owner, effective_mode="strict" if owner != "script" else job["selected_mode"]
-            )
+            job.update(controller=owner, effective_mode="strict")
             self._put(db, job)
             self._event(db, job_id, "control_transferred", dict(owner=owner, epoch=lease["epoch"]))
             return lease
 
     def mode(self, job_id, mode):
-        if mode not in {"strict", "auto"}:
-            raise ValueError("Invalid mode")
+        if mode != "strict":
+            raise ValueError("Auto mode has been removed; staff approval is required")
         with self.db() as db:
             job = self._job(db, job_id)
             if job["status"] in TERMINAL:
@@ -357,10 +483,7 @@ class Store:
     def boundary(self, job_id):
         with self.db() as db:
             job = self._job(db, job_id)
-            if job["pending_mode"]:
-                job.update(selected_mode=job["pending_mode"], pending_mode=None)
-                self._put(db, job)
-            job["effective_mode"] = "strict" if job["controller"] != "script" else job["selected_mode"]
+            job.update(selected_mode="strict", effective_mode="strict", pending_mode=None)
             self._put(db, job)
             return job
 
@@ -475,7 +598,7 @@ class Store:
                     raise Stale("Executable action differs from approved proposal")
                 a.update(status="executing", executed_action=action)
                 db.execute("UPDATE approvals SET data=? WHERE id=?", (canonical(a), approval_id))
-            elif owner == "assistant" or job["effective_mode"] == "strict":
+            else:
                 raise Stale("Approval required by shared execution layer")
             lease["inflight"] = invocation
             self._set_lease(db, lease)
@@ -483,22 +606,23 @@ class Store:
 
     def finish_action(self, job_id, invocation, result, approval_id=None, cache=True):
         with self.db() as db:
-            if cache:
-                db.execute(
-                    "INSERT OR REPLACE INTO invocations VALUES(?,?,?)",
-                    (invocation, job_id, canonical(result)),
-                )
-            lease = json.loads(db.execute("SELECT data FROM lease WHERE id=1").fetchone()[0])
-            if lease["inflight"] == invocation:
-                lease["inflight"] = None
-                self._set_lease(db, lease)
-            if approval_id:
-                a = json.loads(
-                    db.execute("SELECT data FROM approvals WHERE id=?", (approval_id,)).fetchone()[0]
-                )
-                a.update(status="executed", observed_result=result)
-                db.execute("UPDATE approvals SET data=? WHERE id=?", (canonical(a), approval_id))
-            self._event(db, job_id, "action_result", dict(invocation=invocation, result=result))
+            self._finish_action(db, job_id, invocation, result, approval_id, cache)
+
+    def _finish_action(self, db, job_id, invocation, result, approval_id=None, cache=True):
+        if cache:
+            db.execute(
+                "INSERT OR REPLACE INTO invocations VALUES(?,?,?)",
+                (invocation, job_id, canonical(result)),
+            )
+        lease = json.loads(db.execute("SELECT data FROM lease WHERE id=1").fetchone()[0])
+        if lease["inflight"] == invocation:
+            lease["inflight"] = None
+            self._set_lease(db, lease)
+        if approval_id:
+            a = json.loads(db.execute("SELECT data FROM approvals WHERE id=?", (approval_id,)).fetchone()[0])
+            a.update(status="executed", observed_result=result)
+            db.execute("UPDATE approvals SET data=? WHERE id=?", (canonical(a), approval_id))
+        self._event(db, job_id, "action_result", dict(invocation=invocation, result=result))
 
     def result(self, invocation):
         with self.db() as db:
@@ -519,6 +643,25 @@ class Store:
             if "incorrect" in assessments.values():
                 raise ValueError("Resolve reported incorrect operations before accepting this episode")
             job["accepted"] = True
+            reviewed = db.execute(
+                "SELECT 1 FROM approvals WHERE job_id=? AND json_extract(data,'$.name')='review_discovery' AND json_extract(data,'$.status')='executed'",
+                (job_id,),
+            ).fetchone()
+            if (
+                job.get("operation_trace")
+                and (job.get("verified_report") or job["mutation"] == "confirmed_succeeded")
+            ) or (job.get("result_kind") == "reviewed_outcome" and reviewed):
+                item = dict(
+                    id=job_id,
+                    kind="learn",
+                    job_id=job_id,
+                    organization_id=job["organization_id"],
+                    role_id=job["role_id"],
+                    status="queued",
+                    created_at=time.time(),
+                    related_job_ids=self.related_learning_jobs(db, job),
+                )
+                db.execute("INSERT OR IGNORE INTO maintenance VALUES(?,?)", (job_id, canonical(item)))
             self._put(db, job)
             self._event(db, job_id, "staff_accepted", {})
             return job

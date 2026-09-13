@@ -1,7 +1,8 @@
+from eas_shared.skills import SkillRead, SkillResource, WorkflowCall, WorkflowResume, ToolResult
 from dataclasses import dataclass, replace
 from pydantic import BaseModel
 import math
-from eas_harness.contracts import NODE_RESULTS, TOOL_CONTRACTS, NodeInputs, ReviewInputs
+from eas_harness.contracts import NODE_RESULTS, TOOL_CONTRACTS, NodeInputs, ReviewInputs, Invoice
 
 
 @dataclass(frozen=True)
@@ -31,6 +32,14 @@ class Operation:
 
 
 OPERATIONS = {
+    "select_record": Operation(
+        "Use the disclosed invoice for the work requested in this conversation",
+        "The request is bound to this invoice; application actions each require their own approval",
+        desktop=False,
+        conditions="Unbound conversational request; authorized company and role",
+        input_model=Invoice,
+        output_model=ToolResult,
+    ),
     "ask_staff": Operation(
         "Ask the staff member the disclosed question and wait for their answer",
         "A durable question in this job's conversation; an answer never authorizes a desktop action",
@@ -124,3 +133,42 @@ for name, output in NODE_RESULTS.items():
     )
 for name, (inputs, outputs) in TOOL_CONTRACTS.items():
     OPERATIONS[name] = replace(OPERATIONS[name], input_model=inputs, output_model=outputs)
+
+# Agent-led orchestration uses the same authority and typed result contracts.
+for name, schema, description in [
+    ("read_skill", SkillRead, "Read the disclosed version of a skill within this job's scope"),
+    (
+        "read_skill_resource",
+        SkillResource,
+        "Read the disclosed supporting file from this exact skill version",
+    ),
+    (
+        "run_workflow",
+        WorkflowCall,
+        "Start this versioned workflow; each internal operation needs separate approval",
+    ),
+    (
+        "resume_workflow",
+        WorkflowResume,
+        "Resume this suspended workflow after rechecking current application state",
+    ),
+]:
+    OPERATIONS[name] = Operation(
+        description,
+        "Only this invocation and scope are authorized",
+        desktop=False,
+        input_model=schema,
+        output_model=ToolResult,
+    )
+for name, description in [
+    ("judge", "Classify the verified comparison in an isolated model context"),
+    ("report", "Verify and report the current invoice and purchase-order discrepancy without saving"),
+]:
+    OPERATIONS[name] = Operation(
+        description,
+        "A result bound to current comparison evidence",
+        desktop=name == "report",
+        input_model=NodeInputs,
+        output_model=ToolResult,
+        timeout_seconds=45 if name == "judge" else 10,
+    )

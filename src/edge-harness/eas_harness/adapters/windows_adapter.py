@@ -169,10 +169,13 @@ class WindowsAdapter:
 
     @adapter_contract(Invoice, Invoice)
     def ensure_invoice_open(self, invoice_id):
+        from eas_harness.errors import check_visible_invoice
+
         state = self.ready()
         if state["view"] != "invoice" or state["invoice_id"] != invoice_id:
             self.click_target("invoices")
             self.ready()
+            check_visible_invoice(self.observe(), invoice_id, self.job["company_id"])
             self.click_target("open-" + invoice_id)
         if self.ready()["invoice_id"] != invoice_id:
             raise PermissionError("Invoice identity mismatch")

@@ -5,6 +5,7 @@ import time
 from langgraph.checkpoint.sqlite import SqliteSaver
 from eas_harness.config import Settings
 from eas_harness.execution import ExecutionLayer
+from eas_harness.coordinator import Coordinator
 from eas_harness.workflows.roles import get_role
 from eas_harness.remote import RemoteStore
 from eas_shared.identity import uid
@@ -25,8 +26,13 @@ def validate_assignment(settings, job):
         raise PermissionError("Job department does not match the installed worker role")
     if not set(job.get("permissions", [])).issubset(role.permissions):
         raise PermissionError("Job permissions exceed the installed worker role")
-    normalized = role.normalize(job)
-    if any(normalized[field] != job.get(field) for field in role.input_model.model_fields):
+    normalized = role.normalize(
+        job,
+        allow_unbound=bool(job.get("conversation_request"))
+        and job.get("execution_engine") == "agent-led-1"
+        and role.id == "invoice_correction",
+    )
+    if any(normalized[field] != job.get(field) for field in (*role.input_model.model_fields, "record_id")):
         raise PermissionError("Job inputs differ from the validated role inputs")
     return role
 
@@ -42,10 +48,19 @@ def run_worker(settings=None, once=False):
     worker_id = uid()
     graph_db = sqlite3.connect(settings.data_dir / "worker-checkpoints.sqlite", check_same_thread=False)
     assist_db = sqlite3.connect(settings.data_dir / "assistant-checkpoints.sqlite", check_same_thread=False)
+    from eas_harness.maintenance import maintain
+
+    next_maintenance = 0
     try:
         while True:
             job = store.claim(worker_id)
             if not job:
+                if time.monotonic() >= next_maintenance:
+                    try:
+                        maintain(settings, store, worker_id)
+                    except Exception:
+                        log.exception("Maintenance pass failed; business authority is unchanged")
+                    next_maintenance = time.monotonic() + 5
                 if once:
                     return
                 time.sleep(0.5)
@@ -58,31 +73,41 @@ def run_worker(settings=None, once=False):
                 lease = store.lease()
                 store.check(job_id, lease["owner"], lease["epoch"])
                 role_id = job.get("role_id", "invoice_correction")
-                if role_id != active_role:
+                engine = job.get("execution_engine", "legacy-strict")
+                if (role_id, engine) != active_role:
                     if adapter:
                         adapter.close()
                     adapter = role.adapter_factory(settings, store)
-                    graph = role.graph_factory(
-                        settings,
-                        store,
-                        ExecutionLayer(store, adapter, role.operations),
-                        SqliteSaver(graph_db),
-                        SqliteSaver(assist_db),
-                    ).graph
-                    active_role = role_id
+                    layer = ExecutionLayer(store, adapter, role.operations)
+                    if role_id == "invoice_correction" and engine == "agent-led-1":
+                        graph = Coordinator(
+                            settings, store, layer, SqliteSaver(assist_db), SqliteSaver(graph_db)
+                        )
+                    else:
+                        graph = role.graph_factory(
+                            settings, store, layer, SqliteSaver(graph_db), SqliteSaver(assist_db)
+                        ).graph
+                    active_role = (role_id, engine)
                 if store.lease()["owner"] == "staff":
                     time.sleep(0.5)
                     continue
-                config = {"configurable": {"thread_id": job_id}, "recursion_limit": 160, "max_concurrency": 4}
-                snapshot = graph.get_state(config)
-                # On every restart and resume observations come from the actual application.
-                if snapshot.next:
-                    value = None  # Retry an interrupted task after a process crash.
-                elif snapshot.values:
-                    value = {"job_id": job_id, "paused": False}
+                if isinstance(graph, Coordinator):
+                    graph.tick(job)
                 else:
-                    value = {"job_id": job_id, "turn": 0, "paused": False}
-                graph.invoke(value, config, durability="sync")
+                    config = {
+                        "configurable": {"thread_id": job_id},
+                        "recursion_limit": 160,
+                        "max_concurrency": 4,
+                    }
+                    snapshot = graph.get_state(config)
+                    # On every restart and resume observations come from the actual application.
+                    if snapshot.next:
+                        value = None  # Retry an interrupted task after a process crash.
+                    elif snapshot.values:
+                        value = {"job_id": job_id, "paused": False}
+                    else:
+                        value = {"job_id": job_id, "turn": 0, "paused": False}
+                    graph.invoke(value, config, durability="sync")
             except Stale:
                 # Handoffs invalidate queued actions; retry only after observing current authority.
                 time.sleep(0.25)

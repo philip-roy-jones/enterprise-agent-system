@@ -40,7 +40,34 @@ class Conversation:
                 json.loads(r[0])
                 for r in db.execute("SELECT data FROM questions WHERE job_id=? ORDER BY rowid", (job_id,))
             ]
+            requests = []
+            if job.get("conversation_id"):
+                for row in db.execute(
+                    "SELECT data FROM jobs WHERE json_extract(data,'$.conversation_id')=? ORDER BY rowid DESC LIMIT 20",
+                    (job["conversation_id"],),
+                ):
+                    previous = json.loads(row[0])
+                    if (
+                        previous["id"] != job_id
+                        and previous["created_at"] < job["created_at"]
+                        and all(
+                            previous.get(k) == job.get(k)
+                            for k in ("organization_id", "department_id", "role_id", "company_id", "staff_id")
+                        )
+                    ):
+                        turn = {k: previous[k] for k in ("id", "task", "record_id", "status")}
+                        reply = db.execute(
+                            "SELECT data FROM events WHERE job_id=? AND kind='assistant_message' ORDER BY seq DESC LIMIT 1",
+                            (previous["id"],),
+                        ).fetchone()
+                        turn["reply"] = (
+                            json.loads(reply[0]).get("text", "")
+                            if reply
+                            else previous.get("assistant_report", "")
+                        )
+                        requests.append(turn)
             return {
+                "requests": list(reversed(requests)),
                 "messages": messages,
                 "questions": questions,
                 "revision": messages[-1]["seq"] if messages else 0,

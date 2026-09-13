@@ -83,7 +83,11 @@ Keep exactly one worker running for this prototype's single desktop lease. **Do 
 
 ## 3. Use the staff console
 
-Open your reachable backend URL, sign in using the backend's staff token, and create a job. Choose Strict to review every known operation. Unmatched requests, unfamiliar states, and implemented procedure failures enter supervised Deep Agent assistance; each tool needs approval even if Auto was selected.
+Open your reachable backend URL, sign in using the backend's staff token, and send a request in the conversation. The Deep Agent reads approved skills and invokes durable workflows; Strict is the only policy. Each tool and each child operation needs approval. Accepted, verified work enters bounded skill maintenance on the edge.
+
+Use **Accumulated skills & learning** to inspect the proposed or activated version, instruction diff, operation changes, evidence and independent checks. Guidance-only packages explicitly identify their contract-only validation. Feedback reviews may suggest a missing capability or lifecycle change; these suggestions do not execute work or change the active registry. Suspend or activate an installed version to control future retrieval; active runs retain their pinned version.
+
+For a bounded native DemoBooks evaluation, `enterprise longitudinal-demo NAME --simulate-staff --kind report --invoice INV-1043 --task "Report the discrepancy without saving"` uses the configured backend and developer token. It explicitly simulates approvals, verifies output against native observations before accepting teaching, and preserves both summaries and raw evidence under `runtime/agent-led-evaluation/longitudinal/`. Use `--kind correction` or `guidance` for those outcomes, `--guidance` for teaching, and `--no-learn` for held-out evaluation. Each run needs a new name. This driver is for the synthetic Windows application; it is not a real staff evaluation or a general correctness oracle.
 
 Screenshots and observations come from the Windows worker and are uploaded to the backend. The browser test workspace is disabled in this deployment. To take over, select **Take control**, interact with the real Windows application, and select **Release control**. An old screenshot in the console is evidence of a past observation, not a live remote desktop stream.
 

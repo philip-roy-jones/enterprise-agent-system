@@ -10,14 +10,14 @@ from conftest import pending, wait_for
 @pytest.mark.parametrize("waiting", ["fallback", "takeover", "strict"])
 def test_job_deadline_while_waiting(browser_server, waiting):
     client, store = browser_server["client"], browser_server["store"]
-    args = {"invoice_id": "INV-1042", "selected_mode": "auto" if waiting == "fallback" else "strict"}
+    args = {"invoice_id": "INV-1042", "selected_mode": "strict"}
     if waiting == "fallback":
         args["task"] = "Inspect this invoice without changing it"
     created = client.post("/api/jobs", json=args)
     created.raise_for_status()
     job_id = created.json()["id"]
     approval = pending(client, job_id)
-    assert approval["kind"] == ("tool" if waiting == "fallback" else "node")
+    assert approval["kind"] == "tool"
     if waiting == "takeover":
         store.transfer(job_id, "staff", store.lease()["epoch"])
 
@@ -38,6 +38,6 @@ def test_job_deadline_while_waiting(browser_server, waiting):
     next_job = client.post("/api/jobs", json={"invoice_id": "INV-1043", "selected_mode": "strict"})
     next_job.raise_for_status()
     next_id = next_job.json()["id"]
-    assert pending(client, next_id)["kind"] == "node"
+    assert pending(client, next_id)["kind"] == "tool"
     assert store.lease()["job_id"] == next_id
     client.post(f"/api/jobs/{next_id}/cancel").raise_for_status()

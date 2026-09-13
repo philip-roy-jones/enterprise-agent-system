@@ -132,10 +132,9 @@ class KnowledgeModel(BatchModel):
         )
 
 
-def test_assistant_knowledge_read_waits_for_staff_even_in_auto(store, job, monkeypatch):
+def test_assistant_knowledge_read_waits_for_staff_in_strict(store, job, monkeypatch):
     monkeypatch.setattr("eas_harness.assistance.SimulatedModel", KnowledgeModel)
     doc = store.add_knowledge(document())
-    store.mode(job["id"], "auto")
     store.boundary(job["id"])
     store.transfer(job["id"], "assistant")
     adapter = ReadAdapter()

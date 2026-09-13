@@ -69,9 +69,9 @@ def main(argv):
     results = []
     scenarios = [
         ("Known procedure / Strict", "strict", {}, "INV-1042"),
-        ("Known procedure / Auto", "auto", {}, "INV-1043"),
-        ("Changed field / supervised assistance", "auto", {"variant": "renamed"}, "INV-1044"),
-        ("Interrupted save / reconciliation", "auto", {"interrupt_save": True}, "INV-1042"),
+        ("Known procedure / another record", "strict", {}, "INV-1043"),
+        ("Changed field / supervised assistance", "strict", {"variant": "renamed"}, "INV-1044"),
+        ("Interrupted save / reconciliation", "strict", {"interrupt_save": True}, "INV-1042"),
     ]
     for title, mode, scenario, invoice in scenarios:
         client.post(

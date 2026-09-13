@@ -33,6 +33,14 @@ def assess_action(store, job_id, assessment):
         ).fetchone()
         if not previous or json.loads(previous[0]) != assessment:
             store._event(db, job_id, "action_assessment", assessment)
+            if assessment["outcome"] == "incorrect":
+                store.queue_learning_review(
+                    db,
+                    job,
+                    "incorrect_assessment",
+                    revision=str(assessment),
+                    related=store.related_learning_jobs(db, job),
+                )
         if assessment["outcome"] == "incorrect" and job.get("accepted"):
             job["accepted"] = False
             store._put(db, job)

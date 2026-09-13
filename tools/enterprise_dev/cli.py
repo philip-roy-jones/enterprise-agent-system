@@ -8,7 +8,19 @@ import time
 def main():
     parser = argparse.ArgumentParser(prog="enterprise")
     parser.add_argument(
-        "command", choices=["serve", "worker", "dev", "demo", "improve", "review", "deploy", "rollback"]
+        "command",
+        choices=[
+            "serve",
+            "worker",
+            "dev",
+            "demo",
+            "learning-demo",
+            "longitudinal-demo",
+            "improve",
+            "review",
+            "deploy",
+            "rollback",
+        ],
     )
     parser.add_argument("args", nargs=argparse.REMAINDER)
     options = parser.parse_args()
@@ -55,6 +67,14 @@ def main():
         from enterprise_dev.demo import main as demo
 
         demo(options.args)
+    elif options.command == "learning-demo":
+        from enterprise_dev.learning_demo import main as learning_demo
+
+        learning_demo(options.args)
+    elif options.command == "longitudinal-demo":
+        from enterprise_dev.longitudinal_demo import main as longitudinal_demo
+
+        longitudinal_demo(options.args)
     else:
         from enterprise_dev.improve import main as improve
 

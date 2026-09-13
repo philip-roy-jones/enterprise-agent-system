@@ -9,18 +9,19 @@ from eas_harness.execution import ExecutionLayer
 from eas_harness.workflows.finance.operations import OPERATIONS
 from eas_harness.errors import Paused
 from eas_shared.types import Recovery
+from conftest import approve_operation
 from test_execution import FakeAdapter, node_args
 
 
 def layer_for(store, job, name="validate", **settings):
-    store.mode(job["id"], "auto")
     return ExecutionLayer(store, FakeAdapter(), {name: replace(OPERATIONS[name], **settings)})
 
 
 def test_invalid_inputs_never_reach_proposal_or_operation(store, job):
     layer = layer_for(store, job)
     with pytest.raises(ValidationError):
-        layer.run(
+        approve_operation(
+            layer,
             job["id"],
             "bad",
             "validate",
@@ -34,7 +35,9 @@ def test_invalid_inputs_never_reach_proposal_or_operation(store, job):
 def test_operation_result_must_satisfy_its_contract(store, job):
     layer = layer_for(store, job)
     with pytest.raises(Recovery) as error:
-        layer.run(job["id"], "bad-output", "validate", node_args(job), lambda a: {"validated": False})
+        approve_operation(
+            layer, job["id"], "bad-output", "validate", node_args(job), lambda a: {"validated": False}
+        )
     assert error.value.kind == "code_failure"
     assert store.result("bad-output") is None
     assert store.lease()["inflight"] is None
@@ -58,7 +61,7 @@ def test_deadline_revokes_later_effects_without_abandoning_a_thread(store, job):
         return {"validated": True}
 
     with pytest.raises(Recovery, match="deadline"):
-        layer.run(job["id"], "expired", "validate", node_args(job), slow)
+        approve_operation(layer, job["id"], "expired", "validate", node_args(job), slow)
     assert not effects and store.result("expired") is None
     assert store.lease()["inflight"] is None
     with pytest.raises(PermissionError):
@@ -76,7 +79,7 @@ def test_retry_allowance_routes_to_assistance_after_exhaustion(store, job):
     kinds = []
     for attempt in range(2):
         with pytest.raises(Recovery) as error:
-            layer.run(job["id"], f"attempt-{attempt}", "validate", node_args(job), unavailable)
+            approve_operation(layer, job["id"], f"attempt-{attempt}", "validate", node_args(job), unavailable)
         kinds.append(error.value.kind)
     assert kinds == ["temporary", "unfamiliar"] and len(attempts) == 2
 
@@ -100,7 +103,7 @@ def test_retry_in_strict_mode_needs_a_new_approval(store, job):
 def test_unverified_save_output_never_becomes_confirmed_success(store, job):
     layer = layer_for(store, job, name="save_draft")
     with pytest.raises(Recovery):
-        layer.run(job["id"], "save", "save_draft", {}, lambda args: {"ok": True})
+        approve_operation(layer, job["id"], "save", "save_draft", {}, lambda args: {"ok": True})
     assert store.get_job(job["id"])["mutation"] == "attempted_uncertain"
     assert store.result("save") is None
 
@@ -114,7 +117,7 @@ def test_rejection_for_another_operation_does_not_clear_save_uncertainty(store, 
         raise MutationRejected("other-job", "Application rejected another request")
 
     with pytest.raises(Recovery, match="does not identify"):
-        layer.run(job["id"], "save", "save_draft", {}, rejected)
+        approve_operation(layer, job["id"], "save", "save_draft", {}, rejected)
     assert store.get_job(job["id"])["mutation"] == "attempted_uncertain"
 
 
