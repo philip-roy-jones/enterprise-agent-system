@@ -87,7 +87,7 @@ Staff can also add scoped organizational guidance for the worker to search with 
 
 ## Try the demonstration
 
-Describe a request in **Talk to your worker**, including the record in ordinary language when needed. The agent proposes its target for approval or asks a clarification. A conversation can contain several requests; each has its own budget and desktop lease. Use **New request** for department selection and synthetic fault scenarios.
+Describe a request in **Talk to your worker**, including the record in ordinary language when needed. The agent proposes its target for approval or asks a clarification. A conversation can contain several requests; each has its own budget and desktop lease. Choose the department with **Workspace** and describe the work in chat. Synthetic fault scenarios are exercised through the development test drivers.
 
 | Try this | What you should see |
 | --- | --- |

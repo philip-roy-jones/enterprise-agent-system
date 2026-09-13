@@ -44,7 +44,6 @@
                 Describe the outcome. Approve the work. Teach the next request.
               </p>
             </div>
-            <button class="primary" id="new-job">＋ New request</button>
           </div>
           <section class="panel" id="chat-composer">
             <h2>Talk to your worker</h2>
@@ -67,7 +66,6 @@
                 <p>
                   Describe a task in the conversation above. Every operation requires your approval.
                 </p>
-                <button class="primary" id="first-job">Create a request</button>
               </div>
               <div id="active-job" hidden>
                 <section class="panel">
@@ -170,46 +168,6 @@
         </footer>
       </div>
     </div>
-    <dialog id="job-dialog">
-      <form id="job-form">
-        <div class="title-row">
-          <h2>New request</h2>
-          <button type="button" id="close-dialog" aria-label="Close">×</button>
-        </div>
-        <p class="muted">Choose a worker and describe the outcome. Unfamiliar requests go to supervised assistance.</p>
-        <label>Department<select id="department"></select></label>
-        <label>Worker<select id="workflow"></select></label>
-        <label>What should the worker do?<textarea id="request" rows="2" placeholder="Leave blank for the standard invoice correction, or describe another request within this worker's scope."></textarea></label>
-        <div id="workflow-inputs" hidden></div>
-        <label id="invoice-input"
-          >Invoice<select id="invoice">
-            <option value="INV-1042">INV-1042 · Northstar Office Supply</option>
-            <option value="INV-1043">INV-1043 · Cedar IT Services</option>
-            <option value="INV-1044">INV-1044 · Atlas Packaging</option>
-          </select></label
-        ><label id="scenario-input"
-          >Demonstration condition<select id="scenario">
-            <option value="current">Use the current application state</option>
-            <option value="normal">Normal workspace</option>
-            <option value="wrong">Wrong invoice open</option>
-            <option value="reordered">Reordered invoice rows</option>
-            <option value="delayed">Delayed loading</option>
-            <option value="info">Known informational popup</option>
-            <option value="unsaved">Unsaved-changes dialog</option>
-            <option value="unfamiliar">Unfamiliar dialog</option>
-            <option value="renamed">Changed amount field label</option>
-            <option value="new_label">New amount label for teaching</option>
-            <option value="layout">Changed field layout</option>
-            <option value="ambiguous">Save confirmation interrupted</option>
-            <option value="rejected_save">Application rejects Save</option>
-          </select></label
-        >
-        <p class="hint">
-          Every tool and skill operation requires your approval.
-        </p>
-        <button class="primary wide" type="submit">Send request</button>
-      </form>
-    </dialog>
     <dialog id="login-dialog">
       <form id="login-form">
         <div class="brand login-brand">Enterprise Agent System</div>

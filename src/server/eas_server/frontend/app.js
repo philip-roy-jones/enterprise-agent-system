@@ -96,97 +96,6 @@ $("sign-out").onclick = async () => {
   sessionStorage.clear();
   location.reload();
 };
-for (const id of ["new-job", "first-job"])
-  $(id).onclick = () => {
-    $("job-dialog").showModal();
-  };
-$("close-dialog").onclick = () => $("job-dialog").close();
-const scenarios = {
-  normal: {
-    view: "dashboard",
-    dialog: null,
-    variant: "standard",
-    amount_label: null,
-    reordered: false,
-    interrupt_save: false,
-    reject_save: false,
-    unsaved: false,
-  },
-  wrong: { view: "invoice", invoice_id: "INV-1044" },
-  reordered: { view: "invoices", reordered: true },
-  delayed: { delay_seconds: 4 },
-  info: { dialog: "info" },
-  unsaved: {
-    view: "invoice",
-    invoice_id: "INV-1044",
-    dialog: "unsaved",
-    unsaved: true,
-  },
-  unfamiliar: { dialog: "unfamiliar" },
-  renamed: { variant: "renamed" },
-  new_label: { amount_label: "Revised draft amount" },
-  layout: { variant: "layout" },
-  ambiguous: { interrupt_save: true },
-  rejected_save: { reject_save: true },
-};
-$("job-form").onsubmit = (e) => {
-  e.preventDefault();
-  action(async () => {
-    const role = roles.find((r) => r.id === $("workflow").value);
-    if (!role) throw Error("Choose an authorized worker");
-    let inputs = {};
-    if (role.id === "invoice_correction") {
-      if (desktopAdapter === "browser" && $("scenario").value !== "current") {
-        await api("/api/mock/scenario", {
-          ...scenarios.normal,
-          ...scenarios[$("scenario").value],
-        });
-      }
-      inputs = { company_id: "ACME", invoice_id: $("invoice").value };
-    } else {
-      document.querySelectorAll("[data-workflow-input]").forEach((el) => {
-        inputs[el.dataset.workflowInput] =
-          el.type === "number" ? Number(el.value) : el.value;
-      });
-    }
-    const result = await api("/api/chat", {
-      department_id: role.department_id,
-      role_id: role.id,
-      inputs,
-      task: $("request").value.trim() || null,
-      selected_mode: "strict",
-    });
-    selectRequest(result.job.id);
-    $("job-dialog").close();
-    selectView("jobs");
-    connectStream();
-  });
-};
-function populateWorkflows() {
-  $("workflow").innerHTML = roles
-    .filter((r) => r.department_id === $("department").value)
-    .map((r) => `<option value="${esc(r.id)}">${esc(r.name)}</option>`)
-    .join("");
-  populateInputs();
-}
-function populateInputs() {
-  const role = roles.find((r) => r.id === $("workflow").value);
-  const invoice = role?.id === "invoice_correction";
-  $("invoice-input").hidden = !invoice;
-  $("scenario-input").hidden = !invoice || desktopAdapter !== "browser";
-  $("workflow-inputs").hidden = invoice;
-  $("workflow-inputs").innerHTML =
-    invoice || !role
-      ? ""
-      : Object.entries(role.input_schema.properties)
-          .map(
-            ([key, field]) =>
-              `<label>${esc(field.title || key)}<input data-workflow-input="${esc(key)}" type="${["number", "integer"].includes(field.type) ? "number" : "text"}" value="${esc(field.default ?? "")}" ${role.input_schema.required?.includes(key) ? "required" : ""}></label>`,
-          )
-          .join("");
-}
-$("department").onchange = populateWorkflows;
-$("workflow").onchange = populateInputs;
 function connectStream() {
   source?.close();
   source = null;
@@ -455,15 +364,6 @@ async function refresh() {
   try {
     if (!roles.length) {
       roles = await api("/api/roles");
-      const departments = [
-        ...new Map(
-          roles.map((r) => [r.department_id, r.department_name]),
-        ).entries(),
-      ];
-      $("department").innerHTML = departments
-        .map(([id, name]) => `<option value="${esc(id)}">${esc(name)}</option>`)
-        .join("");
-      populateWorkflows();
       $("chat-workspace").innerHTML = roles.map(r => `<option value="${esc(r.id)}">${esc(r.department_name)} · ${esc(r.name)}</option>`).join("");
     }
     if (!roles.length) return;
@@ -489,7 +389,6 @@ async function refresh() {
     const health = await api("/api/health");
     desktopAdapter = health.desktop_adapter;
     $("test-workspace").hidden = desktopAdapter !== "browser";
-    $("scenario-input").hidden = $("workflow").value !== "invoice_correction" || desktopAdapter !== "browser";
     $("model-label").textContent =
       health.model_mode === "simulated" ? "Simulated assistance" : "Live model";
     if (activeView === "metrics") await refreshMetrics();
