@@ -137,6 +137,66 @@
     "retry_limit": 2,
     "timeout_seconds": 10
   },
+  "capture_screen": {
+    "conditions": "Staff approval to read the assigned worker desktop; no record required",
+    "description": "Capture the entire interactive desktop, including other visible windows, for this conversation",
+    "desktop": true,
+    "expected": "A timestamped screenshot of all monitors; browser fixtures capture only their test viewport",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "Empty",
+      "type": "object"
+    },
+    "mutation": false,
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "captured_at": {
+          "title": "Captured At",
+          "type": "number"
+        },
+        "height": {
+          "exclusiveMinimum": 0,
+          "maximum": 20000,
+          "title": "Height",
+          "type": "integer"
+        },
+        "screenshot": {
+          "pattern": "^[a-zA-Z0-9_-]+\\.png$",
+          "title": "Screenshot",
+          "type": "string"
+        },
+        "surface": {
+          "enum": [
+            "desktop",
+            "browser_fixture"
+          ],
+          "title": "Surface",
+          "type": "string"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "maximum": 20000,
+          "title": "Width",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "screenshot",
+        "width",
+        "height",
+        "captured_at",
+        "surface"
+      ],
+      "title": "ScreenCapture",
+      "type": "object"
+    },
+    "permission": "read",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 2,
+    "timeout_seconds": 10
+  },
   "click": {
     "conditions": "Fresh observation; authorized company and invoice",
     "description": "Click the annotated control in the assigned application",
@@ -1407,6 +1467,142 @@
       "type": "object"
     },
     "permission": "draft",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "retry_limit": 2,
+    "timeout_seconds": 10
+  },
+  "share_screenshot": {
+    "conditions": "Previously approved capture in this request; same staff conversation",
+    "description": "Send the disclosed screenshot, caption and annotations to this staff conversation",
+    "desktop": false,
+    "expected": "An immutable chat attachment; annotations describe the capture, not current application state",
+    "input_schema": {
+      "$defs": {
+        "Annotation": {
+          "additionalProperties": false,
+          "properties": {
+            "color": {
+              "default": "red",
+              "enum": [
+                "red",
+                "blue",
+                "yellow"
+              ],
+              "title": "Color",
+              "type": "string"
+            },
+            "kind": {
+              "enum": [
+                "rectangle",
+                "arrow",
+                "circle",
+                "text"
+              ],
+              "title": "Kind",
+              "type": "string"
+            },
+            "label": {
+              "default": "",
+              "maxLength": 160,
+              "title": "Label",
+              "type": "string"
+            },
+            "x": {
+              "maximum": 1,
+              "minimum": 0,
+              "title": "X",
+              "type": "number"
+            },
+            "x2": {
+              "anyOf": [
+                {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "X2"
+            },
+            "y": {
+              "maximum": 1,
+              "minimum": 0,
+              "title": "Y",
+              "type": "number"
+            },
+            "y2": {
+              "anyOf": [
+                {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Y2"
+            }
+          },
+          "required": [
+            "kind",
+            "x",
+            "y"
+          ],
+          "title": "Annotation",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "annotations": {
+          "items": {
+            "$ref": "#/$defs/Annotation"
+          },
+          "maxItems": 12,
+          "title": "Annotations",
+          "type": "array"
+        },
+        "caption": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Caption",
+          "type": "string"
+        },
+        "screenshot": {
+          "pattern": "^[a-zA-Z0-9_-]+\\.png$",
+          "title": "Screenshot",
+          "type": "string"
+        }
+      },
+      "required": [
+        "screenshot",
+        "caption"
+      ],
+      "title": "ShareScreenshot",
+      "type": "object"
+    },
+    "mutation": false,
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "title": "ToolResult",
+      "type": "object"
+    },
+    "permission": "read",
     "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
     "retry_limit": 2,
     "timeout_seconds": 10

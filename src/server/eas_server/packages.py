@@ -17,6 +17,32 @@ class Packages:
                 "CREATE TABLE IF NOT EXISTS skill_packages(worker TEXT, id TEXT, version TEXT, data TEXT, PRIMARY KEY(worker,id,version))"
             )
 
+    def chat_evidence(self, principal, evidence_id, spec):
+        # Conversation teaching is an attributed text source, not accepted
+        # execution. Require the exact completed admission record and preserve
+        # its executable bindings; merely chatting cannot attest a new graph.
+        with self.store.db() as db:
+            row = db.execute("SELECT data FROM maintenance WHERE id=?", ("chat-" + evidence_id,)).fetchone()
+        if not row:
+            return False
+        item = json.loads(row[0])
+        result = item.get("result", {})
+        candidate = result.get("candidate")
+        if (
+            item.get("worker_id") != principal.worker_id
+            or item["status"] != "completed"
+            or result.get("status") != "activated"
+            or not result.get("signals")
+            or not candidate
+        ):
+            return False
+        candidate = SkillSpec.model_validate(candidate).model_dump()
+        return (
+            hashlib.sha256(canonical(candidate).encode()).hexdigest() == result.get("version")
+            and evidence_id in candidate["evidence_ids"]
+            and all(candidate[k] == spec[k] for k in (*SCOPE, "skill_id", "steps", "amount_labels"))
+        )
+
     def publish(self, principal, metadata):
         if len(canonical(metadata)) > 4_000_000:
             raise ValueError("Package publication budget exceeded")
@@ -36,6 +62,11 @@ class Packages:
                 raise ValueError("Package hash or identity mismatch")
             for evidence_id in spec["evidence_ids"]:
                 job = self.store.get_job(evidence_id)
+                self.security.authorize(principal, "admit", job)
+                if any(job[k] != spec[k] for k in SCOPE):
+                    raise PermissionError("Publication cannot broaden teaching scope")
+                if self.chat_evidence(principal, evidence_id, spec):
+                    continue
                 if (
                     any(job[k] != spec[k] for k in SCOPE)
                     or not job.get("accepted")
@@ -49,7 +80,6 @@ class Packages:
                     raise PermissionError(
                         "Teaching evidence needs an executed verification or outcome review"
                     )
-                self.security.authorize(principal, "admit", job)
             # Admission identity attests validation. A normal executor or planner
             # cannot use this endpoint, and publication stays on this worker.
             entry = {

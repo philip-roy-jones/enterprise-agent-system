@@ -41,9 +41,10 @@ class ExecutionLayer:
 
         record_field = get_role(job["role_id"]).record_field
         selecting = name == "select_record"
+        screen_operation = name in {"capture_screen", "share_screenshot"}
         if selecting and (kind != "tool" or not job.get("conversation_request")):
             raise PermissionError("Record selection is only available to conversational requests")
-        if job.get("record_id") is None and not selecting:
+        if job.get("record_id") is None and not selecting and not screen_operation:
             raise Recovery(
                 "unfamiliar",
                 "No record is selected. Clarify the target in chat, then use select_record before application operations.",
@@ -67,7 +68,7 @@ class ExecutionLayer:
             if field in arguments and arguments[field] != value:
                 raise PermissionError(f"Operation {field} differs from the authorized job")
         self.adapter.job = job
-        if selecting:
+        if selecting or screen_operation:
             # Selecting scope has no application effects and needs no desktop
             # access. The signed evidence is the current request itself.
             scope = {
@@ -207,7 +208,11 @@ class ExecutionLayer:
                     )
             if name in {"save", "save_draft", "verify"}:
                 self.store.update_job(job_id, {"mutation": "confirmed_succeeded"})
-            after = observation.model_dump() if selecting else self.adapter.observe().model_dump()
+            after = (
+                observation.model_dump()
+                if selecting or screen_operation
+                else self.adapter.observe().model_dump()
+            )
             failures = self.store.get_job(job_id).get("operation_failures", {})
             if name in failures:
                 failures.pop(name)

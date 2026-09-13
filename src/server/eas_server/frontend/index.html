@@ -87,9 +87,9 @@
                   <div id="skill-runs"></div><div id="progress" class="progress-track"></div>
                   <p id="job-error" role="alert"></p>
                 </section>
-                <section class="panel review-panel" id="review-panel">
+                <section class="panel review-panel" id="review-panel" hidden>
                   <div class="panel-heading">
-                    <h2 id="review-title">Live workspace</h2>
+                    <h2 id="review-title">Review operation</h2>
                     <span id="review-kind" class="badge"></span>
                   </div>
                   <div id="proposal-copy"></div>
@@ -144,16 +144,6 @@
                       required
                     /><button type="submit">Send</button>
                   </form>
-                  <details>
-                    <summary>Assess an executed operation</summary>
-                    <p class="hint">Record an observed result for evaluation. Unassessed operations are counted separately. This does not approve or retry an action.</p>
-                    <form id="assessment-form">
-                      <label>Operation<select id="assessment-operation" required></select></label>
-                      <label>Observed result<select id="assessment-outcome"><option value="correct">Correct</option><option value="incorrect">Incorrect</option></select></label>
-                      <label>Explanation<input id="assessment-explanation" required maxlength="2000" /></label>
-                      <button type="submit">Record assessment</button>
-                    </form>
-                  </details>
                 </section>
               </div>
             </section>
@@ -182,6 +172,7 @@
     <div id="toast" role="status" hidden></div>
     <script src="/static/activity.js"></script>
     <script src="/static/learning.js"></script>
+    <script src="/static/screenshots.js"></script>
     <script src="/static/app.js"></script>
   </body>
 </html>

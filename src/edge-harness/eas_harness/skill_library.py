@@ -68,6 +68,7 @@ class SkillLibrary:
         root = Path(__file__).parent
         files = [
             "execution.py",
+            "screenshots.py",
             "executor.py",
             "adapters/adapter.py",
             "adapters/windows_adapter.py",

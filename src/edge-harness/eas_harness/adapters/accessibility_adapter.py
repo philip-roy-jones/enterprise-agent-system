@@ -171,6 +171,10 @@ class AccessibilityAdapter(WindowsAdapter):
     def correction_note(self, note):
         return f"{note} [EAS:{self.job['id']}]"
 
+    def capture_screen(self):
+        self.fence()
+        return self.bridge.call("/screenshot", {})
+
     def read_state(self):
         return decode_observation(self.bridge.call("/observe", {"screenshot": False}))[0]
 

@@ -46,6 +46,7 @@ static class Program
                         "/window" => desktop.Window(),
                         "/activate" when context.Request.HttpMethod == "POST" => desktop.Activate(),
                         "/observe" => desktop.Observe(!data.TryGetProperty("screenshot", out var shot) || shot.GetBoolean()),
+                        "/screenshot" when context.Request.HttpMethod == "POST" => desktop.CaptureScreen(),
                         "/action" when context.Request.HttpMethod == "POST" => desktop.Action(data),
                         _ => throw new ArgumentException("Unknown desktop controller endpoint")
                     };
@@ -145,6 +146,16 @@ sealed class Desktop(string processName)
             finally { SetWindowPos(window, new IntPtr(-2), 0, 0, 0, 0, 0x13); }
         }
         return new { activated = GetForegroundWindow() == window };
+    }
+    public object CaptureScreen()
+    {
+        if (Process.GetCurrentProcess().SessionId == 0 || GetForegroundWindow() == IntPtr.Zero)
+            throw new InvalidOperationException("An unlocked interactive desktop is required");
+        Rectangle bounds = System.Windows.Forms.SystemInformation.VirtualScreen;
+        using var bitmap = new Bitmap(bounds.Width, bounds.Height);
+        using (var g = Graphics.FromImage(bitmap)) g.CopyFromScreen(bounds.Location, Point.Empty, bitmap.Size);
+        using var output = new MemoryStream(); bitmap.Save(output, ImageFormat.Png);
+        return new { screenshot = Convert.ToBase64String(output.ToArray()), width = bounds.Width, height = bounds.Height, surface = "desktop" };
     }
     public Snapshot Observe(bool screenshot = true)
     {

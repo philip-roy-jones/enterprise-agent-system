@@ -69,7 +69,14 @@ def feedback(episode):
             decision = e.get("decision", {})
             if decision.get("decision") == "correct" or decision.get("explanation"):
                 result.append({"kind": "staff_decision", "decision": decision})
-        elif e["kind"] in {"staff_message", "staff_answer", "action_assessment", "capability_gap"}:
+        elif e["kind"] in {
+            "staff_message",
+            "staff_answer",
+            "staff_answered",
+            "action_assessment",
+            "capability_gap",
+            "chat_feedback",
+        }:
             result.append(
                 {
                     k: v
@@ -359,6 +366,10 @@ def maintain(settings, store, worker_id, library=None):
                         "status": "disabled",
                         "reason": "Learning maintenance is disabled in worker configuration",
                     }
+                elif item["kind"] == "chat_review":
+                    from eas_harness.chat_review import review
+
+                    result = review(settings, store, library, item)
                 else:
                     evidence, previous_version = evidence_for(
                         item["episode"],

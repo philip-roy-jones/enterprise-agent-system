@@ -118,6 +118,8 @@ Pin the package and its executable dependencies per run. Markdown is behavior-af
 
 Implement a durable learning queue driven by completed work and feedback. Staff should not need a separate “create workflow” request. Capture failed attempts and rejected proposals as evidence, but do not treat them as successful procedures.
 
+Ordinary conversation now also triggers a bounded review after each request ends. Clear chat teaching can update instructions or create instructions-only guidance without a separate assessment form or outcome-acceptance click. This path preserves executable steps, field bindings and prior evidence audiences; it cannot use an inferred correction to attest successful execution. See [conversation learning and screenshots](../conversation-learning-and-screenshots.md).
+
 The maintenance pass runs in a separate bounded context within the edge-harness software, with access to scoped evidence and a candidate workspace. It has no business-application credentials, desktop control, or release/deployment credentials. Code evaluation uses an isolated test environment and synthetic fixtures. The central server schedules/tracks work without running the learner itself.
 
 Automatic draft generation is an explicitly configured maintenance capability, not autonomous business execution. It cannot operate the application or make candidates available to business runs. An independent runtime admission step validates and activates eligible candidates automatically; a better evaluation score never removes an execution approval requirement.

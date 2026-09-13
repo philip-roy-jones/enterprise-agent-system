@@ -128,6 +128,8 @@ RESERVED_EVENTS = {
     "approval_requested",
     "action_assessment",
     "staff_message",
+    "staff_answered",
+    "chat_feedback",
     "staff_answer",
     "record_bound",
     "accepted",
@@ -476,3 +478,20 @@ def install_worker_api(app, security):
         with store.db() as db:
             db.execute("INSERT INTO artifact_owners VALUES(?,?,?)", (name, job_id, p.id))
         return {"id": name}
+
+    @app.get("/api/worker-artifacts/{job_id}/{name}")
+    def screenshot_image(job_id: str, name: str, metadata: bool = False):
+        from fastapi.responses import FileResponse
+        from eas_shared.screenshots import captured_screen
+
+        p = current.get()
+        if p.kind not in {"planner", "executor"}:
+            raise HTTPException(403, "Assigned execution identity required")
+        assigned(p, job_id)
+        capture = captured_screen(store.events(job_id), name)
+        with store.db() as db:
+            if not db.execute(
+                "SELECT 1 FROM artifact_owners WHERE id=? AND job_id=?", (name, job_id)
+            ).fetchone():
+                raise HTTPException(404, "Screenshot unavailable")
+        return capture if metadata else FileResponse(store.root / "artifacts" / name, media_type="image/png")

@@ -177,6 +177,7 @@ function renderDetail(d) {
     lastImage = obs.screenshot;
   }
   $("screenshot-wrap").hidden = !obs?.screenshot;
+  $("review-panel").hidden = !pending;
   $("review-controls").hidden = !pending;
   $("waiting").hidden = !!pending;
   $("waiting").textContent = j.result_kind === "record_unavailable" ? j.record_lookup.message : j.result_kind === "conversation" ? "Continue in the conversation when you’re ready." : done
@@ -212,6 +213,10 @@ function renderDetail(d) {
     if (pending.name === "set_field") {
       $("proposal-copy").innerHTML += `<p><strong>Text to enter in ${esc(pending.arguments.field === "amount" ? "correction amount" : "correction explanation")}:</strong><br>${esc(pending.arguments.value)}</p>`;
     }
+    if (pending.name === "share_screenshot") {
+      const captured = d.events.filter(e => e.kind === "action_result").map(e => e.data.result?.value).find(v => v?.screenshot === pending.arguments.screenshot);
+      if (captured) $("proposal-copy").innerHTML += renderScreenshot({...captured, ...pending.arguments});
+    }
     if (pending.name === "ask_staff") $("proposal-copy").innerHTML += `<p><strong>Question:</strong> ${esc(pending.arguments.question)}</p>`;
     if (pending.name === "search_knowledge") $("proposal-copy").innerHTML += `<p><strong>Search for:</strong> ${esc(pending.arguments.query)}</p>`;
     if (selectedApproval?.id !== pending.id) {
@@ -226,18 +231,12 @@ function renderDetail(d) {
       pending.kind === "tool" ? "Approve tool call" : "Approve operation";
   } else {
     selectedApproval = null;
-    $("review-title").textContent = "Live workspace";
+    $("review-title").textContent = "Review operation";
     $("review-kind").textContent =
       j.model_mode === "simulated" ? "SIMULATED ASSISTANCE" : "LIVE MODEL";
     $("proposal-copy").innerHTML = "";
     $("target-circle").hidden = true;
   }
-  const finishedInvocations = new Set(d.events.filter(e => e.kind === "action_result").map(e => e.data.invocation));
-  const oldAssessment = $("assessment-operation").value;
-  const finishedActions = [...new Map(d.events.filter(e => e.kind === "action_started" && finishedInvocations.has(e.data.invocation)).map(e => [e.data.invocation, e])).values()];
-  $("assessment-operation").innerHTML = finishedActions.map(e => `<option value="${esc(e.data.invocation)}">${esc(readable[e.data.action.name] || e.data.action.name)} · ${new Date(e.at * 1000).toLocaleTimeString()}</option>`).join("");
-  if (finishedActions.some(e => e.data.invocation === oldAssessment)) $("assessment-operation").value = oldAssessment;
-  $("assessment-form").querySelector("button").disabled = !finishedActions.length;
   activityView.render(d);
 }
 function drawTarget(args, obs) {
@@ -296,15 +295,6 @@ $("takeover").onclick = () =>
     ),
   );
 let draftMessage = null;
-$("assessment-form").onsubmit = (e) => {
-  e.preventDefault();
-  action(async () => {
-    const job = active;
-    const explanation = $("assessment-explanation").value;
-    await api(`/api/jobs/${job}/assessments`, {invocation: $("assessment-operation").value, outcome: $("assessment-outcome").value, explanation});
-    if (job === active && $("assessment-explanation").value === explanation) $("assessment-explanation").value = "";
-  });
-};
 $("message-form").onsubmit = (e) => {
   e.preventDefault();
   action(async () => {
@@ -476,13 +466,14 @@ async function renderSession(session, jobs, selectedDetail) {
   const entries = visible.flatMap(turn => {
     const data = transcriptCache.get(turn.id);
     const created = data.events.find(event => event.kind === "job_created");
+    const shares = new Set(data.events.filter(e => e.kind === "action_started" && e.data.action?.name === "share_screenshot").map(e => e.data.invocation));
     return [{id: "request-"+turn.id, requestId: turn.id, at: turn.created_at, seq: created?.seq || 0, speaker: "staff", text: turn.task, record: turn.record_id},
-      ...data.events.filter(event => ["staff_message", "assistant_message", "assistant_question"].includes(event.kind))
-        .map(event => ({id: "event-"+event.seq, at: event.at, seq: event.seq, speaker: event.kind === "staff_message" ? "staff" : "agent", text: event.data.text || event.data.question || ""}))];
+      ...data.events.filter(event => ["staff_message", "assistant_message", "assistant_question"].includes(event.kind) || (event.kind === "action_result" && shares.has(event.data.invocation)))
+        .map(event => ({id: "event-"+event.seq, at: event.at, seq: event.seq, speaker: event.kind === "staff_message" ? "staff" : "agent", text: event.data.text || event.data.question || "", attachment: event.kind === "action_result" ? event.data.result?.value?.data : null}))];
   }).sort((a,b) => a.at-b.at || a.seq-b.seq);
   const markup = entries.map(entry => {
     const date = new Date(entry.at*1000);
-    return `<div class="chat-message ${entry.speaker}" data-message-id="${esc(entry.id)}"><div class="chat-message-meta"><strong>${entry.speaker === "staff" ? "Staff" : "Worker"}${entry.record ? ` · ${esc(entry.record)}` : ""}</strong><time datetime="${date.toISOString()}" title="${esc(date.toLocaleString())}">${esc(date.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}))}</time></div><p>${esc(entry.text)}</p>${entry.requestId ? `<button type="button" class="chat-activity-link" data-request-activity="${esc(entry.requestId)}">View activity</button>` : ""}</div>`;
+    return `<div class="chat-message ${entry.speaker}" data-message-id="${esc(entry.id)}"><div class="chat-message-meta"><strong>${entry.speaker === "staff" ? "Staff" : "Worker"}${entry.record ? ` · ${esc(entry.record)}` : ""}</strong><time datetime="${date.toISOString()}" title="${esc(date.toLocaleString())}">${esc(date.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}))}</time></div><p>${esc(entry.text)}</p>${entry.attachment ? renderScreenshot(entry.attachment) : ""}${entry.requestId ? `<button type="button" class="chat-activity-link" data-request-activity="${esc(entry.requestId)}">View activity</button>` : ""}</div>`;
   }).join("");
   const transcript = $("session-messages");
   if (markup !== transcriptMarkup) {

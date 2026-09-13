@@ -75,3 +75,15 @@ class RemoteStore:
         if response.is_error:
             self.raise_error(response)
         return response.json()
+
+    def screenshot_image(self, job_id, name):
+        response = self.client.get(f"/api/worker-artifacts/{job_id}/{name}")
+        if response.is_error:
+            self.raise_error(response)
+        return response.content
+
+    def screenshot_metadata(self, job_id, name):
+        response = self.client.get(f"/api/worker-artifacts/{job_id}/{name}", params={"metadata": "true"})
+        if response.is_error:
+            self.raise_error(response)
+        return response.json()

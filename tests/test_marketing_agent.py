@@ -95,7 +95,8 @@ def test_marketing_chat_learns_and_reuses_a_skill_with_child_approvals(store, tm
             return store.skills_publish(metadata, scope)
 
     maintain(settings, RPC(), "simulated-admission", coordinator.library)
-    result = store.learning_status()["queue"][0]["result"]
+    maintain(settings, RPC(), "simulated-admission", coordinator.library)
+    result = next(q for q in store.learning_status()["queue"] if q["kind"] == "learn")["result"]
     assert result["status"] == "activated"
     spec = coordinator.library.get(result["skill_id"], result["version"], job)
     assert spec["capability_version"] == "marketing-1"

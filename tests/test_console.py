@@ -24,7 +24,7 @@ def test_failed_refresh_never_relabels_historical_state_as_fresh(browser_server,
         adapter.close()
 
 
-def test_staff_assessment_updates_metrics_in_rendered_console(browser_server):
+def test_chat_replaces_assessment_form_and_existing_assessments_remain_in_metrics(browser_server):
     c = browser_server["client"]
     response = c.post(
         "/api/chat", json={"invoice_id": "INV-1042", "task": "invoice_correction", "selected_mode": "strict"}
@@ -37,13 +37,21 @@ def test_staff_assessment_updates_metrics_in_rendered_console(browser_server):
         context = browser.new_context(extra_http_headers={"Authorization": "Bearer test-staff"})
         page = context.new_page()
         page.goto(browser_server["url"])
-        page.locator("#assessment-operation option").first.wait_for(state="attached")
-        page.get_by_text("Assess an executed operation", exact=True).click()
-        page.locator("#assessment-outcome").select_option("incorrect")
-        page.locator("#assessment-explanation").fill("Synthetic reviewer reports an incorrect result")
-        with page.expect_response(f"**/api/jobs/{job_id}/assessments") as response:
-            page.get_by_role("button", name="Record assessment", exact=True).click()
-        assert response.value.status == 200
+        page.locator("#chat-request").wait_for()
+        assert page.locator("#assessment-form").count() == 0
+        assert not page.locator("#review-panel").is_visible()
+        detail = c.get(f"/api/jobs/{job_id}").json()
+        invocation = next(e["data"]["invocation"] for e in detail["events"] if e["kind"] == "action_result")
+        # Historical/operator assessment API remains supported; staff no longer
+        # need its form to teach through ordinary conversation.
+        c.post(
+            f"/api/jobs/{job_id}/assessments",
+            json={
+                "invocation": invocation,
+                "outcome": "incorrect",
+                "explanation": "Synthetic historical assessment",
+            },
+        ).raise_for_status()
         page.locator("#metrics-tab").click()
         page.locator("#metrics-tab[aria-current=page]").wait_for()
         row = page.locator("#metrics-view tr").filter(has_text="incorrect actions reported")

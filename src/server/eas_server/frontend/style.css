@@ -864,3 +864,12 @@ th {
 #learning-content pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #f5f7fa; padding: 12px; max-height: 300px; overflow: auto; font-size: .75rem; }
 #learning-content p, #learning-content li { font-size: .82rem; overflow-wrap: anywhere; }
 .learning-suggestion { padding: 14px; margin: 12px 0; background: #fff7e5; border-radius: 6px; }
+
+.chat-screenshot { margin: 12px 0 0; white-space: normal; }
+.chat-screenshot-image { position: relative; width: 100%; max-width: var(--preview-width); }
+.chat-screenshot.expanded .chat-screenshot-image { max-width: 100%; }
+.screenshot-size { margin-top: 8px; font-size: .75rem; padding: 5px 9px; }
+.chat-screenshot img { display: block; width: 100%; height: auto; border-radius: 6px; }
+.chat-screenshot svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.chat-screenshot figcaption { margin-top: 8px; }
+.chat-screenshot small { display: block; color: #64748b; margin-top: 5px; }

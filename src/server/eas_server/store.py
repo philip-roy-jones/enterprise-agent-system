@@ -703,7 +703,7 @@ class Store(LearningStore):
             kind = "reviewed_outcome"
         elif job.get("record_lookup"):
             kind = "record_unavailable"
-        elif not executed - {"select_record"}:
+        elif not executed - {"select_record", "capture_screen", "share_screenshot"}:
             kind = "conversation"
         else:
             raise PermissionError("Business completion requires verified execution or staff outcome review")

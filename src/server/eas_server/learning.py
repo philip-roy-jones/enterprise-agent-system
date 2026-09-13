@@ -56,6 +56,8 @@ class LearningStore:
         db.execute("INSERT OR IGNORE INTO maintenance VALUES(?,?)", (item["id"], canonical(item)))
 
     def learning_terminal(self, db, job):
+        if job.get("conversation_request"):
+            self.queue_chat_review(db, job)
         related = self.related_learning_jobs(db, job)
         if job["status"] in {"failed", "denied", "rejected"}:
             failures = [i for i in related if self._job(db, i)["status"] in {"failed", "denied", "rejected"}]
@@ -66,6 +68,47 @@ class LearningStore:
         )
         if gaps:
             self.queue_learning_review(db, job, "capability_gap", related=related)
+
+    @staticmethod
+    def same_learning_conversation(left, right):
+        return bool(left.get("conversation_id")) and all(
+            left.get(k) == right.get(k)
+            for k in (
+                "conversation_id",
+                "organization_id",
+                "department_id",
+                "role_id",
+                "company_id",
+                "staff_id",
+                "desktop_id",
+            )
+        )
+
+    def queue_chat_review(self, db, job):
+        # One durable review per ended chat request, including guidance received
+        # during execution. Repeated terminal writes and retries do not fan out.
+        related = []
+        for row in db.execute(
+            "SELECT data FROM jobs WHERE json_extract(data,'$.conversation_id')=? ORDER BY rowid DESC",
+            (job["conversation_id"],),
+        ):
+            other = json.loads(row[0])
+            if other["created_at"] < job["created_at"] and self.same_learning_conversation(job, other):
+                related.append(other["id"])
+            if len(related) == 5:
+                break
+        item = dict(
+            id="chat-" + job["id"],
+            kind="chat_review",
+            trigger="conversation",
+            job_id=job["id"],
+            related_job_ids=related,
+            organization_id=job["organization_id"],
+            role_id=job["role_id"],
+            status="queued",
+            created_at=time.time(),
+        )
+        db.execute("INSERT OR IGNORE INTO maintenance VALUES(?,?)", (item["id"], canonical(item)))
 
     def report_capability_gap(self, job_id, proposal):
         from eas_shared.skills import CapabilityGap
@@ -129,13 +172,17 @@ class LearningStore:
                     )
                 db.execute("UPDATE maintenance SET data=? WHERE id=?", (canonical(item), row["id"]))
                 if item["status"] == "running":
-                    if item["kind"] in {"learn", "review"}:
+                    if item["kind"] in {"learn", "review", "chat_review"}:
                         job = self._job(db, item["job_id"])
                         item["episode"] = self.learning_episode(db, job["id"])
                         item["related"] = [
                             self.learning_episode(db, i)
                             for i in item.get("related_job_ids", [])
-                            if self.learning_family(self._job(db, i)) == self.learning_family(job)
+                            if (
+                                self.same_learning_conversation(self._job(db, i), job)
+                                if item["kind"] == "chat_review"
+                                else self.learning_family(self._job(db, i)) == self.learning_family(job)
+                            )
                         ]
                     return item
         return None
@@ -153,6 +200,31 @@ class LearningStore:
                 raise PermissionError("Maintenance scope mismatch")
             if item.get("claim_id") != claim_id or item["status"] != "running":
                 raise Stale("Maintenance claim expired or replaced")
+            if item["kind"] == "chat_review" and result.get("signals"):
+                from eas_shared.chat_learning import ChatReview
+                from eas_shared.chat_learning import validate_signals
+
+                signals = ChatReview.model_validate({k: result[k] for k in ("signals", "reason")}).signals
+                source = self.learning_episode(db, item["job_id"])
+                related = [
+                    self.learning_episode(db, i)
+                    for i in item.get("related_job_ids", [])
+                    if self.same_learning_conversation(source["job"], self._job(db, i))
+                ]
+                validated = validate_signals([s.model_dump() for s in signals], source, related)
+                for signal in validated:
+                    self._event(
+                        db,
+                        item["job_id"],
+                        "chat_feedback",
+                        dict(
+                            signal,
+                            review_id=item_id,
+                            attribution="model_inferred_from_staff_chat",
+                            model=result.get("model"),
+                            model_mode=result.get("model_mode"),
+                        ),
+                    )
             item.update(status="completed", result=result, finished_at=time.time())
             db.execute("UPDATE maintenance SET data=? WHERE id=?", (canonical(item), item_id))
             return item

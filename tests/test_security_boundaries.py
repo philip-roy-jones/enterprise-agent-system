@@ -127,6 +127,58 @@ def test_distinct_desktops_and_no_previous_assignment_access(secured):
     assert c.get(f"/api/jobs/{alice['id']}", headers=h("alice")).json()["lease"]["job_id"] is None
 
 
+def test_chat_teaching_publication_needs_admitted_review_and_retains_audience(secured):
+    import hashlib
+    from eas_shared.identity import canonical
+    from eas_shared.skills import SkillSpec
+
+    app, c, h, rpc, _ = secured
+    job = new_job(secured)
+    rpc("exec-a", "claim", "fixture").raise_for_status()
+    store = app.state.store
+    store.update_job(job["id"], {"status": "completed"})
+    spec = SkillSpec(
+        skill_id="chat_lesson",
+        title="Response preference",
+        description="A staff-taught preference",
+        task="Report requested facts",
+        instructions="Report only the requested facts; include currency units.",
+        application_version=job["app_version"],
+        evidence_ids=[job["id"]],
+    ).model_dump()
+    version = hashlib.sha256(canonical(spec).encode()).hexdigest()
+    entry = dict(skill_id=spec["skill_id"], version=version, package=spec, active=True)
+    assert rpc("admission", "skills_publish", {"versions": [entry]}).status_code == 403
+    with store.db() as db:
+        store.queue_chat_review(db, store._job(db, job["id"]))
+    claim = rpc("admission", "learning_claim", "fixture").json()
+    # A simulated isolated reviewer: the quote is validated against real chat,
+    # never presented as a staff assessment or a successful operation.
+    result = dict(
+        status="activated",
+        reason="Simulated reviewer",
+        version=version,
+        candidate=spec,
+        model_mode="simulated",
+        signals=[
+            dict(
+                kind="preference",
+                message_id="request:" + job["id"],
+                quote=job["task"],
+                explanation="Simulated reusable lesson",
+            )
+        ],
+    )
+    rpc("admission", "learning_finish", claim["id"], claim["claim_id"], result).raise_for_status()
+    rpc("admission", "skills_publish", {"versions": [entry]}).raise_for_status()
+    assert not store.get_job(job["id"])["accepted"]
+    assert "Response preference" in c.get("/api/learning", headers=h("alice")).text
+    assert "Response preference" not in c.get("/api/learning", headers=h("bob")).text
+    invented = {**spec, "steps": ["validate", "establish", "compare", "report", "complete"]}
+    altered = dict(entry, package=invented, version=hashlib.sha256(canonical(invented).encode()).hexdigest())
+    assert rpc("admission", "skills_publish", {"versions": [altered]}).status_code == 403
+
+
 def test_source_evidence_restricts_private_package_delivery(secured):
     import hashlib
     from eas_shared.identity import canonical

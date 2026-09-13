@@ -66,6 +66,15 @@ class BrowserAdapter:
     def get_model_image(self):
         return getattr(self, "_model_image", None)
 
+    def capture_screen(self):
+        self.fence()
+        return dict(
+            screenshot=base64.b64encode(self.page.screenshot(timeout=self.timeout_ms())).decode("ascii"),
+            width=1200,
+            height=800,
+            surface="browser_fixture",
+        )
+
     def prepare_observation(self, job_id, owner, epoch):
         # This adapter owns a dedicated browser page, independent of OS focus.
         return None

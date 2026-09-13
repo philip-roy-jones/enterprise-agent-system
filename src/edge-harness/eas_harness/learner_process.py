@@ -16,12 +16,25 @@ Support files are optional bounded plaintext references/templates/assets/tests. 
 def main():
     payload = json.loads(sys.stdin.read(100001))
     evidence = payload["evidence"]
+    chat = evidence.get("kind") == "chat_review"
+    prompt, version, schema = PROMPT, PROMPT_VERSION, LearningProposal
+    if chat:
+        from eas_harness.chat_review import PROMPT as chat_prompt
+        from eas_shared.chat_learning import ChatReview
+
+        prompt, version, schema = chat_prompt, "conversation-review-1", ChatReview
     if payload["model_mode"] == "simulated":
         # Explicit deterministic fixture. Live maintenance always uses the model below.
-        old = evidence["previous"]
-        steps = evidence["steps"]
-        labels = sorted(set(evidence["labels"] + (old["amount_labels"] if old else [])))
-        if evidence.get("kind") == "review":
+        old = evidence.get("previous")
+        steps = evidence.get("steps", [])
+        labels = sorted(set(evidence.get("labels", []) + (old["amount_labels"] if old else [])))
+        if chat:
+            result = {
+                "candidate": None,
+                "signals": [],
+                "reason": "Simulated chat reviewer: no inferred lesson",
+            }
+        elif evidence.get("kind") == "review":
             catalog = evidence.get("catalog", [])
             gap = next((g for g in evidence.get("guidance", []) if g["kind"] == "capability_gap"), None)
             result = {
@@ -83,9 +96,9 @@ def main():
         settings = SimpleNamespace(model_provider=payload["model_provider"], model_id=payload["model_id"])
         response = model_for(settings).invoke(
             [
-                SystemMessage(content=PROMPT),
+                SystemMessage(content=prompt),
                 HumanMessage(
-                    content=json.dumps({"evidence": evidence, "schema": LearningProposal.model_json_schema()})
+                    content=json.dumps({"evidence": evidence, "schema": schema.model_json_schema()})
                 ),
             ]
         )
@@ -94,7 +107,7 @@ def main():
             content = content.split("\n", 1)[1].rsplit("```", 1)[0]
         result = json.loads(content)
         usage = response.usage_metadata or {}
-    print(json.dumps({"result": result, "usage": usage, "prompt_version": PROMPT_VERSION, "prompt": PROMPT}))
+    print(json.dumps({"result": result, "usage": usage, "prompt_version": version, "prompt": prompt}))
 
 
 if __name__ == "__main__":

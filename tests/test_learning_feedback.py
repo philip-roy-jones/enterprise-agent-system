@@ -318,10 +318,12 @@ def test_judgment_approval_discloses_and_binds_the_exact_model_context(store, jo
     assert sent["prompt"] == fresh["inputs"]["judgment"]["prompt"]
 
 
-def test_capability_gap_uses_no_desktop_or_business_approval(store, tmp_path, monkeypatch):
+def test_missing_capability_is_reviewed_in_background_without_a_chat_reporting_tool(
+    store, tmp_path, monkeypatch
+):
     from eas_harness.coordinator import Coordinator, SimulatedCoordinator
     from langgraph.checkpoint.memory import InMemorySaver
-    from langchain_core.messages import AIMessage, ToolMessage
+    from langchain_core.messages import AIMessage
     from langchain_core.outputs import ChatGeneration, ChatResult
     from test_chat_records import NoDesktop
 
@@ -331,24 +333,7 @@ def test_capability_gap_uses_no_desktop_or_business_approval(store, tmp_path, mo
     store.claim("fixture-worker")
 
     def generate(self, messages, **kwargs):
-        if any(isinstance(m, ToolMessage) for m in messages):
-            response = AIMessage(
-                content="Simulated reply: the missing integration was recorded for development; nothing was exported."
-            )
-        else:
-            response = AIMessage(
-                content="",
-                tool_calls=[
-                    {
-                        "id": "gap",
-                        "name": "report_capability_gap",
-                        "args": {
-                            "capability": "supplier export",
-                            "reason": "The installed operations expose no supplier export integration.",
-                        },
-                    }
-                ],
-            )
+        response = AIMessage(content="This workspace has no supplier export integration.")
         return ChatResult(generations=[ChatGeneration(message=response)])
 
     monkeypatch.setattr(SimulatedCoordinator, "_generate", generate)
@@ -365,8 +350,10 @@ def test_capability_gap_uses_no_desktop_or_business_approval(store, tmp_path, mo
     assert store.get_job(j["id"])["status"] == "completed"
     assert store.approvals(j["id"]) == []
     queue = store.learning_status()["queue"]
-    assert len(queue) == 1 and queue[0]["trigger"] == "capability_gap"
-    assert any(e["kind"] == "capability_gap" for e in store.events(j["id"]))
+    assert sum(q["kind"] == "chat_review" for q in queue) == 1
+    calls = [e["data"] for e in store.events(j["id"]) if e["kind"] == "model_step"]
+    assert all("report_capability_gap" not in call["available_tools"] for call in calls)
+    assert not any(e["kind"] == "agent_tool_call" for e in store.events(j["id"]))
 
 
 def test_supporting_file_read_has_its_own_approval(store, job, tmp_path, monkeypatch):

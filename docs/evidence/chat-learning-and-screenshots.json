@@ -1,0 +1,103 @@
+{
+  "scope": "Prototype conversation learning and annotated desktop screenshots",
+  "model": {
+    "mode": "live",
+    "provider": "openrouter",
+    "id": "openai/gpt-5.6-luna"
+  },
+  "staff": "Synthetic messages and simulated approval decisions; no claim of real staff evaluation",
+  "chat_teaching": {
+    "checks": {
+      "live_model": true,
+      "staff_decisions": "simulated",
+      "screenshots_without_record": true,
+      "annotated_share": true,
+      "no_business_actions_for_teaching": true,
+      "chat_lesson_activated": true,
+      "source_quote_recorded": true
+    },
+    "jobs": {
+      "marketing": "db1f441d550949809aab21051f9c50ea",
+      "finance": "44b4f4579dd34551948ae744e318647b"
+    },
+    "review_id": "chat-db1f441d550949809aab21051f9c50ea",
+    "skill_id": "report-campaign-performance",
+    "version": "f1e3f5e4a4476725b3ba8d0dec461cf2d78c2c8b8bee2d1c96312bf7e52de299"
+  },
+  "subsequent_reuse": {
+    "model_mode": "live",
+    "staff_mode": "simulated",
+    "released_version_read": true,
+    "two_decimal_percentage": true,
+    "currency_disclosed": true,
+    "verified_campaign_result": true
+  },
+  "screen": {
+    "width": 1280,
+    "height": 800,
+    "surface": "desktop",
+    "captured_at": 1789340787.3851285,
+    "caption": "Historical desktop capture: the DemoBooks Desktop window is visible and labeled with an arrow. No application interaction was performed.",
+    "annotations": [
+      {
+        "color": "yellow",
+        "kind": "arrow",
+        "label": "DemoBooks window",
+        "x": 0.16,
+        "x2": 0.28,
+        "y": 0.03,
+        "y2": 0.03
+      }
+    ]
+  },
+  "foreground_limitation": {
+    "model_mode": "live",
+    "staff_mode": "simulated",
+    "no_approvals": true,
+    "response": "I can\u2019t capture or share my screen in this session because the required screen-capture tools are unavailable."
+  },
+  "independent_background_review": {
+    "status": "reviewed",
+    "model_mode": "live",
+    "recommendation_kinds": [
+      "development_request"
+    ],
+    "foreground_reporting_tool": false,
+    "activated_skill": false
+  },
+  "browser_checks": {
+    "desktop_width": 1440,
+    "mobile_width": 390,
+    "annotated_image_loaded": true,
+    "enlarge_and_fit": true,
+    "idle_workspace_hidden": true,
+    "assessment_form_removed": true,
+    "javascript_errors": []
+  },
+  "regression": {
+    "distinct_tests_passed": 249,
+    "execution": "Independent file groups plus focused reruns after corrections",
+    "model_mode": "simulated",
+    "staff_mode": "simulated",
+    "lint_and_format": "passed",
+    "frontend_syntax": "passed",
+    "independent_package_installations": [
+      "server",
+      "edge-harness"
+    ],
+    "native_controller_build": "Windows x64 self-contained"
+  },
+  "initial_failures": [
+    "Remote screenshot lookup used an unsupported store RPC; changed to an assigned-worker artifact route.",
+    "The model attempted to share an old capture; current-request checks now return a recoverable tool error before requesting approval.",
+    "Two frontend/queue assertions assumed removed UI and the old maintenance order; updated and passed.",
+    "An ambiguous-save restart test refused a prompt edited mid-run; passed with stable source, without another save.",
+    "Background proposals with incorrect evidence references were rejected; clarified the ID rules and verified a subsequent independent review."
+  ],
+  "limits": [
+    "Only particular live cases verified.",
+    "Chat review changes text only; contract checks do not prove prose behavior.",
+    "API-only Ubuntu Marketing has no interactive screenshot integration.",
+    "Raw desktop images, credentials and deployment addresses are excluded."
+  ]
+}

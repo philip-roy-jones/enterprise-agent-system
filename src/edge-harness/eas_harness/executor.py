@@ -165,6 +165,10 @@ class Executor(FinanceOperations):
 
     def effect(self, job_id, name, args):
         job = self.store.get_job(job_id)
+        if name in {"capture_screen", "share_screenshot"}:
+            from eas_harness.screenshots import screen_tool
+
+            return screen_tool(self.store, self.layer.adapter, job_id, name, args)
         if name == "review_discovery":
             return {"staff_verified_outcome": args["assistant_report"], "acceptance_required": True}
         if name == "select_record":

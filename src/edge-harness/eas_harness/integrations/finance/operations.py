@@ -3,6 +3,8 @@ from dataclasses import dataclass, replace
 from pydantic import BaseModel
 import math
 from eas_harness.contracts import NODE_RESULTS, TOOL_CONTRACTS, NodeInputs, ReviewInputs, Invoice
+from eas_harness.contracts import Empty
+from eas_shared.screenshots import ScreenCapture, ShareScreenshot
 
 
 @dataclass(frozen=True)
@@ -32,6 +34,21 @@ class Operation:
 
 
 OPERATIONS = {
+    "capture_screen": Operation(
+        "Capture the entire interactive desktop, including other visible windows, for this conversation",
+        "A timestamped screenshot of all monitors; browser fixtures capture only their test viewport",
+        input_model=Empty,
+        output_model=ScreenCapture,
+        conditions="Staff approval to read the assigned worker desktop; no record required",
+    ),
+    "share_screenshot": Operation(
+        "Send the disclosed screenshot, caption and annotations to this staff conversation",
+        "An immutable chat attachment; annotations describe the capture, not current application state",
+        desktop=False,
+        input_model=ShareScreenshot,
+        output_model=ToolResult,
+        conditions="Previously approved capture in this request; same staff conversation",
+    ),
     "select_record": Operation(
         "Use the disclosed invoice for the work requested in this conversation",
         "The request is bound to this invoice; application actions each require their own approval",
