@@ -1,7 +1,6 @@
 """Adversarial HTTP clients, without relying on cooperative model behavior."""
 
 import json
-import time
 import pytest
 from fastapi.testclient import TestClient
 from eas_server.backend import create_app
@@ -338,61 +337,3 @@ def test_artifacts_are_bound_to_assignment_and_owner(secured):
         ).status_code
         == 404
     )
-
-
-def test_oidc_validates_signature_claims_and_registered_subject(tmp_path, monkeypatch):
-    import jwt
-    from cryptography.hazmat.primitives.asymmetric.rsa import generate_private_key
-    from types import SimpleNamespace
-
-    key = generate_private_key(public_exponent=65537, key_size=2048)
-    policy = tmp_path / "identities.json"
-    policy.write_text(
-        json.dumps(
-            {
-                "principals": [
-                    dict(
-                        id="alice",
-                        kind="human",
-                        name="Alice",
-                        issuer="https://identity.test",
-                        subject="subject-1",
-                        grants=[],
-                    )
-                ]
-            }
-        )
-    )
-    app = create_app(
-        Settings(
-            data_dir=tmp_path,
-            identity_file=str(policy),
-            auth_mode="oidc",
-            public_url="https://console.test",
-            oidc_issuer="https://identity.test",
-            oidc_audience="eas",
-            oidc_jwks_url="https://identity.test/keys",
-            desktop_adapter="windows_accessibility",
-        )
-    )
-    monkeypatch.setattr(
-        app.state.security.jwks, "get_signing_key_from_jwt", lambda _: SimpleNamespace(key=key.public_key())
-    )
-    c = TestClient(app)
-    claims = dict(
-        iss="https://identity.test",
-        aud="eas",
-        sub="subject-1",
-        iat=int(time.time()),
-        exp=int(time.time()) + 60,
-    )
-    for edits, status in [
-        ({}, 200),
-        ({"aud": "other"}, 401),
-        ({"iss": "https://evil.test"}, 401),
-        ({"sub": "unregistered"}, 401),
-        ({"exp": 1}, 401),
-    ]:
-        token = jwt.encode(claims | edits, key, algorithm="RS256")
-        assert c.get("/api/me", headers={"Authorization": "Bearer " + token}).status_code == status
-    assert c.get("/api/me", headers={"Authorization": "Bearer local-staff-demo"}).status_code == 401

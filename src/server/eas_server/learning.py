@@ -11,7 +11,7 @@ from eas_shared.types import Stale
 class LearningStore:
     @staticmethod
     def learning_family(job):
-        skills = sorted({r["skill_id"] for r in job.get("workflow_runs", {}).values() if r.get("skill_id")})
+        skills = sorted({r["skill_id"] for r in job.get("skill_runs", {}).values() if r.get("skill_id")})
         task = re.sub(r"\b(?:INV|PO)-?\d+\b|\d+", "record", job["task"], flags=re.I).lower()
         return canonical(
             [

@@ -1,0 +1,7 @@
+{
+  "organization_id": "acme",
+  "department_id": "marketing",
+  "role_id": "campaign_review",
+  "company_id": "ACME",
+  "capabilities": ["read"]
+}

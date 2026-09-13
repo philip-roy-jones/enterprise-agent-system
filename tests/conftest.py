@@ -233,7 +233,7 @@ def candidate(tmp_path, request):
     folder = tmp_path / "proposal"
     checkout = folder / "checkout"
     layouts = {
-        "split": ("src/edge-harness", "eas_harness/workflows/finance"),
+        "split": ("tools", "enterprise_dev/legacy/finance"),
         "src": ("src", "enterprise/workflows/finance"),
         "legacy": (".", "enterprise"),
     }

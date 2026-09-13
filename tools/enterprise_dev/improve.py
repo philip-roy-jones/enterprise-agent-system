@@ -63,7 +63,7 @@ def propose(episode, root, output, publish=False):
         check=True,
         capture_output=True,
     )
-    procedure = checkout / "src/edge-harness/eas_harness/workflows/finance/procedures.py"
+    procedure = checkout / "tools/enterprise_dev/legacy/finance/procedures.py"
     patch_library(procedure, analysis)
     # Export only selected synthetic semantics and evidence hashes, never full
     # episodes, business values, screenshots, runtime paths or credentials.
@@ -82,7 +82,7 @@ def propose(episode, root, output, publish=False):
             "-C",
             str(checkout),
             "add",
-            "src/edge-harness/eas_harness/workflows/finance/procedures.py",
+            "tools/enterprise_dev/legacy/finance/procedures.py",
             str(test.relative_to(checkout)),
             str(fixture_path.relative_to(checkout)),
         ],
@@ -213,9 +213,9 @@ def source_path(checkout):
 def candidate_library(checkout):
     """Locate a pinned candidate's library, including pre-src proposal checkouts."""
     checkout = Path(checkout)
-    split = checkout / "src/edge-harness/eas_harness/workflows/finance/procedures.py"
+    split = checkout / "tools/enterprise_dev/legacy/finance/procedures.py"
     if split.is_file():
-        return split, checkout / "src/edge-harness", "eas_harness.workflows.finance.procedures"
+        return split, checkout / "tools", "enterprise_dev.legacy.finance.procedures"
     current = checkout / "src/enterprise/workflows/finance/procedures.py"
     if current.is_file():
         return current, checkout / "src", "enterprise.workflows.finance.procedures"

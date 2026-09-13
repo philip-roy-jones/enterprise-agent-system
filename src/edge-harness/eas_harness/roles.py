@@ -4,17 +4,18 @@ Role modules are application code, not model-generated imports. EAS_WORKFLOW_MOD
 role definitions separately on the server with EAS_SERVER_ROLE_MODULES.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 import importlib
 import os
 from typing import Callable
 from eas_shared.roles import RoleDefinition, InvoiceCorrectionInputs
-from eas_harness.workflows.finance.operations import OPERATIONS
+from eas_harness.integrations.finance.operations import OPERATIONS
+from eas_shared.marketing import MARKETING_ROLE
+from eas_harness.integrations.marketing import CampaignAdapter, OPERATIONS as MARKETING_OPERATIONS, operation
 
 
 @dataclass(frozen=True, kw_only=True)
 class WorkerRole(RoleDefinition):
-    graph_factory: Callable
     adapter_factory: Callable
     operations: dict
     operation_handler: Callable | None = None
@@ -27,12 +28,6 @@ def register_role(role: WorkerRole):
     if role.id in ROLES:
         raise ValueError(f"Role already registered: {role.id}")
     ROLES[role.id] = role
-
-
-def _invoice_graph(*args, **kwargs):
-    from eas_harness.workflows.finance.graph import RoleGraph
-
-    return RoleGraph(*args, **kwargs)
 
 
 def _browser_adapter(settings, store):
@@ -61,7 +56,6 @@ register_role(
         if os.getenv("EAS_DESKTOP_ADAPTER") in {"windows", "windows_accessibility"}
         else "Ledger (synthetic)",
         input_model=InvoiceCorrectionInputs,
-        graph_factory=_invoice_graph,
         adapter_factory=_browser_adapter,
         operations=OPERATIONS,
         permissions=("read", "navigate", "draft"),
@@ -70,6 +64,15 @@ register_role(
     )
 )
 
+
+register_role(
+    WorkerRole(
+        **{f.name: getattr(MARKETING_ROLE, f.name) for f in fields(RoleDefinition)},
+        adapter_factory=CampaignAdapter,
+        operations=MARKETING_OPERATIONS,
+        operation_handler=operation,
+    )
+)
 
 _loaded = False
 

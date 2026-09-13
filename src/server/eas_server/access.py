@@ -19,8 +19,7 @@ def install_access(app, security):
             "/api/health",
             "/api/session",
             "/api/auth/config",
-            "/api/auth/login",
-            "/api/auth/callback",
+            "/api/account/setup",
         }:
             return await call_next(request)
         token = None

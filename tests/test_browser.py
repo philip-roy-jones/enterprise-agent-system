@@ -45,7 +45,7 @@ def test_explicit_save_rejection_requires_approved_retry(browser_server):
     c = browser_server["client"]
     c.post("/api/mock/scenario", json={"reject_save": True}).raise_for_status()
     job = create(c)
-    approval = until(c, job, "resume_workflow")
+    approval = until(c, job, "resume_skill")
     assert c.get("/api/jobs/" + job).json()["job"]["mutation"] == "confirmed_failed"
     assert not any(d["operation_id"] == job for d in c.get("/api/mock/state").json()["drafts"])
     result = drive(c, job)
@@ -64,7 +64,7 @@ def test_strict_gates_every_executable_node(browser_server):
     result = drive(c, job)
     assert [a["name"] for a in result["approvals"] if a["status"] == "executed"] == [
         "read_skill",
-        "run_workflow",
+        "run_skill",
         "validate",
         "establish",
         "compare",
@@ -83,7 +83,7 @@ def test_unmatched_request_stays_supervised_without_workflow_creation(browser_se
     result = drive(c, job)
     assert result["job"]["verified_report"]
     assert result["job"]["mutation"] == "not_attempted"
-    assert not result["job"].get("workflow_runs")
+    assert not result["job"].get("skill_runs")
     assert all(a["decision"] for a in result["approvals"])
 
 
@@ -144,7 +144,7 @@ def test_workflow_recovery_tools_need_separate_approvals(browser_server, scenari
     job = create(c)
     result = drive(c, job, correction=True)
     names = [a["name"] for a in result["approvals"] if a["status"] == "executed"]
-    assert "observe_app" in names and "resume_workflow" in names
+    assert "observe_app" in names and "resume_skill" in names
     assert result["job"]["effective_mode"] == "strict"
     assert len([d for d in c.get("/api/mock/state").json()["drafts"] if d["operation_id"] == job]) == 1
 
@@ -251,7 +251,7 @@ def test_restart_after_ambiguous_save_never_saves_twice(browser_server):
     c = browser_server["client"]
     c.post("/api/mock/scenario", json={"interrupt_save": True})
     job = create(c)
-    until(c, job, "resume_workflow")
+    until(c, job, "resume_skill")
     before = c.get("/api/mock/state").json()["save_requests"]
     assert c.get("/api/jobs/" + job).json()["job"]["mutation"] == "attempted_uncertain"
     restart(browser_server)

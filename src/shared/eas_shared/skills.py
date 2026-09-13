@@ -18,7 +18,7 @@ class SkillSpec(WireModel):
     role_id: str = "invoice_correction"
     company_id: str = "ACME"
     application_version: str
-    capability_version: Literal["finance-1"] = "finance-1"
+    capability_version: Literal["finance-1", "marketing-1"] = "finance-1"
     task: str = Field(min_length=1, max_length=2000)
     steps: list[
         Literal[
@@ -82,11 +82,11 @@ class LearningProposal(WireModel):
     recommendations: list[LearningRecommendation] = Field(default_factory=list, max_length=5)
 
 
-class WorkflowCall(SkillRead):
+class SkillRun(SkillRead):
     pass
 
 
-class WorkflowResume(WireModel):
+class SkillResume(WireModel):
     run_id: str
 
 

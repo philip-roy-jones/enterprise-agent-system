@@ -77,7 +77,7 @@ def test_infers_actual_correction_without_label_keyword_or_canned_replacement(ep
     assert result["additions"] == [LABEL]
     assert result["library"]["nodes"] and result["evidence"][0]["decision"] == "correct"
     target = tmp_path / "procedures.py"
-    target.write_text((ROOT / "src/edge-harness/eas_harness/workflows/finance/procedures.py").read_text())
+    target.write_text((ROOT / "tools/enterprise_dev/legacy/finance/procedures.py").read_text())
     patch_library(target, result)
     namespace = {}
     exec(compile(target.read_text(), str(target), "exec"), namespace)
@@ -127,15 +127,16 @@ def test_label_reason_alone_does_not_justify_a_change(episode):
 
 
 def test_analysis_refuses_changed_graph_consumer(episode, tmp_path):
-    (tmp_path / "src/edge-harness/eas_harness/workflows/finance").mkdir(parents=True)
-    (tmp_path / "src/edge-harness/eas_harness/workflows/finance/procedures.py").write_text(
-        (ROOT / "src/edge-harness/eas_harness/workflows/finance/procedures.py").read_text()
+    (tmp_path / "tools/enterprise_dev/legacy/finance").mkdir(parents=True)
+    (tmp_path / "tools/enterprise_dev/legacy/finance/procedures.py").write_text(
+        (ROOT / "tools/enterprise_dev/legacy/finance/procedures.py").read_text()
     )
-    (tmp_path / "src/edge-harness/eas_harness/workflows/finance/graph.py").write_text(
-        (ROOT / "src/edge-harness/eas_harness/workflows/finance/graph.py").read_text()
+    (tmp_path / "tools/enterprise_dev/legacy/finance/graph.py").write_text(
+        (ROOT / "tools/enterprise_dev/legacy/finance/graph.py").read_text()
     )
-    (tmp_path / "src/edge-harness/eas_harness/workflows/finance/runtime.py").write_text(
-        (ROOT / "src/edge-harness/eas_harness/workflows/finance/runtime.py")
+    (tmp_path / "src/edge-harness/eas_harness/integrations/finance").mkdir(parents=True)
+    (tmp_path / "src/edge-harness/eas_harness/integrations/finance/runtime.py").write_text(
+        (ROOT / "src/edge-harness/eas_harness/integrations/finance/runtime.py")
         .read_text()
         .replace('job["amount_labels"]', 'job["unrelated_labels"]')
     )

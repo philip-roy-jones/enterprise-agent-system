@@ -22,7 +22,7 @@ Retain three independently installed applications and the shared contract librar
 | --- | --- |
 | `src/server/` | Conversation UI, authenticated dispatch, approval records, progress, evidence, skill metadata, review and release records. No agent or workflow execution. |
 | `src/edge-harness/` | Conversational Deep Agent, skill retrieval, workflow runtime, isolated LLM nodes, shared operation execution, desktop adapters, and bounded learning maintenance. |
-| `src/demobooks/` | Independent synthetic Windows accounting application. |
+| `src/test-software/demobooks/` | Independent synthetic Windows accounting application. |
 | `src/shared/` | Versioned API/data contracts. No execution, persistence, credentials, or environment loading. |
 
 The developer machine hosts the server; the Windows VM/PC hosts the harness and DemoBooks. Use the existing single Windows VM for development. Do not require one VM per staff member or additional department VMs for this milestone. Application credentials and operating-system isolation remain separate from staff approval policy. Deployment addresses stay configurable.

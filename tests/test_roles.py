@@ -1,6 +1,6 @@
 import pytest
 from pydantic import BaseModel
-from eas_harness.workflows.roles import WorkerRole, ROLES
+from eas_harness.roles import WorkerRole, ROLES
 from eas_shared.types import JobInput
 
 
@@ -19,7 +19,6 @@ def people_role(monkeypatch):
         name="Onboarding review",
         application="Test people workspace",
         input_model=PeopleInputs,
-        graph_factory=lambda *a: None,
         adapter_factory=lambda *a: None,
         operations={},
         permissions=("read",),

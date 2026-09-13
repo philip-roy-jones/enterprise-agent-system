@@ -22,8 +22,8 @@
         ><button id="metrics-tab">▥ &nbsp; Evaluation metrics</button>
         <div class="sidebar-bottom">
           <span class="worker-avatar">W1</span
-          ><strong>Development worker</strong
-          ><small>One worker · One desktop</small
+          ><strong>Development workers</strong
+          ><small>One active request per desktop</small
           ><span id="model-label" class="badge">Simulated assistance</span>
           <small id="signed-in-as"></small><button id="sign-out" type="button" hidden>Sign out</button>
         </div>
@@ -51,7 +51,7 @@
               <span>Example department</span
               ><strong id="department-label">Finance</strong
               ><small id="role-label"
-                >Invoice correction · first workflow</small
+                >Invoice correction · first example</small
               >
             </div>
             <div class="overview-card">
@@ -76,6 +76,7 @@
               <button class="primary">Send</button>
 
             </form>
+            <label>Workspace<select id="chat-workspace" aria-label="Conversation workspace"></select></label>
             <p id="conversation-label" class="hint"></p>
           </section>
           <section class="panel" id="learning-panel"><details><summary>Accumulated skills & learning</summary><div id="learning-content"></div></details></section>
@@ -106,7 +107,7 @@
                       Accept completed work
                     </button>
                   </div>
-                  <div id="workflow-runs"></div><div id="progress" class="progress-track"></div>
+                  <div id="skill-runs"></div><div id="progress" class="progress-track"></div>
                   <p id="job-error" role="alert"></p>
                 </section>
                 <section class="panel review-panel" id="review-panel">
@@ -153,7 +154,7 @@
                     <h2>Agent decisions & tool activity</h2>
                     <a id="episode-link" target="_blank">Export episode ↗</a>
                   </div>
-                  <p class="hint">Expand a call to inspect its purpose, arguments, results and evidence. Agent tools and internal workflow steps are shown separately.</p>
+                  <p class="hint">Expand a call to inspect its purpose, arguments, results and evidence. Agent tools and internal skill graph steps are shown separately.</p>
                   <div class="activity-controls"><label>Show<select id="activity-filter"><option value="all">All activity</option><option value="decisions">Agent decisions</option><option value="tools">Tools & operations</option><option value="approvals">Approvals</option><option value="recovery">Errors & recovery</option><option value="evidence">Observations</option><option value="session">Session & context</option></select></label><label>Find<input id="activity-search" type="search" placeholder="Tool, record, run ID, or error…" /></label></div>
                   <p id="activity-counts" class="hint"></p>
                   <div id="timeline" class="timeline" aria-label="Detailed agent activity"></div>
@@ -225,7 +226,7 @@
           </select></label
         >
         <p class="hint">
-          Every tool and workflow operation requires your approval.
+          Every tool and skill operation requires your approval.
         </p>
         <button class="primary wide" type="submit">Send request</button>
       </form>
@@ -234,22 +235,11 @@
       <form id="login-form">
         <div class="brand login-brand">Enterprise Agent System</div>
         <h2>Connect to your workspace</h2>
-        <p class="muted" id="login-explanation">
-          Enter the staff token configured for this local prototype.
-        </p>
-        <div id="development-login"><label
-          >Staff token<input
-            id="token"
-            type="password"
-            autocomplete="current-password"
-            value="local-staff-demo"
-            required /></label
-        ><button class="primary wide">Connect</button>
-        <p class="hint">
-          Default local demo token is prefilled. Change it in .env for your
-          environment.
-        </p></div>
-        <a id="oidc-login" class="primary wide" href="/api/auth/login" hidden>Sign in with your organization</a>
+        <p class="muted" id="login-explanation">Sign in with your prototype staff account.</p>
+        <label>Email<input id="login-email" type="email" autocomplete="username" maxlength="254" required /></label>
+        <label>Password<input id="login-password" type="password" autocomplete="current-password" maxlength="256" required /></label>
+        <button id="login-submit" class="primary wide">Sign in</button>
+        <p class="hint">Need an account or password reset? Ask the prototype operator for a setup link. No email is sent automatically.</p>
       </form>
     </dialog>
     <div id="toast" role="status" hidden></div>

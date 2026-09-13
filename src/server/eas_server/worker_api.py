@@ -10,7 +10,10 @@ from eas_server.access import current
 from eas_shared.identity import uid, fingerprint
 
 CONTRACTS = json.loads(files("eas_shared").joinpath("finance_operations.json").read_text())
-ROLE_CONTRACTS = {"invoice_correction": CONTRACTS}
+ROLE_CONTRACTS = {
+    "invoice_correction": CONTRACTS,
+    "campaign_review": json.loads(files("eas_shared").joinpath("marketing_operations.json").read_text()),
+}
 
 
 def register_contracts(role_id, metadata):
@@ -78,7 +81,7 @@ PLANNER = {
 ADMISSION = {"learning_claim", "learning_finish", "skills_publish", "get_job", "package_access"}
 PLANNER_UPDATES = {
     "execution_state",
-    "workflow_runs",
+    "skill_runs",
     "error",
     "model_calls",
     "tokens",
@@ -402,14 +405,14 @@ def install_worker_api(app, security):
                     raise HTTPException(403, "Service cannot update execution authority or results")
                 if args[1].get("status") and args[1]["status"] not in {"failed", "denied"}:
                     raise HTTPException(403, "Completion requires a validated transition")
-                if "workflow_runs" in args[1]:
-                    old, new = job.get("workflow_runs", {}), args[1]["workflow_runs"]
+                if "skill_runs" in args[1]:
+                    old, new = job.get("skill_runs", {}), args[1]["skill_runs"]
                     if not isinstance(new, dict) or set(old) - set(new):
                         raise HTTPException(403, "Workflow history cannot be removed")
                     approved = [
                         a
                         for a in store.approvals(job["id"])
-                        if a["name"] == "run_workflow" and a["status"] == "executed"
+                        if a["name"] == "run_skill" and a["status"] == "executed"
                     ]
                     for run_id, run in new.items():
                         if run_id != run.get("run_id") or run_id != run.get("checkpoint_thread"):
@@ -421,7 +424,7 @@ def install_worker_api(app, security):
                             ):
                                 raise HTTPException(403, "Pinned workflow cannot change")
                         elif not any(
-                            run_id == a["invocation"] + ":workflow"
+                            run_id == a["invocation"] + ":skill"
                             and {"skill_id": run["skill_id"], "version": run["version"]}
                             == a.get("corrected_arguments", a["arguments"])
                             for a in approved

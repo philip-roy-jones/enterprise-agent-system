@@ -881,7 +881,7 @@
     "retry_limit": 2,
     "timeout_seconds": 10
   },
-  "resume_workflow": {
+  "resume_skill": {
     "conditions": "Fresh observation; authorized company and invoice",
     "description": "Resume this suspended workflow after rechecking current application state",
     "desktop": false,
@@ -897,7 +897,7 @@
       "required": [
         "run_id"
       ],
-      "title": "WorkflowResume",
+      "title": "SkillResume",
       "type": "object"
     },
     "mutation": false,
@@ -985,7 +985,7 @@
     "retry_limit": 2,
     "timeout_seconds": 10
   },
-  "run_workflow": {
+  "run_skill": {
     "conditions": "Fresh observation; authorized company and invoice",
     "description": "Start this versioned workflow; each internal operation needs separate approval",
     "desktop": false,
@@ -1006,7 +1006,7 @@
         "skill_id",
         "version"
       ],
-      "title": "WorkflowCall",
+      "title": "SkillRun",
       "type": "object"
     },
     "mutation": false,

@@ -1,6 +1,6 @@
 # Enterprise Agent System: authorization and worker security boundaries
 
-Status: **A–E implemented for the prototype; F has registration/lease support, with fleet distribution and physical multi-VM validation outstanding.** 2026-09-13. See the [measured validation record](../security-validation.md).
+Status: **A–E implemented for the prototype; F has registration/lease support and Windows/Ubuntu validation; fleet distribution remains outstanding.** 2026-09-13. See the [measured validation record](../security-validation.md).
 
 This is the accepted plan and scope record for the security work after the [agent-led learning milestone](agent-led-learning-plan.md). The implementation and actual deployment evidence are described in [security](../security.md) and [validation](../security-validation.md); this document does not establish enterprise readiness. Preserve the delivered learning behavior and [persistent staff conversation](persistent-session-context.md).
 
@@ -10,9 +10,11 @@ Staff describe outcomes to a supervised assistant. The Deep Agent plans the work
 
 Learning improves procedures without increasing permissions or reducing Strict approvals. A distinct worker identity supports attribution and revocation; it does not turn the model into an independently authorized employee.
 
-Keep the three installed applications: server/frontend, edge harness, and independent DemoBooks Desktop. The server runs no Deep Agent, LangGraph, or learner. The edge harness can contain separately privileged services without becoming a new product or requiring a separate repository. `src/shared/` remains API/data contracts only.
+Keep three software boundaries: server/frontend, edge harness, and independent synthetic business applications (DemoBooks Desktop and Campaign Desk). The server runs no Deep Agent, LangGraph, or learner. The edge harness can contain separately privileged services without becoming a new product or requiring a separate repository. `src/shared/` remains API/data contracts only.
 
 Use the existing Windows VM and synthetic data for development. Individual employee identities and permission combinations do not each require a VM. Physical isolation claims require separate validation from application authorization tests.
+
+> Scope update: organizational SSO/OIDC is removed at the owner's request. Individual email/password accounts replace the provider integration; worker enrollment, server authorization and strict approvals remain unchanged. Marketing on Ubuntu provides a second physical edge environment. Skills are the sole reusable procedure abstraction; optional LangGraph execution lives inside a skill.
 
 ## 1. Starting implementation and the gap (historical baseline)
 
@@ -40,7 +42,7 @@ Test three different compromise scenarios:
 2. **Compromised planner or stolen planner credential:** the attacker can reach only assigned context and proposal APIs; cannot directly control the desktop, obtain application credentials, approve actions, or publish admitted skills.
 3. **Compromised privileged executor or entire edge host:** assume exposure of that environment's accessible applications, local data, credentials, and retained context. The server must still deny access to other workers' resources and prevent the host from granting organization-wide authority. Reports from that host cannot prove that its local actions were legitimate.
 
-The central authority, identity provider, trusted operation implementations, deployment administrators, and the OS/hypervisor enforcing isolation remain trusted components. Compromise of a hypervisor can affect its guest VMs. Signed messages authenticate an origin; they do not make a compromised origin truthful.
+The central authority, password account store, trusted operation implementations, deployment administrators, and the OS/hypervisor enforcing isolation remain trusted components. Compromise of a hypervisor can affect its guest VMs. Signed messages authenticate an origin; they do not make a compromised origin truthful.
 
 For a legacy desktop, an attacker controlling the privileged interactive session can bypass our action broker. This plan limits the consequences of that compromise; it cannot make an application enforce approval semantics it does not support. Where an application API supports its own permissions or transaction approval, retain those protections too.
 
@@ -48,7 +50,7 @@ For a legacy desktop, an attacker controlling the privileged interactive session
 
 ### People
 
-- Use an existing OIDC identity provider for real sign-in. Map verified issuer/subject pairs to stable internal principal IDs. Validate tokens/sessions server-side; never accept actor identity or membership from request bodies.
+- Use individual email/password accounts mapped to stable internal principal IDs. Store Argon2id hashes; provision passwords through single-use expiring setup links without a mailer. Authenticate sessions server-side; never accept actor identity or membership from request bodies. Organizational SSO is outside the revised prototype scope.
 - Provide a clearly labeled development identity fixture with several distinct users for repeatable tests. Keep it explicit and restricted to development; no silent fallback from failed production authentication to demo credentials.
 - Store organization membership and entitlements server-side. Separate rights to request work, approve an operation, read a resource, administer policy, and publish a package. An administrator does not automatically receive all business data.
 - An authorized requester can also approve their own operation when policy permits. This plan does not require two humans. Supporting organizational separation-of-duties rules must not imply enabling them for every prototype task.
@@ -132,7 +134,7 @@ Define centrally managed environment profiles based on data and credential compa
 
 A broadly privileged machine image must not be cloned as a substitute for role-specific provisioning. Installing an application does not itself grant access, but copied credentials, authenticated sessions, caches, backups, and private skills can.
 
-The first milestone keeps one physical worker and serial desktop execution. Exercise multiple registered worker identities through protocol fixtures. Actual multiworker scheduling and pool capacity management belong to a later phase, with separate evidence for concurrent desktops.
+The initial milestone used one Windows worker. The follow-up runs Finance on Windows and Marketing on Ubuntu concurrently, each with a distinct registered identity and exclusive lease. Automatic pool placement and cross-worker context/package replication remain later work.
 
 ## 8. Skills, learning, and memory confidentiality
 
@@ -158,7 +160,7 @@ Each phase produces a reviewable change, relevant tests, an updated setup docume
 
 | Phase | Deliverable | Acceptance evidence |
 | --- | --- | --- |
-| A. Policy and identity | Resource/action inventory, central policy evaluator, OIDC integration, labeled development principals, unique worker enrollment/revocation | Staff and worker identities cannot impersonate one another; unauthorized object access fails through raw HTTP |
+| A. Policy and identity | Resource/action inventory, central policy evaluator, email/password login, labeled development principals, unique worker enrollment/revocation | Staff and worker identities cannot impersonate one another; unauthorized object access fails through raw HTTP |
 | B. Resource and protocol enforcement | Scoped staff views, all endpoint checks, assignment-bound typed worker commands, authoritative state transitions | Malicious worker fixture cannot reach another assignment, create decisions, edit authority, or declare an admitted release |
 | C. Grants and migration | Exact-operation grants, current-policy checks, executor consumption and receipts, safe data migration | Altered, replayed, expired, revoked, or wrong-worker grants fail; restart and uncertainty tests retain duplicate-write prevention |
 | D. Scoped knowledge and learning | Protected catalog/distribution, evidence classifications, separate admission authority, context revocation | Restricted skills and history never reach unauthorized clients; same-scope automatic learning/reuse still works; fabricated reports cannot directly publish |
@@ -191,7 +193,7 @@ Use direct API clients and raw privileged-interface attempts as well as frontend
 | Planner directly calls controller, reads its token, modifies binaries, or reaches the desktop | OS-enforced isolation rejects access in the actual deployment |
 | Entire worker host is treated as compromised | Report exposure of its own accessible resources; prove its credentials cannot access other server scopes or mint shared authority |
 
-Most policy/protocol tests use synthetic users and a malicious-worker client on the developer machine. A synthetic second department tests authorization without claiming a CRM integration exists. One Windows VM is sufficient for the serial desktop regression and account-isolation spike; it does not prove isolation between multiple guest VMs or pool scheduling.
+Most policy/protocol tests use synthetic users and a malicious-worker client on the developer machine. Additional checks run against Windows Finance and Ubuntu Marketing using separate accounts and synthetic applications. These establish the tested access boundaries and concurrent execution; they do not establish pool scheduling, generic Linux GUI automation or a hypervisor security assessment.
 
 Live-model tests are only needed to validate changed agent behavior, such as continued teaching and reuse. Security checks must also work without an LLM. Label simulated staff/model runs explicitly; record actual live runs, failures, and untested configurations separately.
 
@@ -212,4 +214,4 @@ Autonomy optimization, arbitrary generated code execution, new business applicat
 
 A–D now have central individual identity/resource checks, a narrow worker protocol, exact signed grants, protected context and immutable scoped package publication. E progressed from the feasibility spike to an installed three-process harness on the existing Windows VM, with direct access probes under both actual noninteractive accounts. Live-model teaching and reuse still work with separately recorded simulated staff decisions.
 
-F provides explicit environment profiles, unique service enrollment, environment-rebinding rejection, and distinct-desktop lease/assignment tests. It does not yet provide shared context/package replication, automated fleet placement, or a validated second physical Windows worker. Cross-worker package delivery fails closed. Retirement/retention is an operator-managed procedure, with no automatic erasure service. Real IdP deployment remains unverified; the OIDC browser flow has controlled-provider tests. These limits are recorded rather than treating the entire original plan as complete.
+F provides explicit environment profiles, unique service enrollment, environment-rebinding rejection, distinct-desktop lease/assignment tests, and concurrent live execution on Windows Finance and Ubuntu Marketing. Both installations have access probes under their actual isolated accounts. Shared context/package replication and automatic fleet placement remain unimplemented; cross-worker package delivery fails closed. Retirement/retention is operator-managed, with no automatic erasure service. Email/password replaces the removed OIDC implementation. These limits are recorded rather than treating the entire original plan as complete.

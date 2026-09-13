@@ -6,7 +6,7 @@ Only synthetic records; no desktop, server, credentials, generated Python or mod
 from copy import deepcopy
 from types import SimpleNamespace
 from eas_harness.skill_library import validate_spec
-from eas_harness.workflows.finance.runtime import FinanceOperations
+from eas_harness.integrations.finance.runtime import FinanceOperations
 from eas_shared.types import Recovery
 
 
@@ -100,6 +100,10 @@ def check_candidate(candidate):
                 {"case": "bounded supporting text paths and content", "passed": True},
             ],
         }
+    if spec["role_id"] == "campaign_review":
+        from eas_harness.marketing_checks import check_marketing
+
+        return check_marketing(spec)
     for amount, po_amount in [(15327, 12340), (47000, 51000), (9900, 9900)]:
         for label in spec["amount_labels"] or ["Correction amount"]:
             job = dict(

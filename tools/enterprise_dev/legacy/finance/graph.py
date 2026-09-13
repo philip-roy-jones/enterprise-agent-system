@@ -1,4 +1,4 @@
-from eas_harness.workflows.finance.runtime import FinanceOperations
+from eas_harness.integrations.finance.runtime import FinanceOperations
 import time
 import contextvars
 from langgraph.graph import StateGraph, START, END
@@ -6,7 +6,7 @@ from eas_harness.state import GraphState
 from eas_harness.errors import Paused
 from eas_shared.types import Recovery
 from eas_harness.assistance import build_assistant, run_assistant
-from eas_harness.workflows.finance.procedures import matches_invoice_procedure
+from enterprise_dev.legacy.finance.procedures import matches_invoice_procedure
 
 NODES = [
     "validate",

@@ -6,7 +6,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from eas_harness.config import Settings
 from eas_harness.execution import ExecutionLayer
 from eas_harness.coordinator import Coordinator
-from eas_harness.workflows.roles import get_role
+from eas_harness.roles import get_role
 from eas_harness.remote import RemoteStore
 from eas_shared.identity import uid
 from eas_shared.types import Stale, Stopped, TERMINAL
@@ -28,9 +28,7 @@ def validate_assignment(settings, job):
         raise PermissionError("Job permissions exceed the installed worker role")
     normalized = role.normalize(
         job,
-        allow_unbound=bool(job.get("conversation_request"))
-        and job.get("execution_engine") == "agent-led-1"
-        and role.id == "invoice_correction",
+        allow_unbound=bool(job.get("conversation_request")) and job.get("execution_engine") == "agent-led-1",
     )
     if any(normalized[field] != job.get(field) for field in (*role.input_model.model_fields, "record_id")):
         raise PermissionError("Job inputs differ from the validated role inputs")
@@ -84,7 +82,11 @@ def run_worker(settings=None, once=False):
                 lease = store.lease()
                 store.check(job_id, lease["owner"], lease["epoch"])
                 role_id = job.get("role_id", "invoice_correction")
-                engine = job.get("execution_engine", "legacy-strict")
+                engine = job.get("execution_engine")
+                if engine != "agent-led-1":
+                    raise Stopped(
+                        "Historical graph-first requests cannot execute; submit a new skill-based request"
+                    )
                 if (role_id, engine) != active_role:
                     if adapter:
                         adapter.close()
@@ -103,31 +105,12 @@ def run_worker(settings=None, once=False):
                         graph_saver = RemoteCheckpointer(layer, "workflow")
                     else:
                         assist_saver, graph_saver = SqliteSaver(assist_db), SqliteSaver(graph_db)
-                    if role_id == "invoice_correction" and engine == "agent-led-1":
-                        graph = Coordinator(settings, store, layer, assist_saver, graph_saver)
-                    else:
-                        graph = role.graph_factory(settings, store, layer, graph_saver, assist_saver).graph
+                    graph = Coordinator(settings, store, layer, assist_saver, graph_saver)
                     active_role = (role_id, engine)
                 if store.lease()["owner"] == "staff":
                     time.sleep(0.5)
                     continue
-                if isinstance(graph, Coordinator):
-                    graph.tick(job)
-                else:
-                    config = {
-                        "configurable": {"thread_id": job_id},
-                        "recursion_limit": 160,
-                        "max_concurrency": 4,
-                    }
-                    snapshot = graph.get_state(config)
-                    # On every restart and resume observations come from the actual application.
-                    if snapshot.next:
-                        value = None  # Retry an interrupted task after a process crash.
-                    elif snapshot.values:
-                        value = {"job_id": job_id, "paused": False}
-                    else:
-                        value = {"job_id": job_id, "turn": 0, "paused": False}
-                    graph.invoke(value, config, durability="sync")
+                graph.tick(job)
             except Stale:
                 # Handoffs invalidate queued actions; retry only after observing current authority.
                 time.sleep(0.25)

@@ -18,7 +18,7 @@ def test_malformed_recovery_click_returns_to_model_before_any_approval(store, jo
         data_dir=tmp_path, model_mode="simulated", model_id="", model_provider="", max_model_calls=4
     )
     run = {"state": "needs_assistance", "run_id": "existing-workflow", "version": "pinned-version"}
-    store.update_job(job["id"], {"workflow_runs": {"existing-workflow": run}})
+    store.update_job(job["id"], {"skill_runs": {"existing-workflow": run}})
     calls = []
 
     def generate(self, messages, **kwargs):
@@ -53,7 +53,7 @@ def test_malformed_recovery_click_returns_to_model_before_any_approval(store, jo
     coordinator.tick(store.get_job(job["id"]))
     current = store.get_job(job["id"])
     assert current["status"] == "running" and current["execution_state"] == "awaiting_approval"
-    assert current["workflow_runs"] == {"existing-workflow": run}
+    assert current["skill_runs"] == {"existing-workflow": run}
     approvals = store.approvals(job["id"])
     assert len(approvals) == 1 and approvals[0]["status"] == "pending"
     assert approvals[0]["arguments"] == {"target": "invoices", "x": None, "y": None}
@@ -87,7 +87,7 @@ def test_agent_workflow_has_child_approvals(browser_server):
     d, names = finish(ctx, job_id)
     assert names == [
         "read_skill",
-        "run_workflow",
+        "run_skill",
         "validate",
         "establish",
         "compare",
@@ -97,7 +97,7 @@ def test_agent_workflow_has_child_approvals(browser_server):
         "complete",
     ]
     assert d["job"]["mutation"] == "confirmed_succeeded"
-    assert list(d["job"]["workflow_runs"].values())[0]["state"] == "completed"
+    assert list(d["job"]["skill_runs"].values())[0]["state"] == "completed"
 
 
 def test_agent_unknown_report(browser_server):
@@ -146,7 +146,7 @@ def test_learning_accumulates_and_pins(browser_server):
 
     first, names, learn = run("Report the discrepancy without saving", "INV-1042")
     assert learn["status"] == "activated", learn
-    assert "run_workflow" not in names
+    assert "run_skill" not in names
     assert learn["candidate"]["steps"] == ["validate", "establish", "compare", "report", "complete"]
     from eas_harness.skill_library import SkillLibrary
 
@@ -154,7 +154,7 @@ def test_learning_accumulates_and_pins(browser_server):
     v1 = learn["version"]
     key = learn["skill_id"]
     second, names, reuse = run("Report the discrepancy without saving", "INV-1043")
-    assert "run_workflow" in names
+    assert "run_skill" in names
     assert reuse["status"] == "no_change", reuse
     third, names, revision = run("Report and classify the discrepancy without saving", "INV-1044")
     assert revision["status"] == "activated", revision
@@ -216,7 +216,7 @@ def test_runtime_final_verification_needs_approval_when_model_stops_early(store,
         verified.append(state)
         return {"verified": True, "acceptance_required": True}
 
-    monkeypatch.setattr(coordinator.workflows, "operation", complete)
+    monkeypatch.setattr(coordinator.skills, "operation", complete)
     coordinator.tick(store.get_job(job["id"]))
     assert not verified and store.get_job(job["id"])["status"] == "running"
     approval = store.approvals(job["id"])[0]
@@ -268,9 +268,9 @@ def test_completed_child_workflow_returns_to_agent_for_remaining_work(store, job
     correction = next(s for s in coordinator.library.catalog(job) if s["skill_id"] == "invoice_correction")
     selections = [
         ("read_skill", {"skill_id": "report"}),
-        ("run_workflow", {"skill_id": "report"}),
+        ("run_skill", {"skill_id": "report"}),
         ("read_skill", {"skill_id": correction["skill_id"]}),
-        ("run_workflow", {"skill_id": correction["skill_id"]}),
+        ("run_skill", {"skill_id": correction["skill_id"]}),
     ]
     calls = []
 
@@ -312,10 +312,10 @@ def test_completed_child_workflow_returns_to_agent_for_remaining_work(store, job
             if approval["status"] == "pending":
                 store.decide(approval["id"], {"decision": "approve"}, actor="simulated-staff")
     assert current["status"] == "completed" and adapter.saves == 1
-    assert len(current["workflow_runs"]) == 2 and len(calls) == 5
-    assert all(r["state"] == "completed" for r in current["workflow_runs"].values())
+    assert len(current["skill_runs"]) == 2 and len(calls) == 5
+    assert all(r["state"] == "completed" for r in current["skill_runs"].values())
     approvals = store.approvals(job["id"])
-    assert sum(a["name"] == "run_workflow" for a in approvals) == 2
+    assert sum(a["name"] == "run_skill" for a in approvals) == 2
     assert all(a["status"] == "executed" and a.get("decision") for a in approvals)
     store.accept(job["id"])
     with store.db() as db:

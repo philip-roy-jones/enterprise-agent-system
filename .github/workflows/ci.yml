@@ -40,13 +40,13 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      - run: dotnet run --project src/demobooks/AccountingSmoke/AccountingSmoke.csproj -c Release
-      - run: dotnet publish src/demobooks/DemoBooks/DemoBooks.csproj -c Release -r win-x64 --self-contained true -o src/demobooks/publish
+      - run: dotnet run --project src/test-software/demobooks/AccountingSmoke/AccountingSmoke.csproj -c Release
+      - run: dotnet publish src/test-software/demobooks/DemoBooks/DemoBooks.csproj -c Release -r win-x64 --self-contained true -o src/test-software/demobooks/publish
       - run: dotnet publish src/edge-harness/windows/DesktopAgent/DesktopAgent.csproj -c Release -r win-x64 --self-contained true -o src/edge-harness/windows/desktop-publish
       - uses: actions/upload-artifact@v4
         with:
           name: DemoBooks-Windows-x64
-          path: src/demobooks/publish/
+          path: src/test-software/demobooks/publish/
       - uses: actions/upload-artifact@v4
         with:
           name: Enterprise-DesktopAgent-Windows-x64

@@ -83,7 +83,7 @@ def run(client, task, invoice, *, guidance=None, correct_field=False, timeout=24
         "error": job.get("error"),
         "verified_report": job.get("verified_report"),
         "mutation": job["mutation"],
-        "workflow_runs": job.get("workflow_runs", {}),
+        "skill_runs": job.get("skill_runs", {}),
         "operations": job.get("operation_trace", []),
         "metrics": {
             "approval_requests": len(data["approvals"]),

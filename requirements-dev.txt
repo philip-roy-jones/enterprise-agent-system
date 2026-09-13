@@ -1,6 +1,8 @@
 # Run from the repository root. Each application can also be installed separately.
 -c requirements.lock
 -e src/shared
+-e src/test-software/ledger-fixture
+-e src/test-software/campaign-desk
 -e src/server
 -e src/edge-harness[browser]
 -e .[dev]

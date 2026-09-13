@@ -17,6 +17,14 @@ SCOPE = ("organization_id", "department_id", "role_id", "company_id")
 def validate_spec(spec):
     spec = SkillSpec.model_validate(spec)
     steps = spec.steps
+    if spec.role_id == "campaign_review":
+        if spec.capability_version != "marketing-1" or spec.department_id != "marketing":
+            raise ValueError("Marketing capability binding mismatch")
+        if spec.steps and spec.steps != ["validate", "establish", "report", "complete"]:
+            raise ValueError("Marketing workflows must validate, establish, report and complete")
+        return spec
+    if spec.capability_version != "finance-1":
+        raise ValueError("Unknown role capability binding")
     if any(not label.strip() or len(label) > 120 for label in spec.amount_labels):
         raise ValueError("Invalid field label")
     if not steps:
@@ -64,11 +72,12 @@ class SkillLibrary:
             "adapters/adapter.py",
             "adapters/windows_adapter.py",
             "adapters/accessibility_adapter.py",
-            "workflow_tools.py",
-            "workflows/finance/runtime.py",
-            "workflows/finance/operations.py",
+            "skill_runtime.py",
+            "integrations/finance/runtime.py",
+            "integrations/finance/operations.py",
             "judgment.py",
             "contracts.py",
+            "integrations/marketing.py",
         ]
         hashes = {f: hashlib.sha256((root / f).read_bytes()).hexdigest() for f in files}
         hashes["skill_schema"] = hashlib.sha256(canonical(SkillSpec.model_json_schema()).encode()).hexdigest()
@@ -141,6 +150,8 @@ class SkillLibrary:
         return version
 
     def seed(self, job):
+        if job["role_id"] != "invoice_correction":
+            return
         # Trusted bundled procedure, not learned evidence. Never overwrite a learned revision.
         name = "invoice_correction"
         with self.db() as db:
@@ -204,7 +215,7 @@ class SkillLibrary:
                 continue
             result.append(
                 {k: s[k] for k in ("skill_id", "title", "description", "task")}
-                | {"version": version, "has_workflow": bool(s["steps"])}
+                | {"version": version, "has_graph": bool(s["steps"])}
             )
         return result
 

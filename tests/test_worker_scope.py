@@ -1,7 +1,7 @@
 from dataclasses import replace
 import pytest
 from eas_harness.config import Settings
-from eas_harness.workflows.roles import ROLES
+from eas_harness.roles import ROLES
 from eas_shared.types import JobInput
 from eas_harness.worker import validate_assignment, run_worker
 
@@ -34,7 +34,7 @@ def test_misrouted_job_never_initializes_desktop_or_graph(store, monkeypatch, tm
     monkeypatch.setitem(
         ROLES,
         "invoice_correction",
-        replace(ROLES["invoice_correction"], adapter_factory=forbidden, graph_factory=forbidden),
+        replace(ROLES["invoice_correction"], adapter_factory=forbidden),
     )
     run_worker(Settings(data_dir=tmp_path / "edge"), once=True)
     result = store.get_job(job["id"])

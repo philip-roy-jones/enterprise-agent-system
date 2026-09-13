@@ -2,6 +2,7 @@
 
 import importlib
 import os
+from eas_shared.marketing import MARKETING_ROLE
 from eas_shared.roles import RoleDefinition, InvoiceCorrectionInputs
 
 
@@ -30,6 +31,8 @@ register_role(
     )
 )
 
+
+register_role(MARKETING_ROLE)
 
 _loaded = False
 

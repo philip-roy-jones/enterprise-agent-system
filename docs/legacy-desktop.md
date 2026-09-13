@@ -11,7 +11,7 @@ The execution preference is an authorized application API when available, then a
 Publish both Windows executables:
 
 ```bash
-dotnet publish src/demobooks/DemoBooks/DemoBooks.csproj -c Release -r win-x64 --self-contained true -o src/demobooks/publish
+dotnet publish src/test-software/demobooks/DemoBooks/DemoBooks.csproj -c Release -r win-x64 --self-contained true -o src/test-software/demobooks/publish
 dotnet publish src/edge-harness/windows/DesktopAgent/DesktopAgent.csproj -c Release -r win-x64 --self-contained true -o src/edge-harness/windows/desktop-publish
 ```
 

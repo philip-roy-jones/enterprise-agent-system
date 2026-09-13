@@ -1,4 +1,4 @@
-from eas_shared.skills import SkillRead, SkillResource, WorkflowCall, WorkflowResume, ToolResult
+from eas_shared.skills import SkillRead, SkillResource, SkillRun, SkillResume, ToolResult
 from dataclasses import dataclass, replace
 from pydantic import BaseModel
 import math
@@ -143,13 +143,13 @@ for name, schema, description in [
         "Read the disclosed supporting file from this exact skill version",
     ),
     (
-        "run_workflow",
-        WorkflowCall,
+        "run_skill",
+        SkillRun,
         "Start this versioned workflow; each internal operation needs separate approval",
     ),
     (
-        "resume_workflow",
-        WorkflowResume,
+        "resume_skill",
+        SkillResume,
         "Resume this suspended workflow after rechecking current application state",
     ),
 ]:

@@ -53,7 +53,7 @@ def test_hard_limit_rotates_complete_tool_pairs_without_erasing_history(tmp_path
     ]
     memory.archive(job, messages)
     window, state = memory.window(
-        job, {"task": "Continue", "workflow_runs": {"same-id": "awaiting_approval"}}, max_chars=16000
+        job, {"task": "Continue", "skill_runs": {"same-id": "awaiting_approval"}}, max_chars=16000
     )
     assert state["reason"] == "context_limit"
     assert all(m.type == "human" for m in window)

@@ -49,11 +49,13 @@ def main():
                     if old
                     else "observed_record_guidance"
                     if not steps
+                    else "campaign_metrics_report"
+                    if evidence["scope"]["role_id"] == "campaign_review"
                     else "discrepancy_report",
-                    title="Verified Finance procedure",
+                    title="Verified department procedure",
                     description="A procedure learned from accepted work.",
                     instructions="Use only for "
-                    + re.sub(r"\b(?:INV|PO)-?\d+\b", "the assigned record", evidence["task"], flags=re.I)
+                    + re.sub(r"\b(?:INV|PO|CAM)-?\d+\b", "the assigned record", evidence["task"], flags=re.I)
                     + ". Validate scope and current record. "
                     + (
                         ", then ".join(steps)
@@ -61,7 +63,9 @@ def main():
                         else "Use establish and observe_app to inspect the assigned record; answer only the requested facts from the current observation and obtain staff outcome review"
                     )
                     + ". Require individual operation approvals. Decline outside the declared application and role. Verify the actual outcome before completion.",
-                    task=re.sub(r"\b(?:INV|PO)-?\d+\b", "the assigned record", evidence["task"], flags=re.I),
+                    task=re.sub(
+                        r"\b(?:INV|PO|CAM)-?\d+\b", "the assigned record", evidence["task"], flags=re.I
+                    ),
                     steps=steps,
                     amount_labels=labels,
                     evidence_ids=list(

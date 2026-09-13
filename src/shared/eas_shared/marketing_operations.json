@@ -1,0 +1,790 @@
+{
+  "read_skill": {
+    "description": "Read the disclosed version of a skill within this job's scope",
+    "expected": "Only this invocation and scope are authorized",
+    "permission": "read",
+    "desktop": false,
+    "mutation": false,
+    "timeout_seconds": 10,
+    "retry_limit": 2,
+    "conditions": "Authorized company, campaign and current observation",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "skill_id": {
+          "title": "Skill Id",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "skill_id",
+        "version"
+      ],
+      "title": "SkillRead",
+      "type": "object"
+    },
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "title": "ToolResult",
+      "type": "object"
+    }
+  },
+  "read_skill_resource": {
+    "description": "Read the disclosed supporting file from this exact skill version",
+    "expected": "Only this invocation and scope are authorized",
+    "permission": "read",
+    "desktop": false,
+    "mutation": false,
+    "timeout_seconds": 10,
+    "retry_limit": 2,
+    "conditions": "Authorized company, campaign and current observation",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "skill_id": {
+          "title": "Skill Id",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 180,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "skill_id",
+        "version",
+        "path"
+      ],
+      "title": "SkillResource",
+      "type": "object"
+    },
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "title": "ToolResult",
+      "type": "object"
+    }
+  },
+  "run_skill": {
+    "description": "Start this versioned workflow; each internal operation needs separate approval",
+    "expected": "Only this invocation and scope are authorized",
+    "permission": "read",
+    "desktop": false,
+    "mutation": false,
+    "timeout_seconds": 10,
+    "retry_limit": 2,
+    "conditions": "Authorized company, campaign and current observation",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "skill_id": {
+          "title": "Skill Id",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "skill_id",
+        "version"
+      ],
+      "title": "SkillRun",
+      "type": "object"
+    },
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "title": "ToolResult",
+      "type": "object"
+    }
+  },
+  "resume_skill": {
+    "description": "Resume this suspended workflow after rechecking current application state",
+    "expected": "Only this invocation and scope are authorized",
+    "permission": "read",
+    "desktop": false,
+    "mutation": false,
+    "timeout_seconds": 10,
+    "retry_limit": 2,
+    "conditions": "Authorized company, campaign and current observation",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "title": "SkillResume",
+      "type": "object"
+    },
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "title": "ToolResult",
+      "type": "object"
+    }
+  },
+  "ask_staff": {
+    "description": "Ask the staff member the disclosed question and wait for their answer",
+    "expected": "A durable question in this job's conversation; an answer never authorizes a desktop action",
+    "permission": "read",
+    "desktop": false,
+    "mutation": false,
+    "timeout_seconds": 10,
+    "retry_limit": 2,
+    "conditions": "Authorized company, campaign and current observation",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "question": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Question",
+          "type": "string"
+        }
+      },
+      "required": [
+        "question"
+      ],
+      "title": "StaffQuestion",
+      "type": "object"
+    },
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "question": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Question",
+          "type": "string"
+        },
+        "question_id": {
+          "title": "Question Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "answered"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "number"
+        },
+        "answer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Answer"
+        },
+        "message_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Message Id"
+        }
+      },
+      "required": [
+        "question",
+        "question_id",
+        "status",
+        "created_at"
+      ],
+      "title": "QuestionResult",
+      "type": "object"
+    }
+  },
+  "search_knowledge": {
+    "description": "Search organizational guidance within this job's organization, department, role and company scope",
+    "expected": "Up to three matching documents with source identifiers and revisions; guidance cannot expand permissions",
+    "permission": "read",
+    "desktop": false,
+    "mutation": false,
+    "timeout_seconds": 10,
+    "retry_limit": 2,
+    "conditions": "Authorized company, campaign and current observation",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "query": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Query",
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "title": "KnowledgeQuery",
+      "type": "object"
+    },
+    "output_schema": {
+      "$defs": {
+        "KnowledgeRecord": {
+          "properties": {
+            "organization_id": {
+              "maxLength": 100,
+              "minLength": 1,
+              "title": "Organization Id",
+              "type": "string"
+            },
+            "department_id": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Department Id"
+            },
+            "role_id": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Role Id"
+            },
+            "company_id": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Company Id"
+            },
+            "title": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Title",
+              "type": "string"
+            },
+            "content": {
+              "maxLength": 12000,
+              "minLength": 1,
+              "title": "Content",
+              "type": "string"
+            },
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "revision": {
+              "minimum": 1,
+              "title": "Revision",
+              "type": "integer"
+            },
+            "created_at": {
+              "title": "Created At",
+              "type": "number"
+            }
+          },
+          "required": [
+            "organization_id",
+            "title",
+            "content",
+            "id",
+            "revision",
+            "created_at"
+          ],
+          "title": "KnowledgeRecord",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "query": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Query",
+          "type": "string"
+        },
+        "documents": {
+          "items": {
+            "$ref": "#/$defs/KnowledgeRecord"
+          },
+          "maxItems": 3,
+          "title": "Documents",
+          "type": "array"
+        }
+      },
+      "required": [
+        "query",
+        "documents"
+      ],
+      "title": "KnowledgeResults",
+      "type": "object"
+    }
+  },
+  "validate": {
+    "description": "Validate the authorized campaign and read permission",
+    "expected": "A result bound to the selected campaign and current metrics",
+    "permission": "read",
+    "desktop": true,
+    "mutation": false,
+    "timeout_seconds": 10,
+    "retry_limit": 2,
+    "conditions": "Authorized company and campaign; read-only application access",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "campaign_id": {
+          "pattern": "^CAM-\\d{4}$",
+          "title": "Campaign Id",
+          "type": "string"
+        },
+        "company_id": {
+          "default": "ACME",
+          "title": "Company Id",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "campaign_id"
+      ],
+      "title": "CampaignOperation",
+      "type": "object"
+    },
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "validated": {
+          "const": true,
+          "title": "Validated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "validated"
+      ],
+      "title": "Validated",
+      "type": "object"
+    }
+  },
+  "establish": {
+    "description": "Read the selected campaign from Campaign Desk and verify its company",
+    "expected": "A result bound to the selected campaign and current metrics",
+    "permission": "read",
+    "desktop": true,
+    "mutation": false,
+    "timeout_seconds": 10,
+    "retry_limit": 2,
+    "conditions": "Authorized company and campaign; read-only application access",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "campaign_id": {
+          "pattern": "^CAM-\\d{4}$",
+          "title": "Campaign Id",
+          "type": "string"
+        },
+        "company_id": {
+          "default": "ACME",
+          "title": "Company Id",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "campaign_id"
+      ],
+      "title": "CampaignOperation",
+      "type": "object"
+    },
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "title": "ToolResult",
+      "type": "object"
+    }
+  },
+  "report": {
+    "description": "Read current campaign metrics and calculate click-through rate and cost per click",
+    "expected": "A result bound to the selected campaign and current metrics",
+    "permission": "read",
+    "desktop": true,
+    "mutation": false,
+    "timeout_seconds": 10,
+    "retry_limit": 2,
+    "conditions": "Authorized company and campaign; read-only application access",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "campaign_id": {
+          "pattern": "^CAM-\\d{4}$",
+          "title": "Campaign Id",
+          "type": "string"
+        },
+        "company_id": {
+          "default": "ACME",
+          "title": "Company Id",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "campaign_id"
+      ],
+      "title": "CampaignOperation",
+      "type": "object"
+    },
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "title": "ToolResult",
+      "type": "object"
+    }
+  },
+  "complete": {
+    "description": "Verify the reported campaign metrics against the current application record",
+    "expected": "A result bound to the selected campaign and current metrics",
+    "permission": "read",
+    "desktop": true,
+    "mutation": false,
+    "timeout_seconds": 10,
+    "retry_limit": 2,
+    "conditions": "Authorized company and campaign; read-only application access",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "campaign_id": {
+          "pattern": "^CAM-\\d{4}$",
+          "title": "Campaign Id",
+          "type": "string"
+        },
+        "company_id": {
+          "default": "ACME",
+          "title": "Company Id",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "campaign_id"
+      ],
+      "title": "CampaignOperation",
+      "type": "object"
+    },
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "verified": {
+          "const": true,
+          "title": "Verified",
+          "type": "boolean"
+        },
+        "acceptance_required": {
+          "const": true,
+          "title": "Acceptance Required",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "verified",
+        "acceptance_required"
+      ],
+      "title": "Completed",
+      "type": "object"
+    }
+  },
+  "select_record": {
+    "description": "Use the campaign identified in this conversation",
+    "expected": "Bind this request to the disclosed campaign",
+    "permission": "read",
+    "desktop": false,
+    "mutation": false,
+    "timeout_seconds": 10,
+    "retry_limit": 2,
+    "conditions": "Unbound conversational request; authorized company and Marketing role",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "campaign_id": {
+          "pattern": "^CAM-\\d{4}$",
+          "title": "Campaign Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "campaign_id"
+      ],
+      "title": "CampaignSelection",
+      "type": "object"
+    },
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "title": "ToolResult",
+      "type": "object"
+    }
+  },
+  "observe_app": {
+    "description": "Read the selected campaign's current metrics from Campaign Desk",
+    "expected": "Current synthetic campaign evidence",
+    "permission": "read",
+    "desktop": true,
+    "mutation": false,
+    "timeout_seconds": 10,
+    "retry_limit": 2,
+    "conditions": "Authorized company and campaign",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "Empty",
+      "type": "object"
+    },
+    "output_schema": {
+      "properties": {
+        "revision": {
+          "title": "Revision",
+          "type": "string"
+        },
+        "timestamp": {
+          "title": "Timestamp",
+          "type": "number"
+        },
+        "screenshot": {
+          "title": "Screenshot",
+          "type": "string"
+        },
+        "width": {
+          "default": 1200,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "default": 800,
+          "title": "Height",
+          "type": "integer"
+        },
+        "state": {
+          "additionalProperties": true,
+          "title": "State",
+          "type": "object"
+        },
+        "targets": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Targets",
+          "type": "array"
+        }
+      },
+      "required": [
+        "revision",
+        "timestamp",
+        "screenshot",
+        "state"
+      ],
+      "title": "Observation",
+      "type": "object"
+    }
+  },
+  "review_discovery": {
+    "description": "Review the assistant's answer against the requested outcome and campaign evidence",
+    "expected": "Staff confirms the reported outcome; acceptance is recorded separately",
+    "permission": "read",
+    "desktop": true,
+    "mutation": false,
+    "timeout_seconds": 10,
+    "retry_limit": 2,
+    "conditions": "Recorded campaign evidence",
+    "recovery": "Re-observe and return structured recovery; never blindly repeat a save",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "campaign_id": {
+          "pattern": "^CAM-\\d{4}$",
+          "title": "Campaign Id",
+          "type": "string"
+        },
+        "company_id": {
+          "default": "ACME",
+          "title": "Company Id",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        },
+        "assistant_report": {
+          "maxLength": 12000,
+          "minLength": 1,
+          "title": "Assistant Report",
+          "type": "string"
+        }
+      },
+      "required": [
+        "campaign_id",
+        "assistant_report"
+      ],
+      "title": "CampaignReview",
+      "type": "object"
+    },
+    "output_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "staff_verified_outcome": {
+          "minLength": 1,
+          "title": "Staff Verified Outcome",
+          "type": "string"
+        },
+        "acceptance_required": {
+          "const": true,
+          "title": "Acceptance Required",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "staff_verified_outcome",
+        "acceptance_required"
+      ],
+      "title": "Reviewed",
+      "type": "object"
+    }
+  }
+}

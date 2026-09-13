@@ -1,8 +1,8 @@
-# Developer machine and Windows worker
+# Developer server and edge workers
 
-The server/frontend runs on the developer machine. The Windows VM or PC runs the edge harness, desktop controller and independent DemoBooks application. The harness has isolated planner, executor and learner processes. Addresses and secrets are local configuration; no particular VPN, hostname or cloud is required.
+The server/frontend runs on the developer machine. A Windows VM or PC runs the edge harness, desktop controller and DemoBooks. An Ubuntu worker can run the same harness against Campaign Desk; see [Linux setup](linux-worker.md). The harness has isolated planner, executor and learner processes. Addresses and secrets are local configuration; no particular VPN, hostname or cloud is required.
 
-For architecture, access rules and limitations, see [security](security.md). The optional loopback browser fixture remains at the end of this guide.
+For architecture, access rules and limitations, see [security](security.md). The optional loopback browser fixture is documented in the README.
 
 ## 1. Install and provision the server
 
@@ -17,8 +17,7 @@ chmod 700 runtime/security
 python -m eas_server.admin --registry runtime/security/identities.json init
 python -m eas_server.admin --registry runtime/security/identities.json add-human \
   --id developer-staff --name 'Development staff' \
-  --grants docs/examples/staff-grants.json \
-  --development-token-file runtime/security/staff-token.txt
+  --grants docs/examples/staff-grants.json
 python -m eas_server.admin --registry runtime/security/identities.json enroll-worker \
   --id finance-desktop-01 --profile docs/examples/finance-environment.json \
   --backend-url https://your-backend-host --output runtime/security/edge
@@ -33,27 +32,27 @@ EAS_DATA_DIR=runtime
 EAS_BIND_HOST=127.0.0.1
 EAS_BIND_PORT=8000
 EAS_PUBLIC_URL=https://your-backend-host
-EAS_AUTH_MODE=development
+EAS_AUTH_MODE=password
 EAS_IDENTITY_FILE=runtime/security/identities.json
 EAS_DESKTOP_ADAPTER=windows_accessibility
 EAS_MODEL_MODE=live
 ```
 
-Run `enterprise-server` and publish its loopback listener through an authenticated HTTPS endpoint/reverse proxy you control. The explicit development identity registry works remotely over HTTPS; built-in demo identities require loopback configuration. The server needs no application, desktop controller or model-provider credential.
+Run `enterprise-server` and publish its loopback listener through an authenticated HTTPS endpoint/reverse proxy you control. The password identity registry works over HTTPS; built-in demo identities are limited to loopback fixtures. The server needs no application, desktop controller or model-provider credential.
 
-For OIDC sign-in, register a client at your identity provider with redirect URL `https://your-backend-host/api/auth/callback`. Add people with `--issuer` and `--subject` instead of `--development-token-file`, and set:
+Staff use email/password. Issue a one-hour account setup link from the server operator account:
 
-```dotenv
-EAS_AUTH_MODE=oidc
-EAS_OIDC_ISSUER=https://your-identity-provider
-EAS_OIDC_AUDIENCE=your-client-id
-EAS_OIDC_JWKS_URL=https://your-identity-provider/jwks
-EAS_OIDC_AUTHORIZATION_URL=https://your-identity-provider/authorize
-EAS_OIDC_TOKEN_URL=https://your-identity-provider/token
-EAS_OIDC_CLIENT_SECRET=your-confidential-client-secret
+```bash
+python -m eas_server.admin --registry runtime/security/identities.json invite-human \
+  --id developer-staff --email staff@example.test --data-dir runtime \
+  --public-url https://your-backend-host --setup-file runtime/security/staff-setup-link.txt
 ```
 
-Use the exact provider-issued values, not these placeholder paths. The supported ID-token signature algorithm is RS256. The client secret is optional for a public PKCE client. An OIDC failure never enables development fallback. The browser flow is tested against a controlled provider fixture; no real organization IdP is included in the prototype deployment.
+Open the protected file and give its link to the intended person through your trusted development channel. No email is sent. The person chooses a password in the browser, then signs in normally. Use the same command with a new output file to reset a password; completing a reset invalidates existing sessions. Never put passwords in shell arguments or chat. The link's credential is in a URL fragment, which the frontend removes immediately and submits in a bounded JSON request. It cannot be reused after successful setup.
+
+Passwords use Argon2id. Sign-in has persistent account/client throttling, bounded inputs, same-origin checks and HttpOnly sessions with CSRF protection. Remote password login requires HTTPS. The accounts database stores password hashes, not passwords. The registry still owns permissions, and worker service credentials cannot create human browser sessions. The implementation follows the relevant [OWASP password storage](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html) and [setup/reset token guidance](https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html).
+
+Organizational SSO/OIDC was removed from the prototype at the owner's request. `EAS_AUTH_MODE=development` retains bearer identities for explicitly labeled loopback/protocol fixtures; those credentials are not offered in the staff sign-in form.
 
 ## 2. Install the Windows application and controller
 
@@ -108,11 +107,11 @@ Start-ScheduledTask EAS-Planner
 
 The probes rotate only the installer-owned account password and restore its original task action. Review the output: Session 0, denied application/configuration/code/process access, no target UI Automation elements, controller status 403. A missing positive control is a failed probe, not evidence of containment. Keep results protected under the relevant component's `runtime` directory. Remove staging configuration copies after provisioning.
 
-Do not run a legacy `EAS-Worker`, `enterprise-harness`, or `enterprise dev` alongside this installation. Exactly one planner/executor pair owns a registered desktop. The backend can schedule distinct registered desktops independently, but shared skill/context replication and physical multi-VM isolation have not been validated.
+Do not run a legacy `EAS-Worker`, `enterprise-harness`, or `enterprise dev` alongside this installation. Exactly one planner/executor pair owns a registered desktop. The backend can schedule distinct registered desktops independently, but Windows Finance and Ubuntu Marketing have been exercised concurrently. Shared skill/context replication and automatic fleet placement remain unimplemented.
 
 ## 4. Staff use and operations
 
-Open the configured HTTPS frontend. In explicit development mode, sign in with the individual credential written to `staff-token.txt`; in OIDC mode, use the provider sign-in button. The console keeps one conversation per person and work scope. Staff approve each business operation, including graph children. Reading a skill does not authorize running it. Accepting an outcome is separate from approving its actions.
+Open the configured HTTPS frontend and sign in with the email/password established through the setup link. The console keeps one conversation per person and work scope. Staff approve each business operation, including graph children. Reading a skill does not authorize running it. Accepting an outcome is separate from approving its actions.
 
 Skill reads require source-evidence access. Lifecycle changes additionally require `manage_skills`. Accepted work can produce an automatically validated lesson on that worker. A private lesson is not automatically shared with every employee or worker. Use Take control/Release control before interacting during active work.
 
@@ -144,6 +143,31 @@ For later upgrades, drain and stop all three tasks, stage trusted source/configu
 
 ## Optional loopback browser fixture
 
-Without Windows, install `pip install -r requirements-dev.txt`, copy `.env.example` to `.env`, keep `EAS_DESKTOP_ADAPTER=browser` and `EAS_MODEL_MODE=simulated`, then run `python -m playwright install chromium` and `enterprise dev`. Open `http://127.0.0.1:8000` and use the explicitly labeled local demo credential. `/mock` is a synthetic accounting test workspace, disabled in Windows mode.
+Without Windows, install `pip install -r requirements-dev.txt`, copy `.env.example` to `.env`, keep `EAS_DESKTOP_ADAPTER=browser` and `EAS_MODEL_MODE=simulated`, then run `python -m playwright install chromium` and `enterprise dev`. The fixture is loopback-only and retains explicitly labeled bearer identities for automated tests. Staff still sign in with an email and password.
+
+In a second terminal with the same virtual environment and fixture configuration, create a password setup link for its existing synthetic staff identity:
+
+```bash
+python - <<'PYTHON'
+from pathlib import Path
+from urllib.parse import urlencode
+from eas_server.admin import private_write
+from eas_server.config import Settings
+from eas_server.security import Security
+from eas_server.store import Store
+settings = Settings()
+assert settings.auth_mode == "development" and not settings.identity_file, "Fixture setup only"
+security = Security(settings, Store(settings.data_dir))
+email = "staff@example.test"
+token = security.accounts.invite("staff", email)
+private_write(
+    settings.data_dir / "staff-setup-link.txt",
+    settings.public_url.rstrip("/") + "/#" + urlencode({"setup": token, "email": email}) + "\n",
+)
+print("Open runtime/staff-setup-link.txt to set your fixture password; no email was sent.")
+PYTHON
+```
+
+Open that protected file's link, set a password and sign in. Delete the consumed link file before issuing a replacement. This setup preserves the fixture's staff identity and conversation history. `/mock` is the synthetic browser accounting workspace; it is disabled on the ordinary server/edge installation.
 
 This trusted developer fixture uses integrated edge execution. It tests graphs, approvals and recovery; it does not establish the Windows account boundary. Cross-process security regression tests separately exercise the planner/executor protocol with synthetic identities.

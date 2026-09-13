@@ -58,15 +58,32 @@ async function action(fn) {
     toast(e.message);
   }
 }
-$("login-form").onsubmit = (e) => {
+let setupToken = null;
+$("login-form").onsubmit = async (e) => {
   e.preventDefault();
-  action(async () => {
-    const session = await api("/api/session", { token: $("token").value });
+  const button = $("login-submit");
+  button.disabled = true;
+  try {
+    const credentials = {email: $("login-email").value, password: $("login-password").value};
+    if (setupToken) {
+      await api("/api/account/setup", {...credentials, token: setupToken});
+      setupToken = null;
+      $("login-password").value = "";
+      $("login-password").autocomplete = "current-password";
+      $("login-password").removeAttribute("minlength");
+      button.textContent = "Sign in";
+      $("login-explanation").textContent = "Password saved. Sign in with your email and password.";
+      return;
+    }
+    const session = await api("/api/session", credentials);
     sessionStorage.setItem("eas-csrf", session.csrf);
-    $("token").value = "";
+    $("login-password").value = "";
     $("login-dialog").close();
     await loadIdentity();
-  });
+    await refresh();
+    connectStream();
+  } catch (error) { toast(error.message); }
+  finally { button.disabled = false; }
 };
 async function loadIdentity() {
   const me = await api("/api/me");
@@ -218,7 +235,7 @@ function renderDetail(d) {
     `${j.role_name || "Invoice correction"} · ${j.record_id || j.invoice_id || "Conversation"}`;
   $("department-label").textContent = j.department_name || "Finance";
   $("role-label").textContent =
-    j.role_name || "Invoice correction · first workflow";
+    j.role_name || "Invoice correction · first example";
   $("job-status").textContent = (done ? j.status : j.execution_state || j.status);
 
   $("cancel-job").disabled = done;
@@ -240,7 +257,7 @@ function renderDetail(d) {
   $("mode-detail").textContent = "Staff approval before every operation";
   // The composer always addresses the persistent staff session, even while an older activity is inspected.
   $("conversation-label").textContent = "Your ongoing conversation · history is retained across context changes";
-  $("workflow-runs").innerHTML = Object.values(j.workflow_runs || {}).map(run => `<p><strong>${esc(run.skill_id)}</strong> · ${esc(run.state.replaceAll("_"," "))} · step ${run.index + 1}<br><small>Version ${esc(run.version.slice(0,12))} · Run ${esc(run.run_id)}</small>${run.reason ? `<br>${esc(run.reason)}` : ""}</p>`).join("");
+  $("skill-runs").innerHTML = Object.values(j.skill_runs || {}).map(run => `<p><strong>${esc(run.skill_id)}</strong> · ${esc(run.state.replaceAll("_"," "))} · step ${run.index + 1}<br><small>Version ${esc(run.version.slice(0,12))} · Run ${esc(run.run_id)}</small>${run.reason ? `<br>${esc(run.reason)}` : ""}</p>`).join("");
   $("job-error").textContent = j.error || "";
   const staffQuestion = d.conversation?.questions.find(q => q.status === "pending");
   $("staff-question").hidden = !staffQuestion || done;
@@ -463,8 +480,10 @@ async function refresh() {
         .map(([id, name]) => `<option value="${esc(id)}">${esc(name)}</option>`)
         .join("");
       populateWorkflows();
+      $("chat-workspace").innerHTML = roles.map(r => `<option value="${esc(r.id)}">${esc(r.department_name)} · ${esc(r.name)}</option>`).join("");
     }
-    const session = await api("/api/chat");
+    if (!roles.length) return;
+    const session = await api("/api/chat?role_id=" + encodeURIComponent($("chat-workspace").value));
     // Display only this authenticated conversation. Browser storage and the
     // all-request audit endpoint cannot select another identity's execution.
     const jobs = (await api("/api/jobs")).filter(j => j.conversation_id === session.conversation_id);
@@ -497,6 +516,14 @@ async function refresh() {
     refreshing = false;
   }
 }
+$("chat-workspace").onchange = () => {
+  selectRequest(null);
+  conversationId = null;
+  requestDraft = null;
+  transcriptCache.clear();
+  $("session-messages").replaceChildren();
+  refresh();
+};
 let conversationId = null;
 let latestRequestId = null;
 localStorage.removeItem("active-job");
@@ -515,7 +542,9 @@ $("chat-form").onsubmit = (e) => {
     const task = $("chat-request").value.trim();
     if (!requestDraft || requestDraft.task !== task || requestDraft.conversation_id !== conversationId) {
       conversationId ||= crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`;
-      requestDraft = {task,conversation_id:conversationId,request_id:crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`};
+      const role = roles.find(r => r.id === $("chat-workspace").value);
+      if (!role) throw Error("Select an authorized workspace");
+      requestDraft = {task, department_id:role.department_id, role_id:role.id, conversation_id:conversationId,request_id:crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`};
     }
     const result = await api("/api/chat",requestDraft);
     const job = result.job;
@@ -595,12 +624,18 @@ async function refreshLearning() {
 $("activity-filter").onchange = refresh;
 $("activity-search").oninput = refresh;
 async function start() {
-  const config = await (await fetch("/api/auth/config")).json();
-  $("development-login").hidden = config.mode !== "development";
-  $("oidc-login").hidden = !config.browser_login;
-  $("login-explanation").textContent = config.mode === "development"
-    ? "Development identities only. Enter your configured prototype token."
-    : "Use your organization's identity provider to access your authorized workspace.";
+  const setup = new URLSearchParams(location.hash.slice(1));
+  if (setup.has("setup")) {
+    setupToken = setup.get("setup");
+    $("login-email").value = setup.get("email") || "";
+    history.replaceState(null, "", location.pathname + location.search);
+    $("login-password").autocomplete = "new-password";
+    $("login-password").minLength = 15;
+    $("login-submit").textContent = "Set password";
+    $("login-explanation").textContent = "Choose a password of at least 15 characters. This setup link expires after one hour and can be used once.";
+    $("login-dialog").showModal();
+    return;
+  }
   try { await loadIdentity(); } catch { return; }
   await refresh();
   connectStream();

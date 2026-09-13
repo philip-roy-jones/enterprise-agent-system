@@ -30,6 +30,8 @@ class Settings:
     desktop_agent_url: str = os.getenv("EAS_DESKTOP_AGENT_URL", "http://127.0.0.1:8766")
     desktop_agent_token: str = field(default=os.getenv("EAS_DESKTOP_AGENT_TOKEN", ""), repr=False)
     desktop_input_mode: str = os.getenv("EAS_DESKTOP_INPUT_MODE", "accessibility")
+    campaign_url: str = os.getenv("EAS_CAMPAIGN_URL", "http://127.0.0.1:8770")
+    campaign_token: str = field(default=os.getenv("EAS_CAMPAIGN_TOKEN", ""), repr=False)
     headless: bool = os.getenv("EAS_HEADLESS", "true").lower() == "true"
     learning_enabled: bool = os.getenv("EAS_LEARNING_ENABLED", "true").lower() == "true"
     context_max_chars: int = int(os.getenv("EAS_CONTEXT_MAX_CHARS", "96000"))

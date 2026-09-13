@@ -11,7 +11,6 @@ from eas_server.config import Settings
 from eas_server.evaluation import ActionAssessment, assess_action, assessment_metrics
 from eas_server.store import Store
 from eas_shared.identity import uid
-from eas_server.fixtures.mock import MockAccounting
 from eas_shared.types import JobInput, Decision, KnowledgeDocument, Stale, Stopped, TERMINAL
 from eas_server.security import Security, token_hash
 from eas_server.access import install_access, current as current_principal
@@ -22,7 +21,17 @@ def create_app(settings=None):
     settings = settings or Settings()
     store = Store(settings.data_dir)
     # Native desktop connections and credentials belong to the Windows worker.
-    mock = MockAccounting(store) if settings.desktop_adapter == "browser" else None
+    mock, fixture_static = None, None
+    if settings.desktop_adapter == "browser":
+        try:
+            from ledger_fixture.mock import MockAccounting
+            import ledger_fixture
+        except ImportError:
+            raise ValueError(
+                "Install src/test-software/ledger-fixture to enable the browser test application"
+            ) from None
+        mock = MockAccounting(store)
+        fixture_static = Path(ledger_fixture.__file__).parent / "static"
 
     def browser_fixture():
         if mock is None:
@@ -34,11 +43,7 @@ def create_app(settings=None):
     security = Security(settings, store)
     app.state.security = security
     install_access(app, security)
-    from eas_server.oidc import install_oidc
-
-    install_oidc(app, security)
     static = Path(__file__).parent / "frontend"
-    fixture_static = Path(__file__).parent / "fixtures" / "static"
     if mock is not None:
         app.mount("/fixture-static", StaticFiles(directory=fixture_static), name="fixture-static")
     app.mount("/static", StaticFiles(directory=static), name="static")
@@ -83,27 +88,64 @@ def create_app(settings=None):
         return {
             "status": "ok",
             "model_mode": settings.model_mode,
-            "application": "browser_fixture" if mock else "windows_desktop",
+            "application": "browser_fixture" if mock else "configured_edge_applications",
             "release": store.get_value("release")["version"],
             "desktop_adapter": settings.desktop_adapter,
         }
 
     @app.get("/api/auth/config")
     def auth_config():
-        return {
-            "mode": settings.auth_mode,
-            "issuer": settings.oidc_issuer,
-            "audience": settings.oidc_audience,
-            "browser_login": bool(settings.oidc_authorization_url),
-        }
+        return {"mode": settings.auth_mode, "login": "email_password"}
+
+    async def login_body(request):
+        if request.headers.get("content-type", "").split(";", 1)[0] != "application/json":
+            raise HTTPException(415, "JSON sign-in required")
+        origin = request.headers.get("origin")
+        if origin and origin.rstrip("/") != settings.public_url.rstrip("/"):
+            raise HTTPException(403, "Sign-in origin is not allowed")
+        raw = bytearray()
+        async for chunk in request.stream():
+            raw.extend(chunk)
+            if len(raw) > 16384:
+                raise HTTPException(413, "Sign-in request is too large")
+        try:
+            body = json.loads(raw)
+            if not isinstance(body, dict):
+                raise ValueError()
+            return body
+        except (ValueError, UnicodeError):
+            raise HTTPException(400, "Invalid sign-in request") from None
+
+    @app.post("/api/account/setup")
+    async def setup_account(request: Request):
+        from starlette.concurrency import run_in_threadpool
+
+        body = await login_body(request)
+        return await run_in_threadpool(
+            security.accounts.setup,
+            body.get("token"),
+            body.get("email"),
+            body.get("password"),
+            request.client.host if request.client else "unknown",
+        )
 
     @app.post("/api/session")
     async def session(request: Request):
         from fastapi.responses import JSONResponse
 
-        if request.headers.get("content-type", "").split(";", 1)[0] != "application/json":
-            raise HTTPException(415, "JSON sign-in required")
-        p, session_id, csrf = security.session((await request.json()).get("token", ""))
+        from starlette.concurrency import run_in_threadpool
+
+        body = await login_body(request)
+        if "token" in body and settings.auth_mode == "development":
+            # Explicit API fixture compatibility, never offered in the staff UI.
+            p, session_id, csrf = security.session(body["token"])
+        else:
+            p, session_id, csrf = await run_in_threadpool(
+                security.accounts.login,
+                body.get("email"),
+                body.get("password"),
+                request.client.host if request.client else "unknown",
+            )
         r = JSONResponse({"ok": True, "principal": {"id": p.id, "name": p.name}, "csrf": csrf})
         r.set_cookie(
             "eas_session",
@@ -111,7 +153,7 @@ def create_app(settings=None):
             httponly=True,
             samesite="strict",
             max_age=3600,
-            secure=settings.auth_mode == "oidc" or settings.public_url.startswith("https://"),
+            secure=settings.public_url.startswith("https://"),
         )
         return r
 
@@ -171,7 +213,9 @@ def create_app(settings=None):
 
     @app.get("/api/chat")
     def current_chat(role_id: str = "invoice_correction", company_id: str = "ACME", actor=Depends(staff)):
-        body = JobInput(role_id=role_id, company_id=company_id)
+        from eas_server.roles import get_role
+
+        body = JobInput(role_id=role_id, department_id=get_role(role_id).department_id, company_id=company_id)
         conversation_id = chat_scope(body, actor)
         requests = [
             j

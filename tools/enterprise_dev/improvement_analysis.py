@@ -31,7 +31,7 @@ def assignment(tree, name):
 
 def inspect_library(root):
     root = Path(root)
-    source = (root / "src/edge-harness/eas_harness/workflows/finance/procedures.py").read_text()
+    source = (root / "tools/enterprise_dev/legacy/finance/procedures.py").read_text()
     tree = ast.parse(source)
     labels = ast.literal_eval(assignment(tree, "AMOUNT_LABELS").value)
     version = ast.literal_eval(assignment(tree, "GRAPH_VERSION").value)
@@ -39,10 +39,10 @@ def inspect_library(root):
         raise ValueError("Amount resolver labels must be a literal tuple of strings")
     if not isinstance(version, str) or not re.fullmatch(r"v[0-9]+", version):
         raise ValueError("Version requires explicit migration review")
-    graph_source = (root / "src/edge-harness/eas_harness/workflows/finance/graph.py").read_text()
+    graph_source = (root / "tools/enterprise_dev/legacy/finance/graph.py").read_text()
     graph = ast.parse(graph_source)
     nodes = ast.literal_eval(assignment(graph, "NODES").value)
-    runtime_path = root / "src/edge-harness/eas_harness/workflows/finance/runtime.py"
+    runtime_path = root / "src/edge-harness/eas_harness/integrations/finance/runtime.py"
     runtime_source = runtime_path.read_text() if runtime_path.exists() else graph_source
     operations_tree = ast.parse(runtime_source)
     operation = next(
@@ -87,15 +87,11 @@ def inspect_library(root):
         "nodes": nodes,
         "reused_operation": "prepare → set_field(amount) → save → verify",
         "source_hashes": {
-            "src/edge-harness/eas_harness/workflows/finance/runtime.py": hashlib.sha256(
+            "src/edge-harness/eas_harness/integrations/finance/runtime.py": hashlib.sha256(
                 runtime_source.encode()
             ).hexdigest(),
-            "src/edge-harness/eas_harness/workflows/finance/procedures.py": hashlib.sha256(
-                source.encode()
-            ).hexdigest(),
-            "src/edge-harness/eas_harness/workflows/finance/graph.py": hashlib.sha256(
-                graph_source.encode()
-            ).hexdigest(),
+            "tools/enterprise_dev/legacy/finance/procedures.py": hashlib.sha256(source.encode()).hexdigest(),
+            "tools/enterprise_dev/legacy/finance/graph.py": hashlib.sha256(graph_source.encode()).hexdigest(),
         },
     }
 
@@ -221,9 +217,7 @@ def patch_library(path, analysis):
     source = path.read_text()
     if (
         hashlib.sha256(source.encode()).hexdigest()
-        != analysis["library"]["source_hashes"][
-            "src/edge-harness/eas_harness/workflows/finance/procedures.py"
-        ]
+        != analysis["library"]["source_hashes"]["tools/enterprise_dev/legacy/finance/procedures.py"]
     ):
         raise ValueError("Inspected source changed before patching")
     tree = ast.parse(source)
@@ -242,7 +236,7 @@ def regression_source(additions):
     return (
         '''"""Generated from verified synthetic demonstrations; uses fresh records and layouts."""
 import pytest
-from eas_harness.workflows.finance.procedures import AMOUNT_LABELS, GRAPH_VERSION, resolve_amount_label
+from enterprise_dev.legacy.finance.procedures import AMOUNT_LABELS, GRAPH_VERSION, resolve_amount_label
 
 LEARNED_LABELS = '''
         + repr(additions)

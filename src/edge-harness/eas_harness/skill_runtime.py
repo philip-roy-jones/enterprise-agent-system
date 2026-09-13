@@ -5,10 +5,10 @@ from typing import TypedDict
 from langgraph.graph import StateGraph, START, END
 from eas_harness.errors import Paused
 from eas_shared.types import Recovery, Stopped
-from eas_harness.workflows.finance.runtime import FinanceOperations
+from eas_harness.integrations.finance.runtime import FinanceOperations
 
 
-class WorkflowState(TypedDict, total=False):
+class SkillGraphState(TypedDict, total=False):
     index: int
     paused: bool
     needs_assistance: str
@@ -16,19 +16,27 @@ class WorkflowState(TypedDict, total=False):
     record_unavailable: str
 
 
-class WorkflowTools(FinanceOperations):
+class SkillRuntime(FinanceOperations):
     def __init__(self, settings, store, layer, library, checkpointer):
         self.settings, self.store, self.layer = settings, store, layer
         self.library, self.checkpointer = library, checkpointer
 
     def operation_once(self, job_id, invocation, name, *, kind="node"):
         job = self.store.get_job(job_id)
+        from eas_harness.roles import get_role
+
+        role = get_role(job["role_id"])
+        arguments = {"company_id": job["company_id"], role.record_field: job[role.record_field], "reason": ""}
         result = self.layer.run(
             job_id,
             invocation,
             name,
-            {"company_id": job["company_id"], "invoice_id": job["invoice_id"], "reason": ""},
-            lambda args: self.operation(name, {"job_id": job_id}),
+            arguments,
+            lambda args: (
+                role.operation_handler(self.store, self.layer.adapter, job, name, args)
+                if role.operation_handler
+                else self.operation(name, {"job_id": job_id})
+            ),
             kind=kind,
         )
         if getattr(self.layer, "remote", False):
@@ -46,7 +54,7 @@ class WorkflowTools(FinanceOperations):
 
     def run(self, job_id, run_id, skill_id=None, version=None):
         job = self.store.get_job(job_id)
-        runs = job.get("workflow_runs", {})
+        runs = job.get("skill_runs", {})
         run = runs.get(run_id)
         if run is None:
             if any(r["state"] not in {"completed", "failed"} for r in runs.values()):
@@ -67,12 +75,12 @@ class WorkflowTools(FinanceOperations):
                 recoveries=0,
             )
             runs[run_id] = run
-            self.store.update_job(job_id, {"workflow_runs": runs})
+            self.store.update_job(job_id, {"skill_runs": runs})
         spec = self.library.get(run["skill_id"], run["version"], job)
         # Pinned package, including learned labels; never inherit a later active version.
         self.layer.adapter.job = dict(job, amount_labels=spec["amount_labels"])
         steps = spec["steps"]
-        builder = StateGraph(WorkflowState)
+        builder = StateGraph(SkillGraphState)
 
         def perform(state):
             index = state.get("index", 0)
@@ -127,9 +135,9 @@ class WorkflowTools(FinanceOperations):
             else "awaiting_approval",
             reason=state.get("record_unavailable") or state.get("needs_assistance", ""),
         )
-        runs = self.store.get_job(job_id).get("workflow_runs", {})
+        runs = self.store.get_job(job_id).get("skill_runs", {})
         runs[run_id] = run
-        self.store.update_job(job_id, {"workflow_runs": runs, "execution_state": run["state"]})
+        self.store.update_job(job_id, {"skill_runs": runs, "execution_state": run["state"]})
         if run["state"] == "awaiting_approval":
             raise Paused("Workflow operation awaits approval")
         from eas_harness.judgment import comparison_context
@@ -155,16 +163,16 @@ class WorkflowTools(FinanceOperations):
 
     def resume(self, job_id, run_id):
         job = self.store.get_job(job_id)
-        run = job.get("workflow_runs", {}).get(run_id)
+        run = job.get("skill_runs", {}).get(run_id)
         if not run:
             raise PermissionError("Workflow does not belong to this request")
         if run["state"] == "needs_assistance":
             if run["recoveries"] >= 4:
                 raise Stopped("Workflow assistance budget exceeded")
             run["recoveries"] += 1
-            runs = job["workflow_runs"]
+            runs = job["skill_runs"]
             runs[run_id] = run
-            self.store.update_job(job_id, {"workflow_runs": runs})
+            self.store.update_job(job_id, {"skill_runs": runs})
             # Runtime always reobserves at the next operation approval. Save requires
             # reconciliation before another attempt, even after model assistance.
             if job["mutation"] == "attempted_uncertain":

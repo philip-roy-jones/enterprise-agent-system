@@ -1,6 +1,6 @@
 """The sole authority for scripted operations and assistant tool execution."""
 
-from eas_harness.workflows.finance.operations import OPERATIONS
+from eas_harness.integrations.finance.operations import OPERATIONS
 from eas_shared.identity import fingerprint
 from eas_harness.errors import Paused, MutationRejected, RecordUnavailable
 from eas_shared.types import Observation, Recovery, Stale, Stopped
@@ -37,6 +37,9 @@ class ExecutionLayer:
             raise PermissionError(f"Missing permission for {name}")
         if operation.input_model is None or operation.output_model is None:
             raise PermissionError(f"Operation {name} has no executable input/output contract")
+        from eas_harness.roles import get_role
+
+        record_field = get_role(job["role_id"]).record_field
         selecting = name == "select_record"
         if selecting and (kind != "tool" or not job.get("conversation_request")):
             raise PermissionError("Record selection is only available to conversational requests")
@@ -59,7 +62,7 @@ class ExecutionLayer:
             },
         }
         if selecting and job.get("record_id") is None:
-            bound_inputs.pop("invoice_id", None)
+            bound_inputs.pop(record_field, None)
         for field, value in bound_inputs.items():
             if field in arguments and arguments[field] != value:
                 raise PermissionError(f"Operation {field} differs from the authorized job")
@@ -112,10 +115,10 @@ class ExecutionLayer:
                 "department_id": job.get("department_id", "finance"),
                 "role_id": job.get("role_id", "invoice_correction"),
                 "company_id": job.get("company_id"),
-                "record_id": arguments["invoice_id"]
+                "record_id": arguments[record_field]
                 if selecting
                 else job.get("record_id", job.get("invoice_id")),
-                "invoice_id": arguments["invoice_id"] if selecting else job.get("invoice_id"),
+                record_field: arguments[record_field] if selecting else job.get(record_field),
                 "expected": job["expected"],
                 "request": job["task"],
                 "assistant_report": job.get("assistant_report"),

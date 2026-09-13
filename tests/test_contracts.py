@@ -6,7 +6,7 @@ from pydantic import ValidationError
 
 from eas_harness.adapters.adapter import BrowserAdapter
 from eas_harness.execution import ExecutionLayer
-from eas_harness.workflows.finance.operations import OPERATIONS
+from eas_harness.integrations.finance.operations import OPERATIONS
 from eas_harness.errors import Paused
 from eas_shared.types import Recovery
 from conftest import approve_operation

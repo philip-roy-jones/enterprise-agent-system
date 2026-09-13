@@ -31,9 +31,13 @@ def main():
     human.add_argument("--id", required=True)
     human.add_argument("--name", required=True)
     human.add_argument("--grants", type=Path, required=True, help="JSON array of explicit grants")
-    human.add_argument("--issuer")
-    human.add_argument("--subject")
     human.add_argument("--development-token-file", type=Path)
+    invite = commands.add_parser("invite-human", help="Create a one-hour password setup/reset link")
+    invite.add_argument("--id", required=True)
+    invite.add_argument("--email", required=True)
+    invite.add_argument("--data-dir", type=Path, required=True)
+    invite.add_argument("--public-url", required=True)
+    invite.add_argument("--setup-file", type=Path, required=True)
     worker = commands.add_parser("enroll-worker")
     worker.add_argument("--id", required=True, help="Unique physical desktop identity")
     worker.add_argument("--profile", type=Path, required=True)
@@ -48,6 +52,31 @@ def main():
         print("Created empty identity registry; no identities are authorized yet.")
         return
     registry = Registry.model_validate_json(args.registry.read_text())
+    if args.command == "invite-human":
+        from urllib.parse import urlencode
+        from eas_server.config import Settings
+        from eas_server.security import Security
+        from eas_server.store import Store
+
+        if args.setup_file.exists():
+            raise ValueError("Setup output already exists; choose a new protected file")
+        security = Security(
+            Settings(
+                data_dir=args.data_dir,
+                identity_file=str(args.registry),
+                public_url=args.public_url,
+                auth_mode="password",
+            ),
+            Store(args.data_dir),
+        )
+        token = security.accounts.invite(args.id, args.email)
+        # Fragment keeps the credential out of server/proxy request logs.
+        private_write(
+            args.setup_file,
+            args.public_url.rstrip("/") + "/#" + urlencode({"setup": token, "email": args.email}) + "\n",
+        )
+        print("One-hour setup link written to the protected output file; no email was sent.")
+        return
     if args.command == "revoke":
         found = [p for p in registry.principals if p.id == args.id or p.worker_id == args.id]
         if not found:
@@ -55,15 +84,11 @@ def main():
         for p in found:
             p.enabled = False
     elif args.command == "add-human":
-        if bool(args.issuer and args.subject) == bool(args.development_token_file):
-            raise ValueError("Specify an issuer/subject pair or an explicit development token output")
         token = secrets.token_urlsafe(48) if args.development_token_file else None
         person = Principal(
             id=args.id,
             kind="human",
             name=args.name,
-            issuer=args.issuer,
-            subject=args.subject,
             token_sha256=token_hash(token) if token else None,
             grants=[Grant.model_validate(g) for g in json.loads(args.grants.read_text())],
         )

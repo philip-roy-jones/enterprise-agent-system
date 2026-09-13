@@ -74,7 +74,7 @@ class ExecutionGrants:
         for field, target in targets.items():
             if field in action["arguments"] and target is not None and action["arguments"][field] != target:
                 raise Stale("Approved target is outside the request's scope")
-        if action["name"] in {"read_skill", "read_skill_resource", "run_workflow"}:
+        if action["name"] in {"read_skill", "read_skill_resource", "run_skill"}:
             package = self.security.packages.get(
                 p, job, action["arguments"]["skill_id"], action["arguments"]["version"]
             )
@@ -165,6 +165,6 @@ class ExecutionGrants:
         return fingerprint(
             {
                 k: {field: r[field] for field in ("skill_id", "version")}
-                for k, r in job.get("workflow_runs", {}).items()
+                for k, r in job.get("skill_runs", {}).items()
             }
         )

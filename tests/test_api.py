@@ -11,7 +11,7 @@ def test_windows_backend_needs_no_desktop_connection(tmp_path, adapter):
     assert not hasattr(settings, "desktop_agent_token")
     assert not hasattr(settings, "desktop_agent_url")
     client = TestClient(create_app(settings), headers={"Authorization": "Bearer local-staff-demo"})
-    assert client.get("/api/health").json()["application"] == "windows_desktop"
+    assert client.get("/api/health").json()["application"] == "configured_edge_applications"
     assert client.get("/mock").status_code == 404
     assert client.get("/api/mock/state").status_code == 404
     assert client.post("/api/mock/scenario", json={"variant": "renamed"}).status_code == 404

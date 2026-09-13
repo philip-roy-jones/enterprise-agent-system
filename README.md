@@ -2,7 +2,7 @@
 
 # Enterprise Agent System
 
-**A conversational digital worker that uses durable workflows and learns from supervised work.**
+**A conversational digital worker that uses durable skills and learns from supervised work.**
 
 Python · LangGraph · Deep Agents · OpenRouter · Windows UI Automation · FastAPI
 
@@ -12,17 +12,17 @@ Python · LangGraph · Deep Agents · OpenRouter · Windows UI Automation · Fas
 
 ---
 
-Enterprise Agent System is a department-agnostic platform for supervised digital workers. Departments supply role-specific workflows, tools, permissions, and knowledge scopes; the platform provides job dispatch, approvals, evidence, recovery, and versioned learning.
+Enterprise Agent System is a department-agnostic platform for supervised digital workers. Departments supply role-specific skills, tools, permissions, and knowledge scopes; the platform provides job dispatch, approvals, evidence, recovery, and versioned learning.
 
 **This is an experimental prototype.** I'm sharing it to get my ideas out there and explore how supervised digital workers could work. I know it isn't ready for me to dogfood in day-to-day work or for a business to adopt. The demonstrations, tests, and documented limitations reflect an idea in development, not a finished product.
 
 I started this because I haven't found a good option for enterprise computer-use agents that brings together reliability, security, and a feedback cycle that learns from humans. I want to explore how tested procedures, supervised assistance, and human corrections could lead to reusable skills that remain supervised when they reach future runs. Those are the goals behind this prototype, not qualities I'm claiming it has already achieved.
 
-The first runnable example is a Finance workflow: a worker opens a synthetic invoice, compares it with a purchase order, identifies a discrepancy, and saves and verifies a correction draft. Staff can approve each operation, supervise unfamiliar situations, correct proposed actions, or take over the desktop.
+The first runnable example is a Finance skill: a worker opens a synthetic invoice, compares it with a purchase order, identifies a discrepancy, and saves and verifies a correction draft. Staff can approve each operation, supervise unfamiliar situations, correct proposed actions, or take over the desktop.
 
-Staff talk to a Deep Agent on the edge machine. It reads relevant skills and invokes checkpointed LangGraph workflows as tools, or composes approved operations when no procedure fits. **Strict is the only execution policy:** reading a skill, invoking its workflow, and executing each operation require separate staff decisions.
+Staff talk to a Deep Agent on the edge machine. It reads relevant skills and invokes their optional checkpointed LangGraph graphs, or composes approved operations when no procedure fits. **Strict is the only execution policy:** reading a skill, running its graph, and executing each operation require separate staff decisions.
 
-Accepted, verified work enters a durable learning queue. A separate model context proposes guidance or a declarative workflow; trusted runtime checks validate it before automatic activation. Skills can accumulate procedures, observed field handling, and corrected instructions. Repeated failures and later feedback also trigger reviews. Skills cannot add arbitrary Python, grant permissions, or remove approvals. Future requests pin an immutable version; staff can suspend or roll back versions.
+Accepted, verified work enters a durable learning queue. A separate model context proposes guidance or a declarative skill graph; trusted runtime checks validate it before automatic activation. Skills can accumulate procedures, observed field handling, and corrected instructions. Repeated failures and later feedback also trigger reviews. Skills cannot add arbitrary Python, grant permissions, or remove approvals. Future requests pin an immutable version; staff can suspend or roll back versions.
 
 This implements the direction in the [agent-led learning plan](docs/plans/agent-led-learning-plan.md), which supersedes the graph-first ordering, Auto mode, and mandatory learned-package PR review in the [original specification](docs/plans/original-prompt.txt). Earlier reviewed releases and PRs remain historical evidence; they are not silently activated by this change.
 
@@ -36,13 +36,13 @@ Staff return to one ongoing conversation. The edge manages its working context u
 
 Chat does not require a record selector. Say, for example, “Compare invoice INV-1043 with its purchase order without saving.” The agent identifies the target from the conversation or asks for clarification, then proposes that record for staff approval. The current Finance example binds one invoice per work request; subsequent application operations still require their own approvals. Ordinary conversation has no default invoice.
 
-The agent should choose capabilities that match the requested outcome; a related skill does not have to run. It can use approved operations and observations without a workflow. The short-lived hand-coded invoice-price shortcut has been removed: application procedures belong in learned skills, while the harness enforces execution and approvals. Learning composes a bounded set of installed Finance operations and can derive guidance from accepted observed answers. It cannot generate arbitrary new capabilities; insufficient evidence can produce no change. A record missing from the visible invoice list produces a clear lookup result. The **Agent decisions & tool activity** panel exposes public explanations, actual calls, arguments, returned results, approvals, errors and observation evidence, with filters and expandable details. A skill name identifies a package; `run_workflow` is the tool that executes its graph, whose internal operations appear separately in the log.
+The agent should choose capabilities that match the requested outcome; a related skill does not have to run. It can use approved operations and observations without a skill graph. The short-lived hand-coded invoice-price shortcut has been removed: application procedures belong in learned skills, while the harness enforces execution and approvals. Learning composes a bounded set of installed Finance operations and can derive guidance from accepted observed answers. It cannot generate arbitrary new capabilities; insufficient evidence can produce no change. A record missing from the visible invoice list produces a clear lookup result. The **Agent decisions & tool activity** panel exposes public explanations, actual calls, arguments, returned results, approvals, errors and observation evidence, with filters and expandable details. A skill name identifies a package; `run_skill` is the tool that executes its graph, whose internal operations appear separately in the log.
 
 ## Developer setup
 
-The shared platform is department-agnostic; the first runnable workflow belongs to **Finance**. [Department workflow extensions](docs/departments.md) explain how other departments bring their own input schemas, graphs, adapters, and permissions.
+The shared platform supports **Finance** on Windows and **Marketing** on Ubuntu. Marketing uses the independent synthetic Campaign Desk API. [Department integrations](docs/departments.md) explain input schemas, adapters, operation contracts and scoped skills. See the [Linux worker setup](docs/linux-worker.md).
 
-The two-machine execution model has been exercised with a complete Windows job and live model assistance ([execution evidence](docs/evidence/windows-edge-worker.json)). Follow the [two-machine developer setup](docs/developer-setup.md): start `enterprise-server` on the developer machine and install the isolated planner/executor/learner tasks on Windows. Addresses and credentials are configured locally. The backend does not connect directly to the desktop controller.
+The server plus separate Windows and Ubuntu workers has been exercised with concurrent live requests, scoped authorization and Marketing skill learning/reuse ([two-host evidence](docs/evidence/two-host-workers.json)). Follow the [two-machine developer setup](docs/developer-setup.md): start `enterprise-server` on the developer machine and install the isolated planner/executor/learner tasks on Windows. Addresses and credentials are configured locally. The backend does not connect directly to the desktop controller.
 
 The native application can run with its API disabled. A separate controller reads accessibility controls and supplies accessibility actions or real clicks/typing. See [legacy desktop setup](docs/legacy-desktop.md) and the optional [application API adapter](docs/windows-accounting-machine.md).
 
@@ -69,7 +69,7 @@ enterprise dev
 
 On a minimal Linux machine, install browser system dependencies with `python -m playwright install --with-deps chromium`.
 
-Open **[localhost:8000](http://127.0.0.1:8000)**. Use the explicitly labeled local development credential in the sign-in dialog. Send a request in the conversation and approve its first business operation.
+Open **[localhost:8000](http://127.0.0.1:8000)**. Staff sign in with email/password after an operator issues a one-time setup link; follow [fixture account setup](docs/developer-setup.md#optional-loopback-browser-fixture) in a second terminal before interactive use. The fixture API tokens are for explicitly labeled development automation, not the staff login form.
 
 `enterprise dev` starts the backend and worker as separate processes. Ctrl+C stops both. To run them independently:
 
@@ -94,13 +94,13 @@ Describe a request in **Talk to your worker**, including the record in ordinary 
 | “Prepare a correction draft” | The agent requests the correction skill, invokes its workflow, and asks approval for each child operation |
 | “Report the discrepancy without saving” | Supervised inspection and independently verified reporting; no draft is saved |
 | “Report and classify the discrepancy without saving” | A separate judgment node uses only the disclosed comparison evidence |
-| Changed amount field label | Approved observation and editing, followed by resuming the same workflow |
+| Changed amount field label | Approved observation and editing, followed by resuming the same skill run |
 | Unfamiliar dialog | A separately approved recovery action |
 | Interrupted Save confirmation | Reconciliation using the original operation identity; no blind second Save |
 | Covered or minimized Windows app | Application activation before the next preview |
 | Reject, cancel, or take control | Execution stops or pauses; existing authority cannot be reused |
 
-Approve a meaningful registered operation, which may contain disclosed navigation clicks. A workflow approval is never blanket approval of its children. Guidance in chat is not approval. Outcome acceptance is separate from approving actions.
+Approve a meaningful registered operation, which may contain disclosed navigation clicks. A skill approval is never blanket approval of its children. Guidance in chat is not approval. Outcome acceptance is separate from approving actions.
 
 For a repeatable browser walkthrough, run `enterprise demo --simulate-staff` while `enterprise dev` is running. This explicitly simulated staff driver submits decisions on synthetic jobs. Model provenance is recorded separately.
 
@@ -113,7 +113,7 @@ flowchart LR
     Server -->|Exact signed grants| Authority
     subgraph Edge[Edge harness on Windows]
         Agent[Deep Agent coordinator] --> Skills[Versioned skill content]
-        Agent --> Graph[Durable LangGraph workflow tools]
+        Agent --> Graph[Durable skill graphs]
         Agent -->|Proposals| Authority[Protected executor]
         Graph --> Authority
         Graph --> Judgment[Separate scoped judgment context]
@@ -125,11 +125,11 @@ flowchart LR
     Server -->|Accepted evidence| Learner
 ```
 
-The execution ledger, fresh observations, exclusive desktop lease, fencing epochs, deadlines, and uncertain-write reconciliation are shared by direct tools and workflows. Checkpoint replay resumes a stable invocation; it does not grant fresh authority or restore the external application. Rejection and permission denial cannot be routed around through another tool.
+The execution ledger, fresh observations, exclusive desktop lease, fencing epochs, deadlines, and uncertain-write reconciliation are shared by direct tools and skill graphs. Checkpoint replay resumes a stable invocation; it does not grant fresh authority or restore the external application. Rejection and permission denial cannot be routed around through another tool.
 
 See [architecture](docs/architecture.md), [department boundaries](docs/departments.md), and [library API verification](docs/api-verification.md). One VM is enough for this synthetic development example. Staff identities and security boundaries do not imply one VM per employee.
 
-The [security implementation](docs/security.md) adds individual identities, server-enforced resource permissions, exact signed execution grants, protected context and skill delivery, and separate Windows planner/learner accounts. Its final regression suite passed **235 tests**. Business operations remain Strict. The [security validation record](docs/security-validation.md) distinguishes actual account-isolation and live learning tests from controlled OIDC tests and the multi-VM/fleet work that remains unverified.
+The [security implementation](docs/security.md) adds individual identities, server-enforced resource permissions, exact signed execution grants, protected context and skill delivery, and separate planner/learner accounts on Windows and Ubuntu. The current regression suite passed **240 tests**, alongside actual Windows/Ubuntu access probes, live skill reuse and restart checks, and browser password setup/sign-in. Business operations remain Strict. The [security validation record](docs/security-validation.md) records actual account isolation, live learning and multi-host checks separately from simulated tests and remaining fleet limitations. Organizational SSO is intentionally outside the prototype; staff use email/password and workers retain separate service credentials.
 
 ## Teach a reusable improvement
 
@@ -138,7 +138,7 @@ The [security implementation](docs/security.md) adds individual identities, serv
 3. When idle, the edge runs a bounded learner with scoped evidence and no inherited application/backend credentials. It proposes a skill or reports no justified change.
 4. The runtime checks scope, evidence, operation order, compatibility, and prior behavior. Synthetic cases vary records and amounts and exercise refusal conditions. The learner cannot declare its own tests passed.
 5. A passing immutable version activates automatically. **Accumulated skills & learning** shows the change, evidence, and status. A later request still requires every approval.
-6. Use **Suspend** or **Activate this version** to stop future retrieval or roll back. Already running workflows retain their pinned version; cancel a running request if it must stop immediately.
+6. Use **Suspend** or **Activate this version** to stop future retrieval or roll back. Already running skill graphs retain their pinned version; cancel a running request if it must stop immediately.
 
 Seeded source packages live in `src/edge-harness/skills/`. Installed versions live under the edge's `EAS_DATA_DIR/skills/`, with `manifest.json`, `SKILL.md`, hashes, and a local registry. Executable specifications reference trusted operations; Markdown cannot execute shell snippets or import Python. File or dependency changes invalidate the installed package until it is requalified.
 
@@ -157,9 +157,9 @@ Copy `.env.example` to `.env`. Runtime data and credentials are ignored by Git.
 | `EAS_DATA_DIR` | `runtime` | Durable backend data, checkpoints, screenshots, proposals |
 | `EAS_BIND_HOST` / `EAS_BIND_PORT` | `127.0.0.1` / `8000` | Backend listener; configure locally |
 | `EAS_BACKEND_URL` | `http://127.0.0.1:8000` | Worker-to-backend endpoint |
-| `EAS_STAFF_TOKEN` | `local-staff-demo` | Staff decisions and artifact access |
+| `EAS_STAFF_TOKEN` | `local-staff-demo` | Explicit development API fixture only; not password sign-in |
 | `EAS_WORKER_TOKEN` | `local-worker-demo` | Restricted worker API and browser session |
-| `EAS_DEVELOPER_TOKEN` | `local-developer-demo` | Developer review and release commands |
+| `EAS_DEVELOPER_TOKEN` | `local-developer-demo` | Explicit development automation fixture only |
 | `EAS_MODEL_MODE` | `simulated` | `simulated` or `live` |
 | `EAS_MODEL_PROVIDER` / `EAS_MODEL_ID` | `openrouter` / `openai/gpt-5.6-luna` in the example | Provider and model for live assistance |
 | `OPENROUTER_API_KEY` | unset | OpenRouter credential, kept in `.env` or the worker environment |
@@ -190,32 +190,26 @@ See the [original requirement audit](docs/original-prompt-audit.md) and [validat
 
 ```text
 src/
-├── server/                         Independent frontend/backend application
-│   ├── pyproject.toml              enterprise-agent-server package
-│   └── eas_server/
-│       ├── frontend/               Staff console
-│       └── fixtures/               Optional synthetic browser accounting app
-├── edge-harness/                   Independent Windows edge application
-│   ├── pyproject.toml              enterprise-edge-harness package
+├── edge-harness/                   Deep Agent, skill execution and integrations
 │   ├── eas_harness/
-│   │   ├── workflows/finance/      LangGraph and reusable procedure rules
-│   │   └── adapters/               Application API and desktop adapters
-│   ├── skills/                     Bundled declarative skills and instructions
-│   └── windows/                    Desktop controller and worker installers
-├── demobooks/                      Independent native Windows application
-│   ├── DemoBooks/
-│   ├── AccountingSmoke/
-│   └── install.ps1
-└── shared/                         Small API contract library; no running service
-    ├── pyproject.toml              enterprise-agent-contracts package
-    └── eas_shared/                 Requests, results, role schemas and RPC definitions
-tools/enterprise_dev/               Local demos and historical PR learning tooling
+│   │   ├── integrations/           Trusted reusable application operations
+│   │   └── skill_runtime.py        Skill graph compiler and checkpoints
+│   ├── skills/                     Bundled generic skill packages
+│   ├── windows/                    Desktop controller and isolated task installer
+│   └── linux/                      Isolated service installer and access probes
+├── server/                         Independent backend and staff frontend
+├── shared/                         Data contracts; no running service
+└── test-software/
+    ├── demobooks/                  Synthetic Windows accounting desktop
+    ├── campaign-desk/              Synthetic Marketing metrics API
+    └── ledger-fixture/             Optional browser accounting test fixture
+tools/enterprise_dev/               Local demos and historical PR learning fixtures
 tests/                             Cross-application regression tests
 docs/                              Setup, architecture and validation records
-docs/plans/                        Original specification and accepted implementation plans
+docs/plans/                        Original specification and accepted plans
 ```
 
-The server and edge harness are **independently installable applications** with separate dependencies, startup commands and configuration classes. The Windows harness installer separates its planner, executor and learner into differently privileged processes; they remain components of one edge application. Neither package depends on the other. LangGraph, Deep Agent and workflows execute inside the harness. DemoBooks remains a separate .NET application. The shared package contains public contracts and validation definitions, with no credentials, environment loading, databases, desktop actions or graph factories.
+The server and edge harness are **independently installable applications** with separate dependencies, startup commands and configuration classes. The Windows harness installer separates its planner, executor and learner into differently privileged processes; they remain components of one edge application. Neither package depends on the other. The Deep Agent and skill graphs execute inside the harness. DemoBooks remains a separate .NET application. The shared package contains public contracts and validation definitions, with no credentials, environment loading, databases, desktop actions or graph factories.
 
 From the repository root, install only the software a machine needs:
 
@@ -237,9 +231,9 @@ For an existing Windows checkout, stop the idle worker **before** upgrading and 
 
 | Status | Scope |
 | --- | --- |
-| **Implemented** | Runnable console, backend, worker, mock app; real cyclic LangGraph and Deep Agents; real browser automation; durable approval/evidence storage; Strict-only enforcement; agent-led workflow tools; correction/takeover; bounded recovery; save reconciliation; declarative skill learning, automatic admission, version pinning and rollback |
+| **Implemented** | Runnable console, backend, worker, mock app; real cyclic LangGraph and Deep Agents; real browser automation; durable approval/evidence storage; Strict-only enforcement; agent-led skill tools; correction/takeover; bounded recovery; save reconciliation; declarative skill learning, automatic admission, version pinning and rollback |
 | **Simulated by default** | The model's decisions, all accounting records, and staff decisions only when the explicit demo/test driver is used |
-| **Bounded prototype choices** | One deployed company/Windows desktop, pluggable department roles, synthetic Finance records, bounded declarative learning, explicit individual development identities, SQLite persistence |
-| **Deferred** | Real QuickBooks and generic third-party Windows automation; broad real-model quality evaluation; real organizational IdP deployment and physical multi-VM validation; general autonomous code generation; arbitrary graph-code deployment and checkpoint migration; multiworker fleet orchestration |
+| **Bounded prototype choices** | One synthetic company, Windows Finance and Ubuntu Marketing workers, bounded declarative learning, individual email/password accounts, SQLite persistence |
+| **Deferred** | Real QuickBooks and generic third-party Windows automation; broad real-model quality evaluation; general autonomous code generation; arbitrary graph-code deployment and checkpoint migration; multiworker fleet orchestration |
 
 The native adapter targets our own DemoBooks application. Generic Windows automation and real QuickBooks integration remain separate future adapters. No real accounting integration or production readiness is claimed.

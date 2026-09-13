@@ -1,0 +1,370 @@
+{
+  "model_mode": "live",
+  "staff_mode": "simulated",
+  "checks": {
+    "finance_catalog_scoped": true,
+    "marketing_catalog_scoped": true,
+    "marketing_cannot_request_finance": true,
+    "finance_cannot_request_marketing": true,
+    "distinct_registered_workers": true,
+    "marketing_cannot_read_finance_job": true,
+    "finance_cannot_read_marketing_job": true
+  },
+  "runs": {
+    "marketing": {
+      "job_id": "1e5c31f491fa46ac8389d5bb897f01fd",
+      "desktop_id": "ubuntu-marketing-01",
+      "model_calls": 4,
+      "tokens": 20528,
+      "answer": "Current performance for **CAM-2002 \u2014 Customer webinar**:\n\n- **Impressions:** 15,000\n- **Clicks:** 450\n- **Total spend:** **$225.00**\n- **Click-through rate:** 3.0%\n- **Cost per click:** **$0.50**\n\nThe report was verified against the current campaign record for ACME.",
+      "verified_report": {
+        "campaign_id": "CAM-2002",
+        "click_through_percent": 3.0,
+        "clicks": 450,
+        "company_id": "ACME",
+        "cost_per_click_cents": 50.0,
+        "impressions": 15000,
+        "record_fingerprint": "6662d9572fda4345df0b636b6b2cdbef9725a44c4f46bbdbfac9d95f8c73b73f",
+        "revision": 1,
+        "spend_cents": 22500,
+        "synthetic": true,
+        "title": "Customer webinar"
+      },
+      "operations": [
+        "select_record",
+        "read_skill",
+        "run_skill",
+        "validate",
+        "establish",
+        "report",
+        "complete"
+      ],
+      "staff_mode": "simulated",
+      "model_mode": "live"
+    },
+    "finance": {
+      "job_id": "2a9170d7d8cb4d1f85af06d15a84e111",
+      "desktop_id": "windows-finance-01",
+      "model_calls": 6,
+      "tokens": 39171,
+      "answer": "Invoice **INV-1042** currently costs **$1,480.00**.",
+      "verified_report": null,
+      "operations": [
+        "select_record",
+        "read_skill",
+        "run_skill",
+        "establish",
+        "observe_app",
+        "review_discovery"
+      ],
+      "staff_mode": "simulated",
+      "model_mode": "live",
+      "observed_invoice_amount_cents": 148000,
+      "verification": "Driver matched final answer to executor-reported native application observation; not an independently trusted external ledger"
+    }
+  },
+  "date": "2026-09-13",
+  "model_provider": "OpenRouter",
+  "model": "openai/gpt-5.6-luna",
+  "data": "synthetic",
+  "scope": "Windows Finance desktop and Ubuntu Marketing API worker",
+  "marketing_learning": {
+    "skill_id": "report-campaign-performance",
+    "version": "6da68b143a9b8d311430cab4ebd561d9e81d54db6b1684e8df59ea373a0fa0b0",
+    "status": "activated",
+    "model_mode": "live",
+    "model": "openai/gpt-5.6-luna",
+    "usage": {
+      "input_token_details": {
+        "cache_creation": 2262,
+        "cache_read": 0
+      },
+      "input_tokens": 2265,
+      "output_token_details": {
+        "reasoning": 205
+      },
+      "output_tokens": 736,
+      "total_tokens": 3001
+    },
+    "checks": {
+      "checks": [
+        {
+          "case": "campaign metrics 24000/1200/36000",
+          "passed": true
+        },
+        {
+          "case": "changed metrics require another report",
+          "passed": true
+        },
+        {
+          "case": "campaign metrics 15000/450/22500",
+          "passed": true
+        },
+        {
+          "case": "changed metrics require another report",
+          "passed": true
+        },
+        {
+          "case": "campaign metrics 0/0/0",
+          "passed": true
+        },
+        {
+          "case": "changed metrics require another report",
+          "passed": true
+        }
+      ],
+      "model_mode": "none",
+      "suite": "marketing-runtime-1"
+    },
+    "steps": [
+      "validate",
+      "establish",
+      "report",
+      "complete"
+    ],
+    "source_record": "CAM-2001",
+    "reuse_record": "CAM-2002",
+    "release": "Automatic after runtime-owned validation; staff approvals simulated for both requests"
+  },
+  "ubuntu_account_probes": {
+    "results": [
+      {
+        "component": "planner",
+        "checks": {
+          "unprivileged_uid": true,
+          "executor_credential_denied": true,
+          "application_credential_denied": true,
+          "protected_code_write_denied": true,
+          "application_data_denied": true,
+          "executor_memory_denied": true,
+          "application_rejects_missing_credential": true,
+          "unapproved_listener_denied": true,
+          "own_configuration_readable": true,
+          "own_runtime_writable": true,
+          "own_server_identity_works": true
+        },
+        "passed": true
+      },
+      {
+        "component": "learner",
+        "checks": {
+          "unprivileged_uid": true,
+          "executor_credential_denied": true,
+          "application_credential_denied": true,
+          "protected_code_write_denied": true,
+          "application_data_denied": true,
+          "executor_memory_denied": true,
+          "application_rejects_missing_credential": true,
+          "unapproved_listener_denied": true,
+          "own_configuration_readable": true,
+          "own_runtime_writable": true,
+          "no_backend_or_application_credentials": true
+        },
+        "passed": true
+      }
+    ],
+    "passed": true
+  },
+  "service_authorization_probes": [
+    {
+      "kind": "planner",
+      "worker_id": "windows-finance-01",
+      "checks": {
+        "own_identity_valid": true,
+        "foreign_assignment_denied": true,
+        "cannot_use_staff_session": true
+      },
+      "passed": true
+    },
+    {
+      "kind": "executor",
+      "worker_id": "windows-finance-01",
+      "checks": {
+        "own_identity_valid": true,
+        "foreign_assignment_denied": true,
+        "cannot_use_staff_session": true
+      },
+      "passed": true
+    },
+    {
+      "kind": "planner",
+      "worker_id": "ubuntu-marketing-01",
+      "checks": {
+        "own_identity_valid": true,
+        "foreign_assignment_denied": true,
+        "cannot_use_staff_session": true
+      },
+      "passed": true
+    },
+    {
+      "kind": "executor",
+      "worker_id": "ubuntu-marketing-01",
+      "checks": {
+        "own_identity_valid": true,
+        "foreign_assignment_denied": true,
+        "cannot_use_staff_session": true
+      },
+      "passed": true
+    }
+  ],
+  "browser_login": {
+    "checks": {
+      "setup_fragment_removed": true,
+      "password_setup_and_signin": true,
+      "marketing_only_workspace": true,
+      "existing_conversation_preserved": true,
+      "logout": true,
+      "authorized_workspace_switching": true,
+      "no_javascript_errors": true
+    },
+    "passed": true,
+    "staff_mode": "simulated"
+  },
+  "unsuccessful_attempts": [
+    {
+      "area": "Finance availability",
+      "finding": "First attempt had no open DemoBooks window. After reopening, three later attempts reused earlier unavailability without a fresh operation. Added a current-state instruction; it alone did not guarantee a retry. Explicitly telling the agent DemoBooks had reopened produced the recorded successful observed answer.",
+      "accepted": false
+    },
+    {
+      "area": "Ubuntu listener isolation",
+      "finding": "SocketBindDeny was not enforced on the tested systemd build. A seccomp bind restriction was installed and the actual service-account probe then passed."
+    }
+  ],
+  "limits": [
+    "All staff approvals and acceptance were simulated; all records were synthetic.",
+    "Ubuntu integration uses a fixed application API; Linux GUI clicking is not implemented.",
+    "Account probes do not establish security of the OS, hypervisor or a compromised privileged executor.",
+    "Automatic pool placement and cross-worker context/skill replication are not implemented.",
+    "A prompt instruction did not eliminate model reuse of stale negative context."
+  ],
+  "installed_source": {
+    "ubuntu": {
+      "matching_source_files": 46,
+      "no_workflows_package": true,
+      "no_server_package": true,
+      "versions": {
+        "enterprise-edge-harness": "0.1.0",
+        "enterprise-agent-contracts": "0.1.0",
+        "langgraph": "1.2.11",
+        "deepagents": "0.7.13"
+      }
+    },
+    "windows": {
+      "matching_source_files": 46,
+      "no_workflows_package": true,
+      "no_server_package": true,
+      "versions": {
+        "enterprise-edge-harness": "0.1.0",
+        "enterprise-agent-contracts": "0.1.0",
+        "langgraph": "1.2.11",
+        "deepagents": "0.7.13"
+      }
+    }
+  },
+  "windows_account_probes": {
+    "learner": {
+      "identity": "eas-learner",
+      "session_id": 0,
+      "executor_config_readable": false,
+      "execution_code_writable": false,
+      "application_records_readable": false,
+      "controller_token_readable": false,
+      "execution_code_acl_writable": false,
+      "executor_directory_listable": false,
+      "application_memory_readable": false,
+      "foreground_available": false,
+      "application_automation_elements": 0,
+      "unauthenticated_controller_status": 403,
+      "model_mode": "none",
+      "staff_mode": "no business actions"
+    },
+    "planner": {
+      "identity": "eas-planner",
+      "session_id": 0,
+      "executor_config_readable": false,
+      "execution_code_writable": false,
+      "application_records_readable": false,
+      "controller_token_readable": false,
+      "execution_code_acl_writable": false,
+      "executor_directory_listable": false,
+      "application_memory_readable": false,
+      "foreground_available": false,
+      "application_automation_elements": 0,
+      "unauthenticated_controller_status": 403,
+      "model_mode": "none",
+      "staff_mode": "no business actions"
+    }
+  },
+  "upgrade": {
+    "finance_skills_requalified": 4,
+    "marketing_skills_requalified": 1,
+    "quarantined": 0,
+    "history_preserved": true
+  },
+  "marketing_restart": {
+    "passed": true,
+    "job_id": "b2cb23e3541f4ce792d5a71cc4280a40",
+    "model_mode": "live",
+    "staff_mode": "simulated",
+    "model_calls": 4,
+    "tokens": 21767,
+    "report": {
+      "campaign_id": "CAM-2003",
+      "click_through_percent": null,
+      "clicks": 0,
+      "company_id": "ACME",
+      "cost_per_click_cents": null,
+      "impressions": 0,
+      "record_fingerprint": "6bf50b05a7df68152921c355aab8ffbbf3919a72855662020c8a93907f3d3ea4",
+      "revision": 1,
+      "spend_cents": 0,
+      "synthetic": true,
+      "title": "Unlaunched winter guide"
+    },
+    "restart_at": {
+      "approval_id": "720c9098bef84757b5f330e3ebb9c8ee",
+      "skill_run_ids": [
+        "b2cb23e3541f4ce792d5a71cc4280a40:agent:call_3EKjYHZR2xZOZtOyGOQQ1I3T:skill"
+      ],
+      "stage": "validate"
+    },
+    "skill_runs": {
+      "b2cb23e3541f4ce792d5a71cc4280a40:agent:call_3EKjYHZR2xZOZtOyGOQQ1I3T:skill": {
+        "checkpoint_thread": "b2cb23e3541f4ce792d5a71cc4280a40:agent:call_3EKjYHZR2xZOZtOyGOQQ1I3T:skill",
+        "index": 4,
+        "reason": "",
+        "recoveries": 0,
+        "run_id": "b2cb23e3541f4ce792d5a71cc4280a40:agent:call_3EKjYHZR2xZOZtOyGOQQ1I3T:skill",
+        "skill_id": "report-campaign-performance",
+        "state": "completed",
+        "version": "6da68b143a9b8d311430cab4ebd561d9e81d54db6b1684e8df59ea373a0fa0b0"
+      }
+    },
+    "operations": [
+      "select_record",
+      "read_skill",
+      "run_skill",
+      "validate",
+      "establish",
+      "report",
+      "complete"
+    ]
+  },
+  "regression": {
+    "tests_passed": 240,
+    "seconds": 1203.95,
+    "warnings": 1,
+    "warning": "Upstream AnyIO/Starlette BlockingPortal deprecation",
+    "model_mode": "simulated",
+    "staff_mode": "simulated",
+    "lint": "passed",
+    "format": "passed",
+    "standalone_installs": [
+      "server",
+      "edge-harness"
+    ],
+    "native_accounting_checks": 10,
+    "demobooks_windows_x64_publish": "passed"
+  }
+}

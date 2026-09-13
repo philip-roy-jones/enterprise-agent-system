@@ -91,13 +91,13 @@ def feedback(episode):
 
 
 def task_words(text):
-    text = re.sub(r"\b(?:INV|PO)-?\d+\b|\d+", "record", text, flags=re.I)
+    text = re.sub(r"\b(?:INV|PO|CAM)-?\d+\b|\d+", "record", text, flags=re.I)
     return set(re.findall(r"[a-z]+", text.lower())) - {"the", "a", "an", "for", "to", "of", "and", "please"}
 
 
 def previous_skill(job, library, steps, kind):
     used = set(job.get("skill_reads", {})) | {
-        r["skill_id"] for r in job.get("workflow_runs", {}).values() if r.get("skill_id")
+        r["skill_id"] for r in job.get("skill_runs", {}).values() if r.get("skill_id")
     }
     matches = []
     for item in library.catalog(job):
@@ -184,7 +184,11 @@ def evidence_for(episode, library, *, review=False, related=()):
         task=job["task"],
         kind=kind,
         accepted=job.get("accepted", False),
-        scope={**{k: job[k] for k in SCOPE}, "application_version": job["app_version"]},
+        scope={
+            **{k: job[k] for k in SCOPE},
+            "application_version": job["app_version"],
+            "capability_version": "marketing-1" if job["role_id"] == "campaign_review" else "finance-1",
+        },
         steps=steps,
         labels=sorted(labels),
         previous=previous,
@@ -266,9 +270,9 @@ def admit(library, candidate, evidence, previous_version, provenance=None):
             *spec.get("supporting_files", {}).values(),
         ]
     )
-    if re.search(r"\b(?:INV|PO)-?\d{4,}\b", reusable, re.I):
+    if re.search(r"\b(?:INV|PO|CAM)-?\d{4,}\b", reusable, re.I):
         raise ValueError("Candidate memorizes teaching-record values")
-    for field in ("invoice_id", "po_id", "note"):
+    for field in ("invoice_id", "campaign_id", "title", "po_id", "note"):
         value = evidence["verification"].get(field)
         if value and str(value) in reusable:
             raise ValueError("Candidate memorizes teaching-record values")

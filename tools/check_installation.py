@@ -30,7 +30,7 @@ def check_server(folder):
         EAS_BIND_PORT=str(port),
         EAS_DATA_DIR=str(folder / "server"),
         EAS_MODEL_MODE="simulated",
-        EAS_DESKTOP_ADAPTER="browser",
+        EAS_DESKTOP_ADAPTER="none",
         EAS_STAFF_TOKEN="isolation-test-staff",
     )
     process = subprocess.Popen(
@@ -59,8 +59,6 @@ def check_server(folder):
             "/static/activity.js",
             "/static/learning.js",
             "/static/style.css",
-            "/mock",
-            "/fixture-static/mock.js",
         ]:
             with urllib.request.urlopen(base + path) as response:
                 assert response.status == 200 and response.read(), path

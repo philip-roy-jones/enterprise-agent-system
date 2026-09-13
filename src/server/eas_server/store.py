@@ -62,7 +62,10 @@ class Store(LearningStore):
         row = db.execute("SELECT data FROM jobs WHERE id=?", (job_id,)).fetchone()
         if not row:
             raise ValueError("Unknown job")
-        return json.loads(row[0])
+        job = json.loads(row[0])
+        if "skill_runs" not in job:
+            job["skill_runs"] = job.get("workflow_runs", {})
+        return job
 
     def _put(self, db, job):
         newly_terminal = False
@@ -88,7 +91,7 @@ class Store(LearningStore):
         from eas_server.roles import get_role
 
         role = get_role(inputs.get("role_id", "invoice_correction"))
-        inputs = role.normalize(inputs, allow_unbound=ongoing and role.id == "invoice_correction")
+        inputs = role.normalize(inputs, allow_unbound=ongoing)
         if inputs.get("selected_mode", "strict") != "strict":
             raise ValueError("Auto mode has been removed; staff approval is required")
         inputs["selected_mode"] = "strict"
@@ -161,12 +164,13 @@ class Store(LearningStore):
             self._event(db, job["id"], "job_created", job)
             return job
 
-    def bind_record(self, job_id, invoice_id):
+    def bind_record(self, job_id, record_id):
         """Resolve an unbound chat request only inside its exact approved tool call."""
         from eas_server.roles import get_role
 
         with self.db() as db:
             job = self._job(db, job_id)
+            record_field = get_role(job["role_id"]).record_field
             lease = self._lease(db, job)
             self._check(job, lease, "assistant", lease["epoch"])
             row = db.execute(
@@ -176,31 +180,29 @@ class Store(LearningStore):
             approval = json.loads(row[0]) if row else {}
             if (
                 not job.get("conversation_request")
-                or job["role_id"] != "invoice_correction"
                 or "read" not in job["permissions"]
                 or approval.get("status") != "executing"
                 or approval.get("name") != "select_record"
                 or approval.get("epoch") != lease["epoch"]
-                or approval.get("corrected_arguments", approval.get("arguments"))
-                != {"invoice_id": invoice_id}
+                or approval.get("corrected_arguments", approval.get("arguments")) != {record_field: record_id}
             ):
                 raise PermissionError("Selecting a record requires approval of that exact tool call")
-            if job.get("record_id") is not None and job["record_id"] != invoice_id:
+            if job.get("record_id") is not None and job["record_id"] != record_id:
                 raise PermissionError("An active request cannot switch records")
             if job.get("record_id") is None:
                 normalized = get_role(job["role_id"]).normalize(
                     {
                         **job,
-                        "invoice_id": invoice_id,
-                        "inputs": {**job["inputs"], "invoice_id": invoice_id},
+                        record_field: record_id,
+                        "inputs": {**job["inputs"], record_field: record_id},
                     }
                 )
-                job.update({k: normalized[k] for k in ("inputs", "invoice_id", "record_id")})
+                job.update({k: normalized[k] for k in ("inputs", record_field, "record_id")})
                 self._put(db, job)
                 self._event(
-                    db, job_id, "record_selected", {"invoice_id": invoice_id, "invocation": lease["inflight"]}
+                    db, job_id, "record_selected", {record_field: record_id, "invocation": lease["inflight"]}
                 )
-            value = {"data": {"company_id": job["company_id"], "invoice_id": job["invoice_id"]}}
+            value = {"data": {"company_id": job["company_id"], record_field: job[record_field]}}
             # Scope and the consumed approval/result are one commit. Losing the
             # RPC response cannot lose a staff correction or strand the lease.
             self._finish_action(
@@ -241,7 +243,7 @@ class Store(LearningStore):
             "model_guidance_revision",
             "model_binding",
             "result_kind",
-            "workflow_runs",
+            "skill_runs",
             "execution_state",
             "verified_report",
             "skill_reads",
@@ -706,8 +708,7 @@ class Store(LearningStore):
         else:
             raise PermissionError("Business completion requires verified execution or staff outcome review")
         if any(
-            r["state"] not in {"completed", "record_unavailable"}
-            for r in job.get("workflow_runs", {}).values()
+            r["state"] not in {"completed", "record_unavailable"} for r in job.get("skill_runs", {}).values()
         ):
             raise Stale("Workflow is not finished")
         with self.db() as db:

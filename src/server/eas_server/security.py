@@ -6,7 +6,6 @@ import time
 from pathlib import Path
 from urllib.parse import urlsplit
 
-import jwt
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -36,8 +35,6 @@ class Principal(BaseModel):
     name: str
     enabled: bool = True
     token_sha256: str | None = None
-    issuer: str | None = None
-    subject: str | None = None
     worker_id: str | None = None
     grants: list[Grant] = Field(default_factory=list)
 
@@ -71,19 +68,15 @@ class Security:
             raise ValueError(
                 "Remote development requires an explicit identity registry; default demo credentials are loopback-only"
             )
-        if settings.auth_mode not in {"development", "oidc"}:
-            raise ValueError("EAS_AUTH_MODE must be development or oidc")
-        if settings.auth_mode == "oidc":
-            if not self.path or not all(
-                (settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url)
-            ):
-                raise ValueError("OIDC requires identity registry, issuer, audience and JWKS URL")
-            if any(
-                urlsplit(u).scheme != "https"
-                for u in (settings.public_url, settings.oidc_issuer, settings.oidc_jwks_url)
-            ):
-                raise ValueError("OIDC remote deployment requires HTTPS")
-        self.jwks = jwt.PyJWKClient(settings.oidc_jwks_url, lifespan=60) if settings.oidc_jwks_url else None
+        if settings.auth_mode not in {"development", "password"}:
+            raise ValueError("EAS_AUTH_MODE must be development or password")
+        if settings.auth_mode == "password" and not self.path:
+            raise ValueError("Password login requires an explicit identity registry")
+        if settings.auth_mode == "password" and (
+            urlsplit(settings.public_url).hostname not in {"127.0.0.1", "::1", "localhost"}
+            and urlsplit(settings.public_url).scheme != "https"
+        ):
+            raise ValueError("Remote password login requires HTTPS")
         with store.db() as db:
             db.executescript("""
                 CREATE TABLE IF NOT EXISTS security_sessions(id TEXT PRIMARY KEY, principal TEXT, expires REAL,
@@ -96,6 +89,9 @@ class Security:
         from eas_server.packages import Packages
 
         self.packages = Packages(self)
+        from eas_server.accounts import Accounts
+
+        self.accounts = Accounts(self)
 
     def registry(self):
         if self.path:
@@ -103,7 +99,7 @@ class Security:
         else:
             if self.settings.auth_mode != "development":
                 raise ValueError("Explicit identities required")
-            # Labeled local fixtures only; never used as an OIDC fallback.
+            # Explicit development fixtures only; no password-mode fallback.
             base = dict(
                 organization_id="acme",
                 department_id="*",
@@ -143,18 +139,13 @@ class Security:
             )
         ids = [p.id for p in data.principals]
         tokens = [p.token_sha256 for p in data.principals if p.token_sha256]
-        subjects = [(p.issuer, p.subject) for p in data.principals if p.subject]
-        if (
-            len(ids) != len(set(ids))
-            or len(tokens) != len(set(tokens))
-            or len(subjects) != len(set(subjects))
-        ):
+        if len(ids) != len(set(ids)) or len(tokens) != len(set(tokens)):
             raise ValueError("Duplicate security identity or credential")
         if any(p.kind != "human" and not p.worker_id for p in data.principals):
             raise ValueError("Service identities require a registered worker_id")
         if data.version != 1:
             raise ValueError("Unsupported identity registry version")
-        if self.settings.auth_mode == "oidc":
+        if self.settings.auth_mode == "password":
             demo_hashes = {
                 token_hash("local-" + name + "-demo")
                 for name in ("staff", "developer", "worker", "planner", "admission")
@@ -180,26 +171,6 @@ class Security:
                 if p.kind == "human" and self.settings.auth_mode != "development":
                     break
                 return p
-        if self.settings.auth_mode == "oidc":
-            try:
-                key = self.jwks.get_signing_key_from_jwt(token).key
-                claims = jwt.decode(
-                    token,
-                    key,
-                    algorithms=["RS256"],
-                    issuer=self.settings.oidc_issuer,
-                    audience=self.settings.oidc_audience,
-                    options={"require": ["exp", "iat", "sub", "iss", "aud"]},
-                )
-                for p in self.registry().principals:
-                    if (
-                        p.enabled
-                        and p.kind == "human"
-                        and (p.issuer, p.subject) == (claims["iss"], claims["sub"])
-                    ):
-                        return p
-            except (jwt.PyJWTError, OSError):
-                pass
         raise HTTPException(401, "Identity unavailable")
 
     def principal(self, request):
@@ -219,12 +190,16 @@ class Security:
         return self.get(row["principal"])
 
     def session(self, token):
-        p = self.authenticate_token(token)
+        return self.create_session(self.authenticate_token(token))
+
+    def create_session(self, p, *, db=None):
         if p.kind != "human":
             raise HTTPException(403, "Human sign-in required")
         session, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
-        with self.store.db() as db:
-            db.execute(
+        from contextlib import nullcontext
+
+        with nullcontext(db) if db is not None else self.store.db() as connection:
+            connection.execute(
                 "INSERT INTO security_sessions VALUES(?,?,?,?,?)",
                 (token_hash(session), p.id, time.time() + 3600, csrf, self.revision()),
             )

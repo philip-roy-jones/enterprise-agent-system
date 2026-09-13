@@ -10,8 +10,8 @@ from eas_harness.config import Settings
 from eas_harness.remote import RemoteStore
 from eas_harness.execution import ExecutionLayer
 from eas_harness.skill_library import SkillLibrary
-from eas_harness.workflows.roles import get_role
-from eas_harness.workflows.finance.runtime import FinanceOperations
+from eas_harness.roles import get_role
+from eas_harness.integrations.finance.runtime import FinanceOperations
 from eas_harness.contracts import NODE_RESULTS
 from eas_harness.errors import Paused
 from eas_shared.types import Recovery, Stale, Stopped
@@ -121,7 +121,7 @@ class Executor(FinanceOperations):
                 )
             if command == "saved_result":
                 if not any(
-                    a["name"] == "resume_workflow" and a["status"] == "executed"
+                    a["name"] == "resume_skill" and a["status"] == "executed"
                     for a in self.store.approvals(job["id"])
                 ):
                     raise PermissionError("Reconciliation requires approved workflow resume")
@@ -133,7 +133,7 @@ class Executor(FinanceOperations):
                 raise ValueError("Executor command is not registered")
             name, invocation = body["name"], body["invocation"]
             # A graph's learned labels come from its pinned admitted package, never caller input.
-            for run in job.get("workflow_runs", {}).values():
+            for run in job.get("skill_runs", {}).values():
                 if invocation.startswith(run["run_id"] + ":"):
                     spec = self.skill(job, run["skill_id"], run["version"])
                     self.amount_labels = spec["amount_labels"]
@@ -165,14 +165,10 @@ class Executor(FinanceOperations):
 
     def effect(self, job_id, name, args):
         job = self.store.get_job(job_id)
-        if self.operation_handler:
-            return self.operation_handler(self.store, self.layer.adapter, job, name, args)
         if name == "review_discovery":
             return {"staff_verified_outcome": args["assistant_report"], "acceptance_required": True}
-        if name in NODE_OPERATIONS:
-            return self.operation(name, {"job_id": job_id, "reason": args.get("reason", "")})
         if name == "select_record":
-            return self.store.bind_record(job_id, args["invoice_id"])
+            return self.store.bind_record(job_id, args[get_role(job["role_id"]).record_field])
         if name == "read_skill":
             import hashlib
 
@@ -192,19 +188,23 @@ class Executor(FinanceOperations):
         if name == "read_skill_resource":
             self.skill(job, args["skill_id"], args["version"])
             return {"data": self.library.resource(args["skill_id"], args["version"], args["path"], job)}
-        if name == "run_workflow":
+        if name == "run_skill":
             if job.get("skill_reads", {}).get(args["skill_id"]) != args["version"]:
                 raise PermissionError("Workflow requires approved skill read")
             self.skill(job, args["skill_id"], args["version"], active_only=True)
             return {"data": args}
-        if name == "resume_workflow":
-            if args["run_id"] not in job.get("workflow_runs", {}):
+        if name == "resume_skill":
+            if args["run_id"] not in job.get("skill_runs", {}):
                 raise PermissionError("Unknown workflow run")
             return {"data": args}
         if name == "ask_staff":
             return self.store.ask_staff(job_id, args["question"])
         if name == "search_knowledge":
             return self.store.search_knowledge(job_id, args["query"])
+        if self.operation_handler:
+            return self.operation_handler(self.store, self.layer.adapter, job, name, args)
+        if name in NODE_OPERATIONS:
+            return self.operation(name, {"job_id": job_id, "reason": args.get("reason", "")})
         if name == "set_field":
             expected = job["expected"]
             if not expected or args.get("field") not in {"amount", "note"}:

@@ -56,7 +56,7 @@ def main(argv=None):
             name = approval["name"]
             arguments = approval["arguments"]
             allowed = a.kind == "correction" or name not in {"prepare", "save", "save_draft", "set_field"}
-            if name == "run_workflow" and a.kind != "correction":
+            if name == "run_skill" and a.kind != "correction":
                 status = client.get("/api/learning").json()
                 spec = next(
                     (
@@ -217,7 +217,7 @@ def main(argv=None):
         "application": job["application"],
         "application_version": job["app_version"],
         "verification": verification,
-        "workflow_runs": job.get("workflow_runs", {}),
+        "skill_runs": job.get("skill_runs", {}),
         "operations": job.get("operation_trace", []),
         "skill_reads": job.get("skill_reads", {}),
         "guidance": a.guidance,
