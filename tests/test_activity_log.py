@@ -49,10 +49,10 @@ def test_activity_exposes_tools_errors_and_keeps_expanded_evidence(browser_serve
         expect(page.locator(f'[data-request-activity="{foreign_id}"]')).to_have_count(0)
         assert not any(f"/api/jobs/{foreign_id}" in url for url in requested)
         own_activity.click()
-        expect(page.locator("#job-id")).to_contain_text(job_id[:8])
-        expect(page.locator("#activity-counts")).to_contain_text("Simulated model")
-        page.locator("#activity-filter").select_option("tools")
-        call = page.locator("#timeline > details").filter(has_text="run_operation → establish").first
+        expect(page.locator("#job-id")).to_contain_text(latest_id[:8])
+        transcript = page.locator("#session-messages")
+        expect(transcript).to_contain_text("Simulated model")
+        call = transcript.locator(".chat-debug-event").filter(has_text="run_operation → establish").first
         expect(call).to_be_visible()
         call.locator("summary").first.click()
         expect(call).to_contain_text('"operation": "establish"')
@@ -64,13 +64,13 @@ def test_activity_exposes_tools_errors_and_keeps_expanded_evidence(browser_serve
         page.wait_for_timeout(3000)
         expect(call).to_have_attribute("open", "")
         expect(payload).to_have_attribute("open", "")
-        page.locator("#activity-filter").select_option("recovery")
-        expect(page.locator("#timeline")).to_contain_text("Invalid proposal — nothing executed")
-        expect(page.locator("#timeline")).to_contain_text("Specify a target or both screen coordinates")
-        page.locator("#activity-filter").select_option("all")
-        page.locator("#activity-search").fill("Synthetic explanation")
-        expect(page.locator("#timeline")).to_contain_text("<img src=x onerror=alert(1)>")
-        assert page.locator("#timeline img").count() == 0 and not errors
+        expect(transcript).to_contain_text("Invalid proposal — nothing executed")
+        expect(transcript).to_contain_text("Specify a target or both screen coordinates")
+        expect(transcript).to_contain_text("<img src=x onerror=alert(1)>")
+        expect(
+            transcript.locator(".chat-debug-event").filter(has_text="Synthetic explanation")
+        ).to_have_count(0)
+        assert transcript.locator("img").count() == 0 and not errors
         assert not any(f"/api/jobs/{foreign_id}" in url for url in requested)
         page.reload()
         expect(page.locator("#job-id")).to_contain_text(latest_id[:8])

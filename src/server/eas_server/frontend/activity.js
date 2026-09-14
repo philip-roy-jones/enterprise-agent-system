@@ -3,7 +3,7 @@ const activityView = (() => {
   const escape = value => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const json = value => `<pre>${escape(JSON.stringify(value, null, 2))}</pre>`;
   const opened = new Set();
-  let current = null, lastMarkup = "";
+  const bound = new WeakSet();
   const categories = kind => {
     if (["assistant_message", "model_step", "model_response", "coordinator_configuration"].includes(kind)) return "decisions";
     if (["approval_requested", "staff_decision", "stale_proposal", "record_selected"].includes(kind)) return "approvals";
@@ -20,6 +20,15 @@ const activityView = (() => {
     record_unavailable:"Record lookup stopped", tool_arguments_rejected:"Invalid proposal — nothing executed",
     observation:"Application observation", recovery_required:"Workflow needs help",
   };
+  function debugData(event) {
+    // Public response text already has a chat bubble. Keep the model call's
+    // technical metadata without repeating that text in expanded details.
+    if (event.kind === "model_response") {
+      const {public_summary, ...metadata} = event.data;
+      return metadata;
+    }
+    return event.data;
+  }
   function summary(event) {
     const d = event.data;
     if (event.kind === "model_step") return `Call ${d.call} · ${d.available_tools.length} available tools · ${d.record_id || "No selected record"}`;
@@ -33,47 +42,43 @@ const activityView = (() => {
     return d.description || d.text || d.message || d.reason || d.name || d.operation || "";
   }
   function details(event, data) {
-    const d = event.data;
+    const d = debugData(event);
     let result = "";
     const invocation = d.invocation || d.run_id;
     if (invocation) result += `<p class="activity-id">Call / run: ${escape(invocation)}</p>`;
     if (d.description) result += `<p><strong>Registered purpose</strong> ${escape(d.description)}</p>`;
     if (d.expected) result += `<p><strong>Expected outcome</strong> ${escape(d.expected)}</p>`;
-    if (event.kind === "assistant_message") result += `<p>${escape(d.text)}</p><p class="hint">${d.source ? escape(d.source) : "Public agent explanation; an explanation is not proof of execution."}</p>`;
     if (d.arguments) result += `<h4>Proposed arguments</h4>${json(d.arguments)}`;
     if (d.corrected_arguments) result += `<h4>Staff-corrected arguments</h4>${json(d.corrected_arguments)}`;
     if (d.action) result += `<h4>Executed arguments</h4>${json(d.action.arguments)}`;
     if (d.result) result += `<h4>Returned result</h4>${json(event.kind === "action_result" ? d.result.value || d.result : d.result)}`;
-    if (d.public_summary?.length) result += `<h4>Public decision summary</h4><p>${escape(d.public_summary.join("\n"))}</p>`;
     const observation = event.kind === "observation" ? d : d.observation || d.result?.after || d.evidence;
     if (observation?.screenshot) result += `<a href="/api/artifacts/${encodeURIComponent(observation.screenshot)}" target="_blank" rel="noopener">Open recorded screenshot ↗</a>`;
     if (event.kind === "action_result") {
       const start = data.events.find(e => e.kind === "action_started" && e.data.invocation === d.invocation);
       if (start) result += `<p class="hint">Elapsed since operation start: ${Math.max(0, event.at-start.at).toFixed(2)} seconds</p>`;
     }
-    return result + `<details class="activity-payload" data-event-id="payload-${event.seq}" ${opened.has("payload-"+event.seq) ? "open" : ""}><summary>Full event data</summary>${json(d)}</details>`;
+    return result + `<details class="activity-payload" data-event-id="payload-${event.seq}"><summary>${event.kind === "model_response" ? "Model metadata" : "Full event data"}</summary>${json(d)}</details>`;
   }
-  function render(data) {
-    const container = document.getElementById("timeline");
-    if (current !== data.job.id) { current = data.job.id; opened.clear(); lastMarkup = ""; }
-    const filter = document.getElementById("activity-filter").value;
-    const search = document.getElementById("activity-search").value.trim().toLowerCase();
+  function events(data) {
+    const chat = new Set(["assistant_message", "assistant_message_delta", "assistant_stream_end", "staff_message", "assistant_question"]);
     const quiet = new Set(["context_window", "conversation_context", "operation_completed"]);
-    const events = data.events.filter(e => !["assistant_message_delta", "assistant_stream_end"].includes(e.kind) && (filter === "all" ? !quiet.has(e.kind) : categories(e.kind) === filter) && (!search || JSON.stringify(e).toLowerCase().includes(search)));
-    const calls = new Set(data.events.filter(e=>e.kind === "agent_tool_call").map(e=>e.data.invocation));
-    if (!calls.size) data.approvals.filter(a=>a.kind === "tool").forEach(a=>calls.add(a.invocation));
-    const steps = new Set(data.events.filter(e=>e.kind === "action_started" && e.data.invocation.includes(":skill:")).map(e=>e.data.invocation));
-    document.getElementById("activity-counts").textContent = `${data.job.model_mode === "live" ? "Live model" : "Simulated model"} · ${data.job.model_calls} model calls · ${calls.size} recorded agent calls · ${steps.size} skill graph steps · ${events.length} events shown`;
-    const markup = [...events].reverse().map(e => `<details class="activity-event activity-${categories(e.kind)}" data-event-id="${e.seq}" ${opened.has(String(e.seq)) ? "open" : ""}><summary><span><strong>${escape(names[e.kind] || e.kind.replaceAll("_", " "))}</strong><span class="activity-summary">${escape(summary(e))}</span></span><time datetime="${new Date(e.at*1000).toISOString()}">${escape(new Date(e.at*1000).toLocaleTimeString())}</time></summary><div class="activity-body">${details(e,data)}</div></details>`).join("") || '<p class="muted">No matching events.</p>';
-    if (markup !== lastMarkup) {
-      const top = container.scrollTop;
-      container.innerHTML = markup;
-      container.scrollTop = top;
-      lastMarkup = markup;
-      container.querySelectorAll("details[data-event-id]").forEach(detail => detail.addEventListener("toggle", () => {
-        if (detail.open) opened.add(detail.dataset.eventId); else opened.delete(detail.dataset.eventId);
-      }));
+    return data.events.filter(e => !chat.has(e.kind) && !quiet.has(e.kind));
+  }
+  function entry(event, data) {
+    return `<details class="chat-debug-event activity-event activity-${categories(event.kind)}" data-message-id="debug-${escape(data.job.id)}-${event.seq}" data-debug-request="${escape(data.job.id)}" data-event-id="${event.seq}"><summary><span><strong>${escape(names[event.kind] || event.kind.replaceAll("_", " "))}</strong><span class="activity-summary">${escape(summary(event))}</span></span><time datetime="${new Date(event.at*1000).toISOString()}">${escape(new Date(event.at*1000).toLocaleTimeString())}</time></summary><div class="activity-body">${details(event,data)}</div></details>`;
+  }
+  function bind(container) {
+    for (const detail of container.querySelectorAll("details[data-event-id]")) {
+      if (bound.has(detail)) continue;
+      bound.add(detail);
+      detail.open = opened.has(detail.dataset.eventId);
+      detail.addEventListener("toggle", () => {
+        if (!detail.isConnected) return;
+        if (detail.open) opened.add(detail.dataset.eventId);
+        else opened.delete(detail.dataset.eventId);
+      });
     }
   }
-  return {render};
+  return {events, entry, bind, reset:() => opened.clear()};
 })();

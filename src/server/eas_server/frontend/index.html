@@ -46,8 +46,10 @@
             </div>
           </div>
           <section class="panel" id="chat-composer">
-            <h2>Talk to your worker</h2>
-            <p class="muted">Describe the work in your own words, including any relevant records. Your worker will ask when something is unclear and request approval before acting.</p>
+            <div class="chat-heading">
+              <h2>Talk to your worker</h2>
+              <button type="button" id="debug-mode" aria-pressed="false" aria-controls="session-messages">Debug mode</button>
+            </div>
             <button type="button" id="earlier-messages" class="history-button" hidden>Load earlier messages</button>
             <div id="session-messages" class="session-messages" role="log" aria-label="Conversation history" aria-live="polite" aria-relevant="additions text"></div><form id="chat-form" class="message-form">
               <textarea id="chat-request" required maxlength="2000" rows="2" placeholder="For example: compare invoice INV-1043 with its purchase order without saving…" aria-label="New work request"></textarea>
@@ -86,6 +88,15 @@
                   </div>
                   <div id="skill-runs"></div><div id="progress" class="progress-track"></div>
                   <p id="job-error" role="alert"></p>
+                  <p id="staff-question" role="status" hidden></p>
+                  <form id="message-form" class="message-form">
+                    <input
+                      id="message"
+                      aria-label="Message to the request conversation"
+                      placeholder="Add context or a review note…"
+                      required
+                    /><button type="submit">Send</button>
+                  </form>
                 </section>
                 <section class="panel review-panel" id="review-panel" hidden>
                   <div class="panel-heading">
@@ -126,25 +137,7 @@
                     Waiting for the worker’s first observation.
                   </p>
                 </section>
-                <section class="panel">
-                  <div class="panel-heading">
-                    <h2>Agent decisions & tool activity</h2>
-                    <a id="episode-link" target="_blank">Export episode ↗</a>
-                  </div>
-                  <p class="hint">Expand a call to inspect its purpose, arguments, results and evidence. Agent tools and internal skill graph steps are shown separately.</p>
-                  <div class="activity-controls"><label>Show<select id="activity-filter"><option value="all">All activity</option><option value="decisions">Agent decisions</option><option value="tools">Tools & operations</option><option value="approvals">Approvals</option><option value="recovery">Errors & recovery</option><option value="evidence">Observations</option><option value="session">Session & context</option></select></label><label>Find<input id="activity-search" type="search" placeholder="Tool, record, run ID, or error…" /></label></div>
-                  <p id="activity-counts" class="hint"></p>
-                  <div id="timeline" class="timeline" aria-label="Detailed agent activity"></div>
-                  <p id="staff-question" role="status" hidden></p>
-                  <form id="message-form" class="message-form">
-                    <input
-                      id="message"
-                      aria-label="Message to the request conversation"
-                      placeholder="Add context or a review note…"
-                      required
-                    /><button type="submit">Send</button>
-                  </form>
-                </section>
+
               </div>
             </section>
           </div>

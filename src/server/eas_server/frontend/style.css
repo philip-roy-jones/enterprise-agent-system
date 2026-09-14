@@ -821,12 +821,16 @@ th {
 }
 
 #chat-composer, #learning-panel { margin-bottom: 20px; }
+.chat-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+#debug-mode { font-size: .8rem; padding: 8px 12px; }
+#debug-mode[aria-pressed="true"] { color: #fff; background: var(--accent); border-color: var(--accent); }
 #chat-form { align-items: end; flex-wrap: wrap; }
 #chat-form textarea { flex: 1; min-width: 260px; margin: 0; }
 #chat-form label { min-width: 130px; margin: 0; }
 #workflow-runs { overflow-wrap: anywhere; }
 #learning-content { overflow-x: auto; }
 .session-messages { max-height: 430px; overflow-y: auto; margin-bottom: 18px; }
+.session-messages.debug-enabled { max-height: min(65vh, 740px); }
 .chat-message { padding: 12px 16px; margin: 10px 0; border-radius: 8px; max-width: 90%; white-space: pre-wrap; overflow-wrap: anywhere; }
 .chat-message p { margin: 6px 0 0; }
 .chat-message.staff { background: #edf6f5; margin-left: auto; }
@@ -838,10 +842,11 @@ th {
 .history-button[hidden] { display: none; }
 
 
-.activity-controls { display:flex; gap:16px; align-items:end; flex-wrap:wrap; }
-.activity-controls label { flex:1; min-width:180px; }
-#timeline { max-height:650px; margin-bottom:20px; }
 .activity-event { border-bottom:1px solid #e4eaf0; padding:12px 0; }
+.chat-debug-event { margin: 8px 0; padding: 10px 12px; border: 1px solid var(--line); border-left: 3px solid #a7b8c9; border-radius: 6px; background: #fafbfd; }
+.chat-debug-event.activity-recovery { border-left-color: #b36b59; }
+.chat-debug-event.activity-approvals { border-left-color: var(--accent); }
+.chat-debug-request { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: .72rem; color: var(--muted); white-space: normal; margin-top: 6px; }
 .activity-event > summary { display:flex; justify-content:space-between; gap:16px; cursor:pointer; list-style:none; }
 .activity-event > summary::before { content:"▸"; color:#6d7e91; }
 .activity-event[open] > summary::before { content:"▾"; }
@@ -874,3 +879,9 @@ th {
 .chat-screenshot figcaption { margin-top: 8px; }
 .chat-screenshot small { display: block; color: #64748b; margin-top: 5px; }
 .stream-status { display: block; color: #64748b; margin-top: 6px; font-size: .75rem; }
+@media (max-width: 600px) {
+  .chat-debug-event > summary { flex-wrap: wrap; gap: 8px; }
+  .chat-debug-event > summary > span { flex-basis: 75%; }
+  .chat-debug-event > summary time { margin-left: 18px; }
+  .chat-debug-event .activity-body { padding-left: 0; }
+}

@@ -15,6 +15,7 @@ const submitted = new Set();
 const streamedEvents = new Map();
 const renderedBubbles = new Map();
 let renderedSession = null, renderedJobs = [];
+let chatDebug = localStorage.getItem("eas-chat-debug") === "true";
 let roles = [];
 let desktopAdapter = "browser";
 let activeView = "jobs";
@@ -42,6 +43,7 @@ async function api(path, body) {
     if (typeof transcriptCache !== "undefined") transcriptCache.clear();
     streamedEvents.clear();
     renderedBubbles.clear();
+    activityView.reset();
     renderedSession = null;
     renderedJobs = [];
     $("session-messages").replaceChildren();
@@ -116,9 +118,9 @@ function connectStream() {
     streamedEvents.set(event.seq, event);
     const detail = transcriptCache.get(requestId);
     if (detail) cacheTranscript(detail);
-    if (["assistant_message_delta", "assistant_message", "assistant_stream_end"].includes(event.kind) && detail && renderedSession) {
+    if ((chatDebug || ["assistant_message_delta", "assistant_message", "assistant_stream_end"].includes(event.kind)) && detail && renderedSession) {
       renderTranscript(renderedSession, renderedJobs);
-      if (event.kind !== "assistant_message") return;
+      if (["assistant_message_delta", "assistant_stream_end"].includes(event.kind)) return;
     }
     refresh();
   };
@@ -188,7 +190,6 @@ function renderDetail(d) {
         `<div class="step ${j.completed.includes(id) ? "finished" : ""}"><span>${j.completed.includes(id) ? "✓" : i + 1}</span><small>${label}</small></div>`,
     )
     .join("");
-  $("episode-link").href = `/api/jobs/${j.id}/episode`;
   const latestObs = [...d.events]
     .reverse()
     .find((e) => e.kind === "observation")?.data;
@@ -258,7 +259,6 @@ function renderDetail(d) {
     $("proposal-copy").innerHTML = "";
     $("target-circle").hidden = true;
   }
-  activityView.render(d);
 }
 function drawTarget(args, obs) {
   let t = obs.targets.find((t) => t.target === args.target);
@@ -451,11 +451,9 @@ $("chat-form").onsubmit = (e) => {
 $("session-messages").onclick = event => {
   const button = event.target.closest("[data-request-activity]");
   if (!button) return;
-  action(async () => {
-    selectRequest(button.dataset.requestActivity);
-    await refresh();
-    $("main-view").scrollIntoView({behavior: "smooth", block: "start"});
-  });
+  setChatDebug(true);
+  const row = [...$("session-messages").querySelectorAll("[data-debug-request]")].find(node => node.dataset.debugRequest === button.dataset.requestActivity);
+  row?.scrollIntoView({behavior:"smooth", block:"nearest"});
 };
 async function renderSession(session, jobs, selectedDetail) {
   const j = session.current;
@@ -465,6 +463,7 @@ async function renderSession(session, jobs, selectedDetail) {
     transcriptMarkup = "";
     transcriptCache.clear();
     renderedBubbles.clear();
+    activityView.reset();
     $("session-messages").replaceChildren();
   }
   const done = !j || ["completed", "cancelled", "rejected", "failed", "denied"].includes(j.status);
@@ -504,19 +503,24 @@ function renderTranscript(session, jobs) {
     if (!data) return [];
     const created = data.events.find(event => event.kind === "job_created");
     const shares = new Set(data.events.filter(e => e.kind === "action_started" && e.data.action?.name === "share_screenshot").map(e => e.data.invocation));
-    return [{id: "request-"+turn.id, requestId: turn.id, at: turn.created_at, seq: created?.seq || 0, speaker: "staff", text: turn.task, record: turn.record_id},
+    const debug = chatDebug ? activityView.events(data).map(event => ({at:event.at, seq:event.seq, debug:event, detail:data})) : [];
+    return [{id: "request-"+turn.id, requestId: turn.id, modelMode:turn.model_mode, at: turn.created_at, seq: created?.seq || 0, speaker: "staff", text: turn.task, record: turn.record_id}, ...debug,
       ...chatStream.events(data.events, data.job.status).filter(event => ["staff_message", "assistant_message", "assistant_question"].includes(event.kind) || (event.kind === "action_result" && shares.has(event.data.invocation)))
         .map(event => ({id: event.data.message_id && event.kind === "assistant_message" ? "reply-"+event.data.message_id : "event-"+event.seq, at: event.at, seq: event.seq, speaker: event.kind === "staff_message" ? "staff" : "agent", text: event.data.text || event.data.question || "", partial:event.partial, interrupted:event.interrupted, attachment: event.kind === "action_result" ? event.data.result?.value?.data : null}))];
   }).sort((a,b) => a.at-b.at || a.seq-b.seq);
   const markup = entries.map(entry => {
+    if (entry.debug) return activityView.entry(entry.debug, entry.detail);
     const date = new Date(entry.at*1000);
-    return `<div class="chat-message ${entry.speaker}${entry.partial && !entry.interrupted ? " streaming" : ""}" data-message-id="${esc(entry.id)}"><div class="chat-message-meta"><strong>${entry.speaker === "staff" ? "Staff" : "Worker"}${entry.record ? ` · ${esc(entry.record)}` : ""}</strong><time datetime="${date.toISOString()}" title="${esc(date.toLocaleString())}">${esc(date.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}))}</time></div><p>${esc(entry.text)}</p>${entry.partial ? `<small class="stream-status">${entry.interrupted ? "Response interrupted" : "Responding…"}</small>` : ""}${entry.attachment ? renderScreenshot(entry.attachment) : ""}${entry.requestId ? `<button type="button" class="chat-activity-link" data-request-activity="${esc(entry.requestId)}">View activity</button>` : ""}</div>`;
+    return `<div class="chat-message ${entry.speaker}${entry.partial && !entry.interrupted ? " streaming" : ""}" data-message-id="${esc(entry.id)}"><div class="chat-message-meta"><strong>${entry.speaker === "staff" ? "Staff" : "Worker"}${entry.record ? ` · ${esc(entry.record)}` : ""}</strong><time datetime="${date.toISOString()}" title="${esc(date.toLocaleString())}">${esc(date.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}))}</time></div><p>${esc(entry.text)}</p>${entry.partial ? `<small class="stream-status">${entry.interrupted ? "Response interrupted" : "Responding…"}</small>` : ""}${entry.attachment ? renderScreenshot(entry.attachment) : ""}${entry.requestId ? chatDebug ? `<div class="chat-debug-request"><span>${entry.modelMode === "live" ? "Live model" : "Simulated model"}</span><a class="chat-activity-link" href="/api/jobs/${encodeURIComponent(entry.requestId)}/episode" target="_blank" rel="noopener">Export episode ↗</a></div>` : `<button type="button" class="chat-activity-link" data-request-activity="${esc(entry.requestId)}">Debug this request</button>` : ""}</div>`;
   }).join("");
   const transcript = $("session-messages");
   if (markup !== transcriptMarkup) {
     const first = transcript.firstElementChild?.dataset.messageId;
     const oldHeight = transcript.scrollHeight, oldTop = transcript.scrollTop;
     const atBottom = oldHeight-transcript.clientHeight-oldTop < 48;
+    const top = transcript.getBoundingClientRect().top;
+    const anchor = [...transcript.children].find(node => node.getBoundingClientRect().bottom > top);
+    const anchorId = anchor?.dataset.messageId, anchorTop = anchor?.getBoundingClientRect().top;
     const wasEmpty = !transcriptMarkup;
     const template = document.createElement("template");
     template.innerHTML = markup;
@@ -524,15 +528,17 @@ function renderTranscript(session, jobs) {
     const fragment = document.createDocumentFragment(), nextBubbles = new Map();
     for (const node of [...template.content.children]) {
       const id = node.dataset.messageId, html = node.outerHTML;
-      // Retain unchanged bubbles, including enlarged historical screenshots.
+      // Retain unchanged messages, enlarged screenshots and expanded debug rows.
       fragment.append(existing.has(id) && renderedBubbles.get(id) === html ? existing.get(id) : node);
       nextBubbles.set(id, html);
     }
     transcript.replaceChildren(fragment);
+    activityView.bind(transcript);
     renderedBubbles.clear();
     nextBubbles.forEach((html,id) => renderedBubbles.set(id, html));
     const prepended = first && first !== transcript.firstElementChild?.dataset.messageId;
-    if (prepended) transcript.scrollTop = oldTop + transcript.scrollHeight-oldHeight;
+    const restoredAnchor = [...transcript.children].find(node => node.dataset.messageId === anchorId);
+    if ((prepended || !atBottom) && restoredAnchor) transcript.scrollTop += restoredAnchor.getBoundingClientRect().top-anchorTop;
     else if (atBottom || wasEmpty) transcript.scrollTop = transcript.scrollHeight;
     else transcript.scrollTop = oldTop;
     transcriptMarkup = markup;
@@ -544,8 +550,18 @@ async function refreshLearning() {
   learningView.render(status);
   document.querySelectorAll("[data-skill]").forEach(button => button.onclick=()=>action(()=>api(`/api/skills/${encodeURIComponent(button.dataset.skill)}/change`,{version:button.dataset.version || null})));
 }
-$("activity-filter").onchange = refresh;
-$("activity-search").oninput = refresh;
+function renderCurrentTranscript() {
+  if (renderedSession && renderedSession.conversation_id === conversationId) renderTranscript(renderedSession, renderedJobs);
+}
+function setChatDebug(enabled) {
+  chatDebug = enabled;
+  localStorage.setItem("eas-chat-debug", String(enabled));
+  $("debug-mode").setAttribute("aria-pressed", String(enabled));
+  $("session-messages").classList.toggle("debug-enabled", enabled);
+  renderCurrentTranscript();
+}
+$("debug-mode").onclick = () => setChatDebug(!chatDebug);
+setChatDebug(chatDebug);
 async function start() {
   const setup = new URLSearchParams(location.hash.slice(1));
   if (setup.has("setup")) {
