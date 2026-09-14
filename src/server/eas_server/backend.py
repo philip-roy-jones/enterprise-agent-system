@@ -222,7 +222,12 @@ def create_app(settings=None):
             for j in security.jobs(current_principal.get())
             if j.get("conversation_id") == conversation_id and j.get("staff_id") == actor
         ]
-        return {"conversation_id": conversation_id, "current": requests[0] if requests else None}
+        # Updating an older result (for example, accepting it from chat history)
+        # must not replace the conversation's newest request.
+        return {
+            "conversation_id": conversation_id,
+            "current": max(requests, key=lambda j: (j["created_at"], j["id"]), default=None),
+        }
 
     @app.post("/api/chat")
     def send_chat(body: JobInput, actor=Depends(staff)):

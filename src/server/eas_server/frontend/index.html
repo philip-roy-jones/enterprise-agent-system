@@ -51,7 +51,48 @@
               <button type="button" id="debug-mode" aria-pressed="false" aria-controls="session-messages">Debug mode</button>
             </div>
             <button type="button" id="earlier-messages" class="history-button" hidden>Load earlier messages</button>
-            <div id="session-messages" class="session-messages" role="log" aria-label="Conversation history" aria-live="polite" aria-relevant="additions text"></div><form id="chat-form" class="message-form">
+            <div id="session-messages" class="session-messages" role="log" aria-label="Conversation history" aria-live="polite" aria-relevant="additions text"></div>
+            <section class="review-panel chat-review" id="review-panel" hidden>
+              <div class="panel-heading">
+                <h2 id="review-title">Review operation</h2>
+                <span id="review-kind" class="badge"></span>
+              </div>
+              <div id="proposal-copy"></div>
+              <div class="screenshot-wrap" id="screenshot-wrap">
+                <img
+                  id="screenshot"
+                  alt="Current worker application screenshot"
+                /><span id="target-circle" hidden></span>
+              </div>
+              <div id="review-controls" hidden>
+                <p class="hint">
+                  Click the screenshot to correct a click target. Edit the
+                  arguments to correct text.
+                </p>
+                <label
+                  >Proposed arguments<textarea
+                    id="arguments"
+                    rows="3"
+                    spellcheck="false"
+                  ></textarea></label
+                ><label
+                  >Correction or decision note<input
+                    id="decision-note"
+                    placeholder="Optional explanation for the teaching record"
+                /></label>
+                <div class="actions">
+                  <button class="primary" id="approve">
+                    Approve operation</button
+                  ><button id="correct">Approve correction</button
+                  ><button class="danger-text" id="reject">Reject</button>
+                </div>
+              </div>
+            </section>
+            <div id="chat-controls" class="chat-controls" hidden>
+              <button id="takeover" type="button">Take control</button>
+              <button id="cancel-job" type="button" class="danger-text">Stop</button>
+            </div>
+            <form id="chat-form" class="message-form">
               <textarea id="chat-request" required maxlength="2000" rows="2" placeholder="For example: compare invoice INV-1043 with its purchase order without saving…" aria-label="New work request"></textarea>
               <button class="primary">Send</button>
 
@@ -60,87 +101,6 @@
             <p id="conversation-label" class="hint"></p>
           </section>
           <section class="panel" id="learning-panel"><details><summary>Accumulated skills & learning</summary><div id="learning-content"></div></details></section>
-          <div id="main-view" class="console-grid">
-            <section class="job-detail">
-              <div id="empty" class="panel empty-state">
-                <div class="empty-icon">◫</div>
-                <h2>Your worker is ready.</h2>
-                <p>
-                  Describe a task in the conversation above. Every operation requires your approval.
-                </p>
-              </div>
-              <div id="active-job" hidden>
-                <section class="panel">
-                  <div class="title-row">
-                    <div>
-                      <span class="eyebrow" id="job-id"></span>
-                      <h2 id="job-title"></h2>
-                    </div>
-                    <span class="badge" id="job-status"></span>
-                  </div>
-                  <div class="job-toolbar">
-                    <button id="takeover">Take control</button
-                    ><button id="cancel-job" class="danger-text">
-                      Cancel request</button
-                    ><button id="accept-job" class="primary" hidden>
-                      Accept completed work
-                    </button>
-                  </div>
-                  <div id="skill-runs"></div><div id="progress" class="progress-track"></div>
-                  <p id="job-error" role="alert"></p>
-                  <p id="staff-question" role="status" hidden></p>
-                  <form id="message-form" class="message-form">
-                    <input
-                      id="message"
-                      aria-label="Message to the request conversation"
-                      placeholder="Add context or a review note…"
-                      required
-                    /><button type="submit">Send</button>
-                  </form>
-                </section>
-                <section class="panel review-panel" id="review-panel" hidden>
-                  <div class="panel-heading">
-                    <h2 id="review-title">Review operation</h2>
-                    <span id="review-kind" class="badge"></span>
-                  </div>
-                  <div id="proposal-copy"></div>
-                  <div class="screenshot-wrap" id="screenshot-wrap">
-                    <img
-                      id="screenshot"
-                      alt="Current worker application screenshot"
-                    /><span id="target-circle" hidden></span>
-                  </div>
-                  <div id="review-controls" hidden>
-                    <p class="hint">
-                      Click the screenshot to correct a click target. Edit the
-                      arguments to correct text.
-                    </p>
-                    <label
-                      >Proposed arguments<textarea
-                        id="arguments"
-                        rows="3"
-                        spellcheck="false"
-                      ></textarea></label
-                    ><label
-                      >Correction or decision note<input
-                        id="decision-note"
-                        placeholder="Optional explanation for the teaching record"
-                    /></label>
-                    <div class="actions">
-                      <button class="primary" id="approve">
-                        Approve operation</button
-                      ><button id="correct">Approve correction</button
-                      ><button class="danger-text" id="reject">Reject</button>
-                    </div>
-                  </div>
-                  <p id="waiting" class="muted">
-                    Waiting for the worker’s first observation.
-                  </p>
-                </section>
-
-              </div>
-            </section>
-          </div>
           <div id="metrics-view" hidden></div>
         </main>
         <footer class="app-footer">

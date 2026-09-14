@@ -508,13 +508,6 @@ dialog .muted {
   font-size: 0.875rem;
   box-shadow: 0 8px 30px #0002;
 }
-#job-error:empty {
-  display: none;
-}
-#job-error {
-  color: #af5151;
-  font-size: 0.875rem;
-}
 [hidden] {
   display: none !important;
 }
@@ -821,6 +814,11 @@ th {
 }
 
 #chat-composer, #learning-panel { margin-bottom: 20px; }
+.chat-controls { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.chat-controls button { font-size: .8rem; padding: 8px 12px; }
+.chat-review { padding: 18px; margin: 16px 0; border: 1px solid var(--line); border-radius: 8px; }
+.chat-outcome { margin: 10px 0 16px; padding: 0 16px; font-size: .85rem; color: var(--muted); }
+.chat-outcome p { margin: 0; }
 .chat-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 #debug-mode { font-size: .8rem; padding: 8px 12px; }
 #debug-mode[aria-pressed="true"] { color: #fff; background: var(--accent); border-color: var(--accent); }

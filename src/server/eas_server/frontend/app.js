@@ -46,6 +46,8 @@ async function api(path, body) {
     activityView.reset();
     renderedSession = null;
     renderedJobs = [];
+    $("chat-controls").hidden = true;
+    $("review-panel").hidden = true;
     $("session-messages").replaceChildren();
     if (!$("login-dialog").open) $("login-dialog").showModal();
     throw Error("Connect to your workspace to continue.");
@@ -131,28 +133,13 @@ function selectRequest(id) {
   streamedEvents.clear();
   selectedApproval = null;
   current = null;
+  $("chat-controls").hidden = true;
+  $("review-panel").hidden = true;
   lastImage = "";
   connectStream();
 }
-const invoiceStages = {
-  validate: "Validate",
-  establish: "Open invoice",
-  compare: "Compare PO",
-  prepare: "Prepare draft",
-  save: "Save",
-  verify: "Verify",
-  complete: "Complete",
-  report: "Report",
-  judge: "Classify",
-};
-let readable = invoiceStages;
 function renderDetail(d) {
   current = d;
-  const role = roles.find((r) => r.id === d.job.role_id);
-  readable =
-    !role || role.id === "invoice_correction"
-      ? invoiceStages
-      : Object.fromEntries(role.stages.map((s) => [s, s.replaceAll("_", " ")]));
   const j = d.job,
     pending = d.approvals.find(
       (a) => a.status === "pending" && !submitted.has(a.id),
@@ -160,36 +147,10 @@ function renderDetail(d) {
     done = ["completed", "cancelled", "rejected", "failed", "denied"].includes(
       j.status,
     );
-  $("empty").hidden = true;
-  $("active-job").hidden = false;
-  $("job-id").textContent = `${j.graph_version} / ${j.id.slice(0, 8)}`;
-  $("job-title").textContent =
-    `${j.role_name || "Invoice correction"} · ${j.record_id || j.invoice_id || "Conversation"}`;
-  $("job-status").textContent = (done ? j.status : j.execution_state || j.status);
-
+  $("chat-controls").hidden = done;
   $("cancel-job").disabled = done;
-  $("takeover").disabled = done;
-  $("takeover").textContent =
-    d.lease.owner === "staff" ? "Release control" : "Take control";
-  $("accept-job").hidden = j.status !== "completed" || j.accepted || ["conversation", "record_unavailable"].includes(j.result_kind);
-  // The composer always addresses the persistent staff session, even while an older activity is inspected.
-  $("conversation-label").textContent = "Your ongoing conversation · history is retained across context changes";
-  $("skill-runs").innerHTML = Object.values(j.skill_runs || {}).map(run => `<p><strong>${esc(run.skill_id)}</strong> · ${esc(run.state.replaceAll("_"," "))} · step ${run.index + 1}<br><small>Version ${esc(run.version.slice(0,12))} · Run ${esc(run.run_id)}</small>${run.reason ? `<br>${esc(run.reason)}` : ""}</p>`).join("");
-  $("job-error").textContent = j.error || "";
-  const staffQuestion = d.conversation?.questions.find(q => q.status === "pending");
-  $("staff-question").hidden = !staffQuestion || done;
-  $("staff-question").textContent = staffQuestion ? `The assistant needs your answer: ${staffQuestion.question}` : "";
-  $("message").placeholder = staffQuestion ? "Reply to the assistant’s question…" : "Add context or a review note…";
-  $("message-form").hidden = done || j.conversation_id === conversationId;
-  $("message").disabled = done;
-  $("message-form").querySelector("button").disabled = done;
-  const shownSteps=[...new Set([...j.completed,...(pending ? [pending.name] : [])])];
-  $("progress").innerHTML = shownSteps.map(id=>[id,readable[id] || id.replaceAll("_"," ")])
-    .map(
-      ([id, label], i) =>
-        `<div class="step ${j.completed.includes(id) ? "finished" : ""}"><span>${j.completed.includes(id) ? "✓" : i + 1}</span><small>${label}</small></div>`,
-    )
-    .join("");
+  $("takeover").disabled = done || d.lease.job_id !== j.id;
+  $("takeover").textContent = d.lease.owner === "staff" ? "Release control" : "Take control";
   const latestObs = [...d.events]
     .reverse()
     .find((e) => e.kind === "observation")?.data;
@@ -201,19 +162,6 @@ function renderDetail(d) {
   $("screenshot-wrap").hidden = !obs?.screenshot;
   $("review-panel").hidden = !pending;
   $("review-controls").hidden = !pending;
-  $("waiting").hidden = !!pending;
-  $("waiting").textContent = j.result_kind === "record_unavailable" ? j.record_lookup.message : j.result_kind === "conversation" ? "Continue in the conversation when you’re ready." : done
-    ? j.accepted
-      ? "Staff accepted the verified result."
-      : j.status === "completed"
-        ? "Outcome verified. Accept the work to make this episode available for improvement."
-        : `Request ${j.status}.`
-    : d.lease.owner === "staff"
-      ? desktopAdapter === "browser"
-        ? "You hold desktop control. Use the browser test workspace, then release control."
-        : "You hold desktop control. Work in the application on the Windows machine, then release control."
-      : "Worker is running or reconciling current state.";
-  if (staffQuestion && !done) $("waiting").textContent = "Waiting for your answer in the request conversation.";
   if (pending) {
     $("review-title").textContent =
       pending.kind === "tool"
@@ -306,8 +254,6 @@ $("correct").onclick = () => action(() => decide("correct"));
 $("reject").onclick = () => action(() => decide("reject"));
 $("cancel-job").onclick = () =>
   action(() => api(`/api/jobs/${active}/cancel`, {}));
-$("accept-job").onclick = () =>
-  action(() => api(`/api/jobs/${active}/accept`, {}));
 $("takeover").onclick = () =>
   action(() =>
     api(
@@ -315,25 +261,9 @@ $("takeover").onclick = () =>
       {},
     ),
   );
-let draftMessage = null;
-$("message-form").onsubmit = (e) => {
-  e.preventDefault();
-  action(async () => {
-    const text = $("message").value;
-    const replyTo = current?.conversation?.questions.find(q => q.status === "pending")?.question_id || null;
-    if (!draftMessage || draftMessage.text !== text || draftMessage.reply_to !== replyTo || draftMessage.job !== active) {
-      draftMessage = {job: active, text, reply_to: replyTo, message_id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`};
-    }
-    const {job, ...message} = draftMessage;
-    await api(`/api/jobs/${job}/messages`, message);
-    draftMessage = null;
-    if (active === job && $("message").value === text) $("message").value = "";
-  });
-};
 function selectView(view) {
   activeView = view;
   const metrics = view === "metrics";
-  $("main-view").hidden = metrics;
   $("chat-composer").hidden = metrics;
   $("learning-panel").hidden = metrics;
   $("metrics-view").hidden = !metrics;
@@ -393,8 +323,8 @@ async function refresh() {
       detail=await api("/api/jobs/" + active);
       renderDetail(detail);
     } else {
-      $("empty").hidden = false;
-      $("active-job").hidden = true;
+      $("chat-controls").hidden = true;
+      $("review-panel").hidden = true;
     }
     await renderSession(session, jobs, detail);
     const health = await api("/api/health");
@@ -426,6 +356,26 @@ let transcriptSession = null;
 let transcriptLimit = 20;
 let transcriptMarkup = "";
 const transcriptCache = new Map();
+const accepting = new Set();
+$("session-messages").addEventListener("click", event => {
+  const button = event.target.closest("[data-accept-request]");
+  if (!button || button.disabled) return;
+  const id = button.dataset.acceptRequest;
+  if (accepting.has(id)) return;
+  accepting.add(id);
+  button.disabled = true;
+  action(async () => {
+    try {
+      await api(`/api/jobs/${encodeURIComponent(id)}/accept`, {});
+      cacheTranscript(await api(`/api/jobs/${encodeURIComponent(id)}`));
+      toast("Result accepted.");
+    } finally {
+      accepting.delete(id);
+      button.disabled = false;
+      renderCurrentTranscript();
+    }
+  });
+});
 $("earlier-messages").onclick = () => {
   transcriptLimit += 20;
   refresh();
@@ -488,6 +438,14 @@ function cacheTranscript(data) {
   if (data.job.id === active) streamedEvents.forEach((event, seq) => events.set(seq, event));
   transcriptCache.set(data.job.id, {...data, events:[...events.values()].sort((a,b) => a.seq-b.seq)});
 }
+function outcomeNotice(job) {
+  if (job.status === "completed") return !job.accepted && !["conversation", "record_unavailable"].includes(job.result_kind) ? "acceptance" : null;
+  if (job.status === "cancelled") return "Work stopped.";
+  if (["rejected", "denied"].includes(job.status)) return "This request was declined.";
+  if (job.status === "failed") return "The worker couldn't finish this request. Reply in chat to discuss the next step.";
+  if (job.error) return "The worker needs help to continue. Reply in chat or take control.";
+  return null;
+}
 function renderTranscript(session, jobs) {
   const visible = jobs.filter(turn => turn.conversation_id === session.conversation_id)
     .sort((a,b) => a.created_at-b.created_at || a.id.localeCompare(b.id)).slice(-transcriptLimit);
@@ -497,12 +455,18 @@ function renderTranscript(session, jobs) {
     const created = data.events.find(event => event.kind === "job_created");
     const shares = new Set(data.events.filter(e => e.kind === "action_started" && e.data.action?.name === "share_screenshot").map(e => e.data.invocation));
     const debug = chatDebug ? activityView.events(data).map(event => ({at:event.at, seq:event.seq, debug:event, detail:data})) : [];
+    const messages = chatStream.events(data.events, data.job.status).filter(event => ["staff_message", "assistant_message", "assistant_question"].includes(event.kind) || (event.kind === "action_result" && shares.has(event.data.invocation)));
+    const last = messages.at(-1) || data.events.at(-1) || {at:turn.created_at, seq:0};
+    const notice = outcomeNotice(data.job);
     return [{id: "request-"+turn.id, requestId: turn.id, modelMode:turn.model_mode, at: turn.created_at, seq: created?.seq || 0, speaker: "staff", text: turn.task, record: turn.record_id}, ...debug,
-      ...chatStream.events(data.events, data.job.status).filter(event => ["staff_message", "assistant_message", "assistant_question"].includes(event.kind) || (event.kind === "action_result" && shares.has(event.data.invocation)))
-        .map(event => ({id: event.data.message_id && event.kind === "assistant_message" ? "reply-"+event.data.message_id : "event-"+event.seq, at: event.at, seq: event.seq, speaker: event.kind === "staff_message" ? "staff" : "agent", text: event.data.text || event.data.question || "", partial:event.partial, interrupted:event.interrupted, attachment: event.kind === "action_result" ? event.data.result?.value?.data : null}))];
+      ...(chatDebug ? [{at:turn.created_at, seq:(created?.seq || 0) + 0.1, execution:data}] : []),
+      ...messages.map(event => ({id: event.data.message_id && event.kind === "assistant_message" ? "reply-"+event.data.message_id : "event-"+event.seq, at: event.at, seq: event.seq, speaker: event.kind === "staff_message" ? "staff" : "agent", text: event.data.text || event.data.question || "", partial:event.partial, interrupted:event.interrupted, attachment: event.kind === "action_result" ? event.data.result?.value?.data : null})),
+      ...(notice ? [{at:last.at, seq:last.seq + 0.5, requestId:turn.id, notice}] : [])];
   }).sort((a,b) => a.at-b.at || a.seq-b.seq);
   const markup = entries.map(entry => {
     if (entry.debug) return activityView.entry(entry.debug, entry.detail);
+    if (entry.execution) return activityView.execution(entry.execution);
+    if (entry.notice) return `<div class="chat-outcome" data-message-id="outcome-${esc(entry.requestId)}">${entry.notice === "acceptance" ? `<button type="button" class="primary" data-accept-request="${esc(entry.requestId)}" ${accepting.has(entry.requestId) ? "disabled" : ""}>Accept completed work</button>` : `<p>${esc(entry.notice)}</p>`}</div>`;
     const date = new Date(entry.at*1000);
     return `<div class="chat-message ${entry.speaker}${entry.partial && !entry.interrupted ? " streaming" : ""}" data-message-id="${esc(entry.id)}"><div class="chat-message-meta"><strong>${entry.speaker === "staff" ? "Staff" : "Worker"}${entry.record ? ` · ${esc(entry.record)}` : ""}</strong><time datetime="${date.toISOString()}" title="${esc(date.toLocaleString())}">${esc(date.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}))}</time></div><p>${esc(entry.text)}</p>${entry.partial ? `<small class="stream-status">${entry.interrupted ? "Response interrupted" : "Responding…"}</small>` : ""}${entry.attachment ? renderScreenshot(entry.attachment) : ""}${entry.requestId && chatDebug ? `<div class="chat-debug-request"><span>${entry.modelMode === "live" ? "Live model" : "Simulated model"}</span><a class="chat-activity-link" href="/api/jobs/${encodeURIComponent(entry.requestId)}/episode" target="_blank" rel="noopener">Export episode ↗</a></div>` : ""}</div>`;
   }).join("");

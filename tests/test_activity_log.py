@@ -43,12 +43,12 @@ def test_activity_exposes_tools_errors_and_keeps_expanded_evidence(browser_serve
         page.on("pageerror", lambda error: errors.append(str(error)))
         page.goto(ctx["url"])
         expect(page.get_by_role("heading", name="Recent activity", exact=True)).to_have_count(0)
-        expect(page.locator("#job-id")).to_contain_text(latest_id[:8])
+        page.wait_for_function("id => active === id", arg=latest_id)
         expect(page.locator(f'[data-message-id="request-{job_id}"]')).to_be_attached()
         expect(page.locator(f'[data-message-id="request-{foreign_id}"]')).to_have_count(0)
         assert not any(f"/api/jobs/{foreign_id}" in url for url in requested)
         page.locator("#debug-mode").click()
-        expect(page.locator("#job-id")).to_contain_text(latest_id[:8])
+        expect(page.locator(f'[data-message-id="execution-{latest_id}"]')).to_contain_text(latest_id)
         transcript = page.locator("#session-messages")
         expect(transcript).to_contain_text("Simulated model")
         call = transcript.locator(".chat-debug-event").filter(has_text="run_operation → establish").first
@@ -72,7 +72,7 @@ def test_activity_exposes_tools_errors_and_keeps_expanded_evidence(browser_serve
         assert transcript.locator("img").count() == 0 and not errors
         assert not any(f"/api/jobs/{foreign_id}" in url for url in requested)
         page.reload()
-        expect(page.locator("#job-id")).to_contain_text(latest_id[:8])
+        page.wait_for_function("id => active === id", arg=latest_id)
         browser.close()
 
 

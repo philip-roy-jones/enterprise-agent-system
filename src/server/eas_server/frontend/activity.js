@@ -68,6 +68,12 @@ const activityView = (() => {
   function entry(event, data) {
     return `<details class="chat-debug-event activity-event activity-${categories(event.kind)}" data-message-id="debug-${escape(data.job.id)}-${event.seq}" data-debug-request="${escape(data.job.id)}" data-event-id="${event.seq}"><summary><span><strong>${escape(names[event.kind] || event.kind.replaceAll("_", " "))}</strong><span class="activity-summary">${escape(summary(event))}</span></span><time datetime="${new Date(event.at*1000).toISOString()}">${escape(new Date(event.at*1000).toLocaleTimeString())}</time></summary><div class="activity-body">${details(event,data)}</div></details>`;
   }
+  function execution(data) {
+    const j = data.job;
+    const status = ["completed", "cancelled", "rejected", "failed", "denied"].includes(j.status) ? j.status : j.execution_state || j.status;
+    const metadata = {request_id:j.id, graph_version:j.graph_version, status:j.status, execution_state:j.execution_state, controller:j.controller, model_mode:j.model_mode, model_calls:j.model_calls, tokens:j.tokens, result_kind:j.result_kind, accepted:j.accepted, completed_steps:j.completed, skill_runs:j.skill_runs || {}, error:j.error || null};
+    return `<details class="chat-debug-event activity-event" data-message-id="execution-${escape(j.id)}" data-event-id="execution-${escape(j.id)}"><summary><span><strong>Execution details</strong><span class="activity-summary">Latest status: ${escape(status)}</span></span></summary><div class="activity-body">${json(metadata)}</div></details>`;
+  }
   function bind(container) {
     for (const detail of container.querySelectorAll("details[data-event-id]")) {
       if (bound.has(detail)) continue;
@@ -80,5 +86,5 @@ const activityView = (() => {
       });
     }
   }
-  return {events, entry, bind, reset:() => opened.clear()};
+  return {events, entry, execution, bind, reset:() => opened.clear()};
 })();
