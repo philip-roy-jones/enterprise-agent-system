@@ -858,6 +858,7 @@ th {
 .activity-body pre { white-space:pre-wrap; overflow-wrap:anywhere; background:#f3f6f9; padding:12px; border-radius:6px; max-height:320px; overflow:auto; font-size:.72rem; }
 .activity-id { color:#60758c; font-family:monospace; font-size:.72rem; }
 .activity-payload { margin-top:14px; }
+.activity-payload:first-child { margin-top:0; }
 
 .chat-activity-link { margin-top: 8px; padding: 3px 0; border: 0; background: transparent; color: var(--accent); font-size: .78rem; text-decoration: underline; }
 .job-detail { min-width: 0; }

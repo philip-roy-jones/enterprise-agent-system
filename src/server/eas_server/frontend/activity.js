@@ -58,7 +58,7 @@ const activityView = (() => {
       const start = data.events.find(e => e.kind === "action_started" && e.data.invocation === d.invocation);
       if (start) result += `<p class="hint">Elapsed since operation start: ${Math.max(0, event.at-start.at).toFixed(2)} seconds</p>`;
     }
-    return result + `<details class="activity-payload" data-event-id="payload-${event.seq}"><summary>${event.kind === "model_response" ? "Model metadata" : "Full event data"}</summary>${json(d)}</details>`;
+    return result + `<div class="activity-payload">${result ? "<h4>Full event data</h4>" : ""}${json(d)}</div>`;
   }
   function events(data) {
     const chat = new Set(["assistant_message", "assistant_message_delta", "assistant_stream_end", "staff_message", "assistant_question"]);

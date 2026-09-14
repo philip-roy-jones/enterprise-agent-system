@@ -56,13 +56,13 @@ def test_activity_exposes_tools_errors_and_keeps_expanded_evidence(browser_serve
         call.locator("summary").first.click()
         expect(call).to_contain_text('"operation": "establish"')
         payload = call.locator(".activity-payload")
-        payload.locator("summary").click()
+        expect(payload.locator("pre")).to_be_visible()
         ctx["store"].event(
             job_id, "staff_note", {"text": "Synthetic new activity while evidence is expanded"}
         )
         page.wait_for_timeout(3000)
         expect(call).to_have_attribute("open", "")
-        expect(payload).to_have_attribute("open", "")
+        expect(payload.locator("pre")).to_be_visible()
         expect(transcript).to_contain_text("Invalid proposal — nothing executed")
         expect(transcript).to_contain_text("Specify a target or both screen coordinates")
         expect(transcript).to_contain_text("<img src=x onerror=alert(1)>")

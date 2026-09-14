@@ -84,7 +84,7 @@ def test_chat_debug_history_streaming_and_reload(browser_server):
             expect(transcript).to_contain_text("Simulated model")
             response_row = page.locator(f'[data-message-id="debug-{earlier["id"]}-{model_response["seq"]}"]')
             response_row.locator(":scope > summary").click()
-            response_row.locator(".activity-payload summary").click()
+            expect(response_row.locator(".activity-payload pre")).to_be_visible()
             expect(response_row).to_contain_text('"tokens": 42')
             expect(response_row).not_to_contain_text("Earlier simulated answer")
             expect(response_row).not_to_contain_text("public_summary")
@@ -106,8 +106,7 @@ def test_chat_debug_history_streaming_and_reload(browser_server):
             expect(current).to_contain_text("<script>unsafe()</script>")
             expect(current.locator("script")).to_have_count(0)
             payload = current.locator(".activity-payload")
-            payload.locator("summary").click()
-            expect(payload).to_have_attribute("open", "")
+            expect(payload.locator("pre")).to_be_visible()
             current.evaluate("node => { window.savedDebugRow = node; }")
 
             # SSE must deliver both new activity and text with polling disabled.
@@ -120,7 +119,7 @@ def test_chat_debug_history_streaming_and_reload(browser_server):
             reply = transcript.locator('[data-message-id="reply-debug-reply"]')
             expect(reply.locator("p")).to_have_text("Checking")
             expect(current).to_have_attribute("open", "")
-            expect(payload).to_have_attribute("open", "")
+            expect(payload.locator("pre")).to_be_visible()
             assert current.evaluate("node => node === window.savedDebugRow")
             store.event(
                 job["id"], "assistant_message", {"message_id": "debug-reply", "text": "Checking done."}
@@ -136,7 +135,7 @@ def test_chat_debug_history_streaming_and_reload(browser_server):
             expect(reply).to_have_count(1)
             toggle.click()
             expect(current).to_have_attribute("open", "")
-            expect(current.locator(".activity-payload")).to_have_attribute("open", "")
+            expect(current.locator(".activity-payload pre")).to_be_visible()
             expect(toggle).to_have_attribute("aria-pressed", "true")
             assert page.evaluate("active") == job["id"]
             page.reload()
@@ -145,7 +144,7 @@ def test_chat_debug_history_streaming_and_reload(browser_server):
             expect(reply).to_have_count(1)
             page.set_viewport_size({"width": 390, "height": 844})
             current.locator(":scope > summary").click()
-            current.locator(".activity-payload summary").click()
+            expect(current.locator(".activity-payload pre")).to_be_visible()
             assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
             assert not errors
         finally:
