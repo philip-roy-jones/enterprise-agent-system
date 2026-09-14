@@ -3,7 +3,7 @@
 import pytest
 from playwright.sync_api import expect, sync_playwright
 
-from conftest import pending
+from conftest import pending, wait_for
 from eas_shared.types import JobInput
 
 
@@ -12,7 +12,11 @@ def test_chat_controls_and_acceptance_stay_bound_to_their_request(browser_server
     client, store = browser_server["client"], browser_server["store"]
     session = client.get("/api/chat?role_id=invoice_correction").json()
     completed = []
-    for task, kind in [("Earlier reviewed result", "verified_work"), ("Earlier greeting", "conversation")]:
+    for task, kind in [
+        ("Earlier reviewed result", "verified_work"),
+        ("Earlier greeting", "conversation"),
+        ("Another result awaiting acceptance", "verified_work"),
+    ]:
         job = store.create_job(
             JobInput(task=task, conversation_id=session["conversation_id"]).model_dump(), ongoing=True
         )
@@ -64,7 +68,7 @@ def test_chat_controls_and_acceptance_stay_bound_to_their_request(browser_server
             execution = transcript.locator(f'[data-message-id="execution-{job_id}"]')
             execution.locator("summary").click()
             expect(execution).to_contain_text(job_id)
-            expect(execution).to_contain_text("graph_version")
+            expect(execution).to_contain_text("skill_runs")
             expect(execution).to_contain_text("Simulated UI lookup failure")
             expect(execution.locator("script")).to_have_count(0)
             page.locator("#debug-mode").click()
@@ -85,10 +89,17 @@ def test_chat_controls_and_acceptance_stay_bound_to_their_request(browser_server
             expect(transcript).to_contain_text("Work stopped.")
             assert store.get_job(job_id)["status"] == "cancelled"
             page.locator("#chat-request").fill("Hello")
-            page.locator("#chat-form button.primary").click()
+            with page.expect_response("**/api/chat") as greeting_response:
+                page.locator("#chat-form button.primary").click()
+            assert greeting_response.value.status == 200
+            greeting_id = greeting_response.value.json()["job"]["id"]
+            wait_for(client, greeting_id, lambda data: data["job"]["status"] == "completed")
             expect(transcript).to_contain_text("Simulated conversational reply", timeout=15000)
             expect(page.locator("#chat-controls")).to_be_hidden()
-            expect(transcript.locator("[data-accept-request]")).to_have_count(0)
+            expect(transcript.locator(f'[data-accept-request="{greeting_id}"]')).to_have_count(0)
+            expect(transcript.locator(f'[data-accept-request="{job_id}"]')).to_have_count(0)
+            # Other completed work can still await acceptance in the same chat.
+            expect(transcript.locator(f'[data-accept-request="{completed[2]["id"]}"]')).to_be_attached()
             assert not errors
         finally:
             browser.close()

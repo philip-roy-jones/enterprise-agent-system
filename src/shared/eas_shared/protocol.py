@@ -21,7 +21,6 @@ WORKER_METHODS = {
     "finish_window_recovery",
     "finish_action",
     "result",
-    "relevant_episodes",
     "search_knowledge",
     "conversation",
     "ask_staff",

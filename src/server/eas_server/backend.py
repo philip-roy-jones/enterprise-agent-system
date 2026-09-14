@@ -90,7 +90,6 @@ def create_app(settings=None):
             "status": "ok",
             "model_mode": settings.model_mode,
             "application": "browser_fixture" if mock else "configured_edge_applications",
-            "release": store.get_value("release")["version"],
             "desktop_adapter": settings.desktop_adapter,
         }
 

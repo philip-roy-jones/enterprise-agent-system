@@ -16,10 +16,6 @@ def main():
             "demo",
             "learning-demo",
             "longitudinal-demo",
-            "improve",
-            "review",
-            "deploy",
-            "rollback",
         ],
     )
     parser.add_argument("args", nargs=argparse.REMAINDER)
@@ -75,10 +71,6 @@ def main():
         from enterprise_dev.longitudinal_demo import main as longitudinal_demo
 
         longitudinal_demo(options.args)
-    else:
-        from enterprise_dev.improve import main as improve
-
-        improve([options.command] + options.args)
 
 
 if __name__ == "__main__":

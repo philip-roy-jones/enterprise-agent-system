@@ -71,15 +71,21 @@ def test_role_permissions_do_not_inherit_finance_capabilities(store, people_role
 
 
 def test_episodes_do_not_cross_department_or_role_scopes(store, people_role):
-    first = store.create_job(JobInput(invoice_id="INV-1042").model_dump())
+    first = store.create_job(JobInput(invoice_id="INV-1042", task="Review this record").model_dump())
     store.update_job(first["id"], {"status": "completed"})
     store.accept(first["id"])
     people = store.create_job(
         JobInput(
-            department_id="people", role_id="onboarding_review", inputs={"case_id": "CASE-12"}
+            department_id="people",
+            role_id="onboarding_review",
+            inputs={"case_id": "CASE-12"},
+            task="Review this record",
         ).model_dump()
     )
-    assert store.relevant_episodes(people["id"]) == []
+    finance = store.create_job(JobInput(invoice_id="INV-1043", task="Review this record").model_dump())
+    with store.db() as db:
+        assert store.related_learning_jobs(db, people) == []
+        assert store.related_learning_jobs(db, finance) == [first["id"]]
 
 
 def test_server_and_worker_share_public_contract_without_runtime_factories():

@@ -98,7 +98,7 @@ def main(argv):
                 title=title,
                 job_id=job["id"],
                 status=job["status"],
-                graph_version=job["graph_version"],
+                skill_runs=job.get("skill_runs", {}),
                 fallback_count=job["fallback_count"],
                 model_calls=job["model_calls"],
                 effective_mode=job["effective_mode"],

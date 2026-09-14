@@ -4,6 +4,28 @@ import time
 from conftest import pending
 
 
+def test_historical_release_cannot_configure_new_requests(store):
+    import json
+    from eas_shared.types import JobInput
+
+    # An existing database may still contain a release from the old PR system.
+    assert store.get_value("release") is None
+    release = {"version": "v2", "labels": ["Old learned label"], "previous": None}
+    store.put_value("release", release)
+    old = store.get_job(store.create_job(JobInput(invoice_id="INV-1042").model_dump())["id"])
+    old.update(graph_version="v2", amount_labels=release["labels"])
+    with store.db() as db:
+        db.execute("UPDATE jobs SET data=? WHERE id=?", (json.dumps(old), old["id"]))
+
+    # Reopening the store preserves audit data without applying its old release.
+    restarted = type(store)(store.root)
+    new = restarted.create_job(JobInput(invoice_id="INV-1043").model_dump())
+    assert "graph_version" not in new
+    assert new["amount_labels"] == ["Correction amount"]
+    assert restarted.get_job(old["id"]) == old
+    assert restarted.get_value("release") == release
+
+
 def test_malformed_recovery_click_returns_to_model_before_any_approval(store, job, tmp_path, monkeypatch):
     import json
     from types import SimpleNamespace

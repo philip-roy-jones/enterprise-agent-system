@@ -156,7 +156,7 @@ The first slice supports Finance discrepancy reports, correction drafts, and gui
 
 Workflow admission runs synthetic behavioral checks. Guidance-only admission checks contracts and evidence and explicitly labels behavioral evaluation as not performed. Neither proves that model instructions are correct. Strict approval remains in force regardless of test outcomes. Model changes are recorded without automatically replaying all historical experiences. Arbitrary applications and new Python functions remain outside this learning surface.
 
-The older `enterprise improve/review/deploy/rollback` commands and historical PRs preserve the original developer-reviewed resolver experiment. They do not activate packages in the new skill registry. Ordinary harness code changes remain development work.
+The original PR-based resolver experiment has been removed. Git history and historical validation records preserve its results. Learned skills activate through runtime admission and use the skill registry for suspension and rollback; ordinary harness code changes remain development work.
 
 ## Configuration
 
@@ -164,7 +164,7 @@ Copy `.env.example` to `.env`. Runtime data and credentials are ignored by Git.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `EAS_DATA_DIR` | `runtime` | Durable backend data, checkpoints, screenshots, proposals |
+| `EAS_DATA_DIR` | `runtime` | Durable component data, checkpoints, screenshots, and learned skills |
 | `EAS_BIND_HOST` / `EAS_BIND_PORT` | `127.0.0.1` / `8000` | Backend listener; configure locally |
 | `EAS_BACKEND_URL` | `http://127.0.0.1:8000` | Worker-to-backend endpoint |
 | `EAS_STAFF_TOKEN` | `local-staff-demo` | Explicit development API fixture only; not password sign-in |
@@ -187,7 +187,7 @@ The loopback fixture uses labeled demo credentials. Remote setups require explic
 
 ```bash
 pytest -q                       # Includes real Chromium integration tests
-pytest -q -m 'not browser'       # Authority, persistence, API and release checks
+pytest -q -m 'not browser'       # Authority, persistence, API and skill admission checks
 ruff check src tools tests
 ruff format --check src tools tests
 ```
@@ -213,7 +213,7 @@ src/
     ├── demobooks/                  Synthetic Windows accounting desktop
     ├── campaign-desk/              Synthetic Marketing metrics API
     └── ledger-fixture/             Optional browser accounting test fixture
-tools/enterprise_dev/               Local demos and historical PR learning fixtures
+tools/enterprise_dev/               Local development and simulated staff demos
 tests/                             Cross-application regression tests
 docs/                              Setup, architecture and validation records
 docs/plans/                        Original specification and accepted plans
@@ -233,7 +233,7 @@ python -m pip install -c requirements.lock ./src/shared ./src/edge-harness
 # For the Windows account boundary, use install-isolated-worker.ps1 in the setup guide.
 ```
 
-Each application reads `.env` from its launch directory, or the file named by `EAS_ENV_FILE`. Keep the model and desktop-controller credentials on the edge machine. Development tooling is a separate root package; `pip install -r requirements-dev.txt` installs the full local test environment. Its `enterprise` CLI retains demo/improvement commands and compatibility aliases for `serve` and `worker`.
+Each application reads `.env` from its launch directory, or the file named by `EAS_ENV_FILE`. Keep the model and desktop-controller credentials on the edge machine. Development tooling is a separate root package; `pip install -r requirements-dev.txt` installs the full local test environment. Its `enterprise` CLI provides local development, simulated staff demos, and aliases for `serve` and `worker`.
 
 For an existing Windows checkout, stop the idle worker **before** upgrading and rerun `src/edge-harness/windows/install-worker.ps1`. The installer updates the launcher and installs only the contracts and harness. For a clean package boundary when migrating an old all-in-one installation, recreate its virtual environment after stopping it; reinstalling packages alone does not remove previously installed server dependencies. Preserve `.env` and `runtime/`, including checkpoint databases. The [developer setup](docs/developer-setup.md) has machine-specific steps.
 

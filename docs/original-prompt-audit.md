@@ -2,6 +2,8 @@
 
 > Historical audit of the original graph-first milestone. The accepted [agent-led learning plan](plans/agent-led-learning-plan.md) supersedes Auto mode, fallback-first routing, and mandatory learned-package PR review. Its implementation requires separate validation; historical evidence below is not a claim about the revised runtime.
 
+The PR-based improvement commands, legacy Finance graph, and their dedicated tests were removed on 2026-09-14. References below describe the historical implementation, which remains available in Git history. Current learning uses automatic skill admission and versioned packages.
+
 This audit covers the bounded demonstration in [the original prompt](plans/original-prompt.txt), including the requested Windows deployment and OpenRouter provider. It does not treat arbitrary new workflow generation, production adoption, or an unlimited number of worker VMs as requirements for the original demonstration.
 
 **The bounded demonstration is implemented, and the two deadline defects identified in the recheck are fixed.** Completion here means the requested prototype features have implementation and test evidence; it does not establish an absence of bugs. This audit distinguishes the runnable prototype from production readiness, generic legacy-app support, and arbitrary workflow generation. The evidence below covers the original requirements plus the requested separate Windows deployment. New generated proposals still require their own developer decision; an unapproved proposal is never a release.

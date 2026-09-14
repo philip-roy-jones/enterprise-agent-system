@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "enterprise-agent-system-dev"
 version = "0.1.0"
-description = "Department workflows with supervised digital workers and reviewed improvements"
+description = "Development tools for supervised digital workers and automatic skill learning"
 requires-python = ">=3.11"
 dependencies = ["enterprise-agent-server==0.1.0", "enterprise-edge-harness[browser]==0.1.0", "httpx>=0.28"]
 

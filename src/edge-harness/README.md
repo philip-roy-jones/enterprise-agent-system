@@ -11,7 +11,7 @@ A **skill** is the reusable procedure: instructions, supporting text and an opti
 - `windows/`: Windows installer and independent desktop controller.
 - `linux/`: isolated service installation and access probes for API-based Linux integrations.
 
-Historical graph-first evaluation tools are under `tools/enterprise_dev/legacy/`, outside the deployed harness. New requests always enter the Deep Agent.
+New requests always enter the Deep Agent. The historical graph-first runner and PR-based learning commands have been removed; automatic skill learning is the maintained learning path.
 
 Install from the repository root:
 

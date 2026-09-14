@@ -38,10 +38,6 @@ class Store(LearningStore):
                 "INSERT OR IGNORE INTO lease VALUES(1, ?)",
                 (canonical(dict(job_id=None, owner=None, epoch=0, expires=0, inflight=None)),),
             )
-            db.execute(
-                "INSERT OR IGNORE INTO kv VALUES('release', ?)",
-                (canonical(dict(version="v1", labels=["Correction amount"], previous=None)),),
-            )
 
     @contextmanager
     def db(self):
@@ -129,7 +125,6 @@ class Store(LearningStore):
             if not inputs.get("conversation_id"):
                 inputs["conversation_id"] = uid()
             inputs["request_id"] = inputs.get("request_id") or uid()
-            release = json.loads(db.execute("SELECT data FROM kv WHERE key='release'").fetchone()[0])
             job = dict(
                 inputs,
                 id=uid(),
@@ -142,8 +137,9 @@ class Store(LearningStore):
                 created_at=time.time(),
                 started_at=None,
                 timeout=timeout,
-                graph_version=release["version"],
-                amount_labels=release["labels"],
+                # Direct Finance operations use the baseline field label.
+                # Skill executions resolve labels from their own pinned package.
+                amount_labels=["Correction amount"],
                 completed=[],
                 expected=None,
                 mutation="not_attempted",
@@ -762,29 +758,6 @@ class Store(LearningStore):
             self._put(db, job)
             self._event(db, job_id, "staff_accepted", {})
             return job
-
-    def relevant_episodes(self, job_id, reason=""):
-        job = self.get_job(job_id)
-        return [
-            dict(episode_id=j["id"], task=j["task"], version=j["graph_version"], expected=j["expected"])
-            for j in self.list_jobs()
-            if j["id"] != job_id
-            and j.get("organization_id", "acme") == job.get("organization_id", "acme")
-            and j.get("department_id", "finance") == job.get("department_id", "finance")
-            and j.get("role_id", "invoice_correction") == job.get("role_id", "invoice_correction")
-            and j.get("company_id") == job.get("company_id")
-            and j["task"] == job["task"]
-            and j["accepted"]
-            and j["graph_version"] == job["graph_version"]
-            and j.get("app_version", "mock-1") == job.get("app_version", "mock-1")
-            and (
-                not reason
-                or any(
-                    e["kind"] == "recovery_required" and e["data"].get("reason") == reason
-                    for e in self.events(j["id"])
-                )
-            )
-        ][:3]
 
     def get_value(self, key):
         with self.db() as db:

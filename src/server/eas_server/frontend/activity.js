@@ -71,7 +71,7 @@ const activityView = (() => {
   function execution(data) {
     const j = data.job;
     const status = ["completed", "cancelled", "rejected", "failed", "denied"].includes(j.status) ? j.status : j.execution_state || j.status;
-    const metadata = {request_id:j.id, graph_version:j.graph_version, status:j.status, execution_state:j.execution_state, controller:j.controller, model_mode:j.model_mode, model_calls:j.model_calls, tokens:j.tokens, result_kind:j.result_kind, accepted:j.accepted, completed_steps:j.completed, skill_runs:j.skill_runs || {}, error:j.error || null};
+    const metadata = {request_id:j.id, status:j.status, execution_state:j.execution_state, controller:j.controller, model_mode:j.model_mode, model_calls:j.model_calls, tokens:j.tokens, result_kind:j.result_kind, accepted:j.accepted, completed_steps:j.completed, skill_runs:j.skill_runs || {}, error:j.error || null};
     return `<details class="chat-debug-event activity-event" data-message-id="execution-${escape(j.id)}" data-event-id="execution-${escape(j.id)}"><summary><span><strong>Execution details</strong><span class="activity-summary">Latest status: ${escape(status)}</span></span></summary><div class="activity-body">${json(metadata)}</div></details>`;
   }
   function bind(container) {

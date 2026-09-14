@@ -51,7 +51,6 @@ ARITY = {
     "begin_window_recovery": (4, 4),
     "finish_action": (3, 5),
     "result": (1, 1),
-    "relevant_episodes": (1, 1),
     "search_knowledge": (2, 2),
     "conversation": (1, 1),
     "ask_staff": (2, 2),

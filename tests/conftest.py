@@ -186,7 +186,6 @@ def browser_server(server):
     with library.db() as db:
         for table in ("versions", "active", "changes", "processed", "dependencies"):
             db.execute("DELETE FROM " + table)
-    server["store"].put_value("release", {"version": "v1", "labels": ["Correction amount"], "previous": None})
     client.post(
         "/api/mock/scenario",
         json={
@@ -223,65 +222,6 @@ def wait_for(client, job_id, predicate, timeout=30):
 def pending(client, job_id):
     data = wait_for(client, job_id, lambda d: any(a["status"] == "pending" for a in d["approvals"]))
     return next(a for a in data["approvals"] if a["status"] == "pending")
-
-
-@pytest.fixture(params=["split", "src", "legacy"])
-def candidate(tmp_path, request):
-    import json
-    from enterprise_dev.improve import sha
-
-    folder = tmp_path / "proposal"
-    checkout = folder / "checkout"
-    layouts = {
-        "split": ("tools", "enterprise_dev/legacy/finance"),
-        "src": ("src", "enterprise/workflows/finance"),
-        "legacy": (".", "enterprise"),
-    }
-    source_root, module = layouts[request.param]
-    package_root = checkout / source_root
-    package = package_root / module
-    package.mkdir(parents=True)
-    for parent in [package, *package.parents]:
-        if parent == package_root:
-            break
-        (parent / "__init__.py").write_text("")
-    source = package / "procedures.py"
-    source.write_text(
-        'GRAPH_VERSION="v2"\nAMOUNT_LABELS=("Correction amount","Adjusted total")\ndef resolve_amount_label(labels):\n    return next((l for l in AMOUNT_LABELS if l in labels),None)\n'
-    )
-    (checkout / ".gitignore").write_text("__pycache__/\n")
-    subprocess.run(["git", "init", "-q", str(checkout)], check=True)
-    subprocess.run(["git", "-C", str(checkout), "add", "."], check=True)
-    subprocess.run(
-        [
-            "git",
-            "-C",
-            str(checkout),
-            "-c",
-            "user.name=Fixture",
-            "-c",
-            "user.email=fixture@example.test",
-            "commit",
-            "-qm",
-            "Checked test candidate",
-        ],
-        check=True,
-    )
-    commit = subprocess.check_output(["git", "-C", str(checkout), "rev-parse", "HEAD"], text=True).strip()
-    (folder / "proposal.patch").write_text("Synthetic fixture patch")
-    (folder / "checks.txt").write_text("Synthetic fixture checks passed")
-    manifest = {
-        "checkout": str(checkout),
-        "commit": commit,
-        "source_sha": sha(source),
-        "patch_sha": sha(folder / "proposal.patch"),
-        "checks_sha": sha(folder / "checks.txt"),
-        "checks_passed": True,
-        "review": "pending",
-        "approved_commit": None,
-    }
-    (folder / "manifest.json").write_text(json.dumps(manifest))
-    return folder
 
 
 def approve_operation(layer, *args, **kwargs):
