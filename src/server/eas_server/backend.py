@@ -15,6 +15,7 @@ from eas_shared.types import JobInput, Decision, KnowledgeDocument, Stale, Stopp
 from eas_server.security import Security, token_hash
 from eas_server.access import install_access, current as current_principal
 from eas_server.conversation import Conversation, StaffMessage
+from eas_server.web_assets import FrontendFiles, console_page
 
 
 def create_app(settings=None):
@@ -46,7 +47,7 @@ def create_app(settings=None):
     static = Path(__file__).parent / "frontend"
     if mock is not None:
         app.mount("/fixture-static", StaticFiles(directory=fixture_static), name="fixture-static")
-    app.mount("/static", StaticFiles(directory=static), name="static")
+    app.mount("/static", FrontendFiles(directory=static), name="static")
 
     def principal(request: Request):
         p = getattr(request.state, "principal", None) or security.principal(request)
@@ -76,7 +77,7 @@ def create_app(settings=None):
 
     @app.get("/")
     def index():
-        return FileResponse(static / "index.html")
+        return console_page(static)
 
     @app.get("/mock")
     def mock_page():
