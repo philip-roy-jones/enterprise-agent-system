@@ -137,17 +137,8 @@ def test_chat_debug_history_streaming_and_reload(browser_server):
             toggle.click()
             expect(current).to_have_attribute("open", "")
             expect(current.locator(".activity-payload")).to_have_attribute("open", "")
-            toggle.click()
-            expect(transcript.locator(".chat-debug-event")).to_have_count(0)
-            transcript.locator(f'[data-request-activity="{earlier["id"]}"]').click()
             expect(toggle).to_have_attribute("aria-pressed", "true")
             assert page.evaluate("active") == job["id"]
-            page.wait_for_function(
-                "selector => { const node = document.querySelector(selector); "
-                "const box = node.closest('.session-messages').getBoundingClientRect(); "
-                "const row = node.getBoundingClientRect(); return row.bottom > box.top && row.top < box.bottom; }",
-                arg=previous_selector,
-            )
             page.reload()
             expect(toggle).to_have_attribute("aria-pressed", "true")
             expect(page.locator(previous_selector)).to_be_attached()

@@ -448,13 +448,6 @@ $("chat-form").onsubmit = (e) => {
     connectStream();
   });
 };
-$("session-messages").onclick = event => {
-  const button = event.target.closest("[data-request-activity]");
-  if (!button) return;
-  setChatDebug(true);
-  const row = [...$("session-messages").querySelectorAll("[data-debug-request]")].find(node => node.dataset.debugRequest === button.dataset.requestActivity);
-  row?.scrollIntoView({behavior:"smooth", block:"nearest"});
-};
 async function renderSession(session, jobs, selectedDetail) {
   const j = session.current;
   if (transcriptSession !== session.conversation_id) {
@@ -511,7 +504,7 @@ function renderTranscript(session, jobs) {
   const markup = entries.map(entry => {
     if (entry.debug) return activityView.entry(entry.debug, entry.detail);
     const date = new Date(entry.at*1000);
-    return `<div class="chat-message ${entry.speaker}${entry.partial && !entry.interrupted ? " streaming" : ""}" data-message-id="${esc(entry.id)}"><div class="chat-message-meta"><strong>${entry.speaker === "staff" ? "Staff" : "Worker"}${entry.record ? ` · ${esc(entry.record)}` : ""}</strong><time datetime="${date.toISOString()}" title="${esc(date.toLocaleString())}">${esc(date.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}))}</time></div><p>${esc(entry.text)}</p>${entry.partial ? `<small class="stream-status">${entry.interrupted ? "Response interrupted" : "Responding…"}</small>` : ""}${entry.attachment ? renderScreenshot(entry.attachment) : ""}${entry.requestId ? chatDebug ? `<div class="chat-debug-request"><span>${entry.modelMode === "live" ? "Live model" : "Simulated model"}</span><a class="chat-activity-link" href="/api/jobs/${encodeURIComponent(entry.requestId)}/episode" target="_blank" rel="noopener">Export episode ↗</a></div>` : `<button type="button" class="chat-activity-link" data-request-activity="${esc(entry.requestId)}">Debug this request</button>` : ""}</div>`;
+    return `<div class="chat-message ${entry.speaker}${entry.partial && !entry.interrupted ? " streaming" : ""}" data-message-id="${esc(entry.id)}"><div class="chat-message-meta"><strong>${entry.speaker === "staff" ? "Staff" : "Worker"}${entry.record ? ` · ${esc(entry.record)}` : ""}</strong><time datetime="${date.toISOString()}" title="${esc(date.toLocaleString())}">${esc(date.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}))}</time></div><p>${esc(entry.text)}</p>${entry.partial ? `<small class="stream-status">${entry.interrupted ? "Response interrupted" : "Responding…"}</small>` : ""}${entry.attachment ? renderScreenshot(entry.attachment) : ""}${entry.requestId && chatDebug ? `<div class="chat-debug-request"><span>${entry.modelMode === "live" ? "Live model" : "Simulated model"}</span><a class="chat-activity-link" href="/api/jobs/${encodeURIComponent(entry.requestId)}/episode" target="_blank" rel="noopener">Export episode ↗</a></div>` : ""}</div>`;
   }).join("");
   const transcript = $("session-messages");
   if (markup !== transcriptMarkup) {
