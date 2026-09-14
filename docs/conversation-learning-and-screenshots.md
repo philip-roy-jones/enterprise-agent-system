@@ -22,7 +22,7 @@ Reviews are bounded, and the model can miss or misunderstand a correction. They 
 
 The model sees the captured image. Durable context stores its artifact reference; image bytes are loaded only at the provider boundary. The newest capture in the current request is included, avoiding repeated image copies in checkpoints and premature context rotation from base64 text.
 
-`share_screenshot` proposes a caption and optional rectangles, circles, arrows or text labels. Coordinates are normalized to the full image. Annotations are bounded typed data rendered by trusted frontend code; the model cannot supply HTML, SVG or executable drawing scripts. Staff can preview the proposed attachment before approving it.
+`share_screenshot` proposes a caption and optional rectangles, circles, arrows or text labels. A simple request to see the screen defaults to a plain screenshot; the agent adds drawings only when they help explain something or staff requests them. Coordinates are normalized to the full image. Annotations are bounded typed data rendered by trusted frontend code; the model cannot supply HTML, SVG or executable drawing scripts. Staff can preview the proposed attachment before approving it.
 
 Only a completed capture from the same request can be shared or retrieved by the planner. The server checks the assigned worker, current staff authorization and artifact ownership. Chat renders the completed share receipt, not an unverified model message. Attachments show the capture time and remain chronological with the rest of the conversation. They are historical evidence, not live application state or authorization to click.
 
