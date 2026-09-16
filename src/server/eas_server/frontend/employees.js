@@ -45,12 +45,12 @@ const workforceView = {
     if (demo) {
       markup = demo.events.map(event => {
         const data = event.data;
-        let text = "", who = "Employee", staff = false;
+        let text = "", who = c.employee.name, staff = false;
         if (event.kind === "shadow_started") { text = data.task; who = "Mentor"; staff = true; }
         if (event.kind === "mentor_message" || event.kind === "mentor_outcome") { text = data.text; who = "Mentor"; staff = true; }
-        if (event.kind === "shadow_notes") { text = [data.observation, data.question].filter(Boolean).join("\n\n"); who = data.model_mode === "simulated" ? "Employee · simulated observer" : "Employee"; }
+        if (event.kind === "shadow_notes") { text = [data.observation, data.question].filter(Boolean).join("\n\n"); who = c.employee.name + (data.model_mode === "simulated" ? " · simulated observer" : ""); }
         if (event.kind === "shadow_unavailable") { text = data.message; who = "Observation status"; }
-        if (text) return `<article class="session-message ${staff ? "staff" : "assistant"}"><strong>${who}</strong><div class="message-text">${esc(text).replaceAll("\n", "<br>")}</div></article>`;
+        if (text) return `<article class="session-message ${staff ? "staff" : "assistant"}"><strong>${esc(who)}</strong><div class="message-text">${esc(text).replaceAll("\n", "<br>")}</div></article>`;
         if (chatDebug && event.kind === "shadow_observation") return `<details class="activity-event"><summary>Desktop sample · ${new Date(event.at*1000).toLocaleTimeString()}</summary>${data.screenshot ? `<img class="shadow-sample" src="/api/artifacts/${encodeURIComponent(data.screenshot)}" alt="Sampled mentor desktop" loading="lazy">` : ""}<pre>${esc(JSON.stringify(data.state, null, 2))}</pre></details>`;
         return "";
       }).join("");
