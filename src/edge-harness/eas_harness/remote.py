@@ -56,6 +56,10 @@ class RemoteStore:
 
     @staticmethod
     def raise_error(r):
+        # Gateways may return HTML while the backend restarts. Preserve the
+        # HTTP status so the polling loop can distinguish outages from denials.
+        if r.status_code in {408, 429, 500, 502, 503, 504}:
+            r.raise_for_status()
         detail = r.json().get("detail", {})
         if isinstance(detail, dict):
             cls = {"Stale": Stale, "Stopped": Stopped, "PermissionError": PermissionError}.get(

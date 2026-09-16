@@ -2,6 +2,7 @@ import logging
 import platform
 import sqlite3
 import time
+import httpx
 from langgraph.checkpoint.sqlite import SqliteSaver
 from eas_harness.config import Settings
 from eas_harness.execution import ExecutionLayer
@@ -60,9 +61,24 @@ def run_worker(settings=None, once=False):
     from eas_harness.maintenance import maintain
 
     next_maintenance = 0
+    poll_delay = 1
     try:
         while True:
-            job = store.claim(worker_id)
+            try:
+                job = store.claim(worker_id)
+            except (httpx.TransportError, httpx.HTTPStatusError) as error:
+                # Only retry dispatch polling. An operation with an uncertain
+                # external effect must still use the existing reconciliation path.
+                if once or (
+                    isinstance(error, httpx.HTTPStatusError)
+                    and error.response.status_code not in {408, 429, 500, 502, 503, 504}
+                ):
+                    raise
+                log.warning("Server poll unavailable (%s); retrying in %ss", type(error).__name__, poll_delay)
+                time.sleep(poll_delay)
+                poll_delay = min(poll_delay * 2, 30)
+                continue
+            poll_delay = 1
             if not job:
                 if admission_store and time.monotonic() >= next_maintenance:
                     try:

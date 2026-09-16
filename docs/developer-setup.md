@@ -117,6 +117,8 @@ Skill reads require source-evidence access. Lifecycle changes additionally requi
 
 Configuration and state are under `Worker\planner`, `Worker\executor`, and `Worker\learner`. The executor owns persistent context, checkpoints and admitted packages. The backend owns central requests, approvals and artifacts. Keep both sides' state stable across restarts. `EAS_ENV_FILE` selects each component's config; paths should be absolute in installed configurations. Logs contain business evidence and must remain under the same access restrictions as that evidence.
 
+The planner retries failed dispatch polls after connection errors or temporary server/gateway failures, with backoff capped at 30 seconds. Authorization and protocol failures still stop it; business operations are not automatically replayed by this retry loop. On Windows, an unexpected planner exit records only its timestamp and exception type in `planner/runtime/planner-exit.json`, without retaining prompts or credentials. Check `EAS-Planner` in Task Scheduler when requests remain queued: an employee's **Active** state expresses permission to work, not process health.
+
 Revoke a person, service or entire worker immediately through the trusted server operator command:
 
 ```bash

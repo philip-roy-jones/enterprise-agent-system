@@ -1,6 +1,8 @@
 """Scheduled-task entry point. Planner logs contain no retained private context."""
 
 import argparse
+from datetime import datetime, timezone
+import json
 import os
 from pathlib import Path
 import sys
@@ -34,4 +36,15 @@ with open(log_path, "a", buffering=1, encoding="utf-8") as log:
 
         if not settings.executor_url:
             raise RuntimeError("Isolated planner requires the execution broker")
-        run_worker(settings)
+        try:
+            run_worker(settings)
+        except Exception as error:
+            # Retain an operational diagnostic without prompts, credentials,
+            # business context, exception messages or tracebacks.
+            (settings.data_dir / "planner-exit.json").write_text(
+                json.dumps(
+                    {"at": datetime.now(timezone.utc).isoformat(), "error_type": type(error).__name__}
+                ),
+                encoding="utf-8",
+            )
+            raise
