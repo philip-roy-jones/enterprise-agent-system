@@ -267,26 +267,6 @@ let transcriptSession = null;
 let transcriptLimit = 20;
 let transcriptMarkup = "";
 const transcriptCache = new Map();
-const accepting = new Set();
-$("session-messages").addEventListener("click", event => {
-  const button = event.target.closest("[data-accept-request]");
-  if (!button || button.disabled) return;
-  const id = button.dataset.acceptRequest;
-  if (accepting.has(id)) return;
-  accepting.add(id);
-  button.disabled = true;
-  action(async () => {
-    try {
-      await api(`/api/jobs/${encodeURIComponent(id)}/accept`, {});
-      cacheTranscript(await api(`/api/jobs/${encodeURIComponent(id)}`));
-      toast("Result accepted.");
-    } finally {
-      accepting.delete(id);
-      button.disabled = false;
-      renderCurrentTranscript();
-    }
-  });
-});
 $("earlier-messages").onclick = () => {
   transcriptLimit += 20;
   refresh();
@@ -352,7 +332,7 @@ function cacheTranscript(data) {
   transcriptCache.set(data.job.id, {...data, events:[...events.values()].sort((a,b) => a.seq-b.seq)});
 }
 function outcomeNotice(job) {
-  if (job.status === "completed") return !job.accepted && !["conversation", "record_unavailable"].includes(job.result_kind) ? "acceptance" : null;
+  if (job.status === "completed") return null;
   if (job.status === "cancelled") return "Work stopped.";
   if (["rejected", "denied"].includes(job.status)) return "This request was declined.";
   if (job.status === "failed") return "The worker couldn't finish this request. Reply in chat to discuss the next step.";
@@ -379,7 +359,7 @@ function renderTranscript(session, jobs) {
   const markup = entries.map(entry => {
     if (entry.debug) return activityView.entry(entry.debug, entry.detail);
     if (entry.execution) return activityView.execution(entry.execution);
-    if (entry.notice) return `<div class="chat-outcome" data-message-id="outcome-${esc(entry.requestId)}">${entry.notice === "acceptance" ? `<button type="button" class="primary" data-accept-request="${esc(entry.requestId)}" ${accepting.has(entry.requestId) ? "disabled" : ""}>Accept completed work</button>` : `<p>${esc(entry.notice)}</p>`}</div>`;
+    if (entry.notice) return `<div class="chat-outcome" data-message-id="outcome-${esc(entry.requestId)}"><p>${esc(entry.notice)}</p></div>`;
     const date = new Date(entry.at*1000);
     return `<div class="chat-message ${entry.speaker}${entry.partial && !entry.interrupted ? " streaming" : ""}" data-message-id="${esc(entry.id)}"><div class="chat-message-meta"><strong>${entry.speaker === "staff" ? esc(entry.actor || "Staff") : "Worker"}${entry.record ? ` · ${esc(entry.record)}` : ""}</strong><time datetime="${date.toISOString()}" title="${esc(date.toLocaleString())}">${esc(date.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}))}</time></div><p>${esc(entry.text)}</p>${entry.partial ? `<small class="stream-status">${entry.interrupted ? "Response interrupted" : "Responding…"}</small>` : ""}${entry.attachment ? renderScreenshot(entry.attachment) : ""}${entry.requestId && chatDebug ? `<div class="chat-debug-request"><span>${entry.modelMode === "live" ? "Live model" : "Simulated model"}</span><a class="chat-activity-link" href="/api/jobs/${encodeURIComponent(entry.requestId)}/episode" target="_blank" rel="noopener">Export episode ↗</a></div>` : ""}</div>`;
   }).join("");

@@ -8,14 +8,14 @@ from eas_shared.types import JobInput
 
 
 @pytest.mark.browser
-def test_chat_controls_and_acceptance_stay_bound_to_their_request(browser_server):
+def test_chat_controls_stay_bound_without_completion_acceptance(browser_server):
     client, store = browser_server["client"], browser_server["store"]
     session = client.get("/api/chat?role_id=invoice_correction").json()
     completed = []
     for task, kind in [
         ("Earlier reviewed result", "verified_work"),
         ("Earlier greeting", "conversation"),
-        ("Another result awaiting acceptance", "verified_work"),
+        ("Another completed result", "verified_work"),
     ]:
         job = store.create_job(
             JobInput(task=task, conversation_id=session["conversation_id"]).model_dump(), ongoing=True
@@ -31,7 +31,7 @@ def test_chat_controls_and_acceptance_stay_bound_to_their_request(browser_server
     )
     response.raise_for_status()
     job_id = response.json()["job"]["id"]
-    # Hold the test worker to inspect control/acceptance UI without racing Auto.
+    # Hold the test worker to inspect control UI without racing Auto.
     from eas_server.store import desktop_context
 
     token = desktop_context.set("development-desktop")
@@ -53,14 +53,9 @@ def test_chat_controls_and_acceptance_stay_bound_to_their_request(browser_server
                 page.locator("#active-job, #job-id, #job-title, #job-status, #empty, #message-form")
             ).to_have_count(0)
             transcript = page.locator("#session-messages")
-            accept = transcript.locator(f'[data-accept-request="{completed[0]["id"]}"]')
-            expect(accept).to_be_attached()
-            expect(transcript.locator(f'[data-accept-request="{completed[1]["id"]}"]')).to_have_count(0)
-            with page.expect_response(f"**/api/jobs/{completed[0]['id']}/accept") as accepted:
-                accept.click()
-            assert accepted.value.status == 200
-            expect(accept).to_have_count(0)
-            assert store.get_job(completed[0]["id"])["accepted"]
+            expect(transcript.locator("[data-accept-request]")).to_have_count(0)
+            expect(page.get_by_role("button", name="Accept completed work")).to_have_count(0)
+            assert all(not store.get_job(j["id"])["accepted"] for j in completed)
             assert not store.get_job(job_id)["accepted"]
             assert client.get("/api/chat?role_id=invoice_correction").json()["current"]["id"] == job_id
             assert page.evaluate("active") == job_id
@@ -108,10 +103,8 @@ def test_chat_controls_and_acceptance_stay_bound_to_their_request(browser_server
             wait_for(client, greeting_id, lambda data: data["job"]["status"] == "completed")
             expect(transcript).to_contain_text("Simulated conversational reply", timeout=15000)
             expect(page.locator("#chat-controls")).to_be_hidden()
-            expect(transcript.locator(f'[data-accept-request="{greeting_id}"]')).to_have_count(0)
-            expect(transcript.locator(f'[data-accept-request="{job_id}"]')).to_have_count(0)
-            # Other completed work can still await acceptance in the same chat.
-            expect(transcript.locator(f'[data-accept-request="{completed[2]["id"]}"]')).to_be_attached()
+            expect(transcript.locator("[data-accept-request]")).to_have_count(0)
+            assert all(not store.get_job(j["id"])["accepted"] for j in completed)
             assert not errors
         finally:
             browser_server["worker"].send_signal(signal.SIGCONT)

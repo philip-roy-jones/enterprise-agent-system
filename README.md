@@ -46,7 +46,7 @@ The agent should choose capabilities that match the requested outcome; a related
 
 Turn on **Debug mode** above the chat to see recorded model calls, tool arguments and results, authorization records, errors and observation evidence alongside the messages in chronological order. **Execution details** holds the latest status, execution ID, graph version and skill progress. One click expands an event to show its details; it stays open as replies stream. Chat messages appear once; debug entries omit copies of the model's public reply, including in expanded metadata. The toggle is remembered in your browser. Each request has an episode export link while debugging. A skill name identifies a package; `run_skill` is the tool that executes its graph, whose internal operations appear separately. This displays public explanations and recorded evidence, not private model reasoning, and does not change access rules.
 
-While work is active, **Stop** and **Take control / Release control** appear beside the chat composer. **Accept completed work** appears inline with a result when outcome acceptance is needed. Each acceptance applies to that specific result, including older results in the conversation. Completed conversations leave no separate execution card or disabled controls.
+While work is active, **Stop** and **Take control / Release control** appear beside the chat composer. Completed answers need no acceptance click; corrections and preferences belong in ordinary chat. Completed conversations leave no separate execution card or disabled controls.
 
 ## Developer setup
 
@@ -107,7 +107,7 @@ Open a **Digital employee** from the developer directory. New and migrated emplo
 
 Windows capture uses the installed desktop controller. Linux shadowing requires an accessible X11 graphical session (`DISPLAY` and, where required, `XAUTHORITY` configured for the executor). A headless Campaign Desk API worker can execute Marketing requests but has no desktop to shadow until one is provisioned. Browser tests capture only the synthetic fixture viewport. Sampling is bounded to 180 frames and 12 observer model attempts per demonstration, with a 30-minute time limit; it is not a lossless click recorder.
 
-When active, describe the requested work and record in ordinary chat. The agent can ask for clarification, compose tools, use an existing skill, recover from changed UI state, and reconcile uncertain saves. **Stop** cancels the request; **Take control** and **Release control** transfer desktop ownership. Outcome acceptance remains optional feedback for learning, separate from permission to act.
+When active, describe the requested work and record in ordinary chat. The agent can ask for clarification, compose tools, use an existing skill, recover from changed UI state, and reconcile uncertain saves. **Stop** cancels the request; **Take control** and **Release control** transfer desktop ownership. Give corrections and preferences in ordinary chat; background review can turn that teaching into skill instructions.
 
 For a repeatable synthetic walkthrough, `enterprise demo --simulate-staff` uses an explicitly simulated supervisor. Model provenance remains separate from human simulation. Earlier validation documents describe the policy that was in effect when those runs occurred; they do not attest the new lifecycle.
 
@@ -140,12 +140,14 @@ The [security implementation](docs/security.md) adds individual identities, serv
 
 ## Teach a reusable improvement
 
-1. Complete a request, supply corrections or guidance when needed, and verify the result.
-2. Select **Accept completed work**. The server queues the evidence once.
-3. When idle, the edge runs a bounded learner with scoped evidence and no inherited application/backend credentials. It proposes a skill or reports no justified change.
-4. The runtime checks scope, evidence, operation order, compatibility, and prior behavior. Synthetic cases vary records and amounts and exercise refusal conditions. The learner cannot declare its own tests passed.
+1. Explain corrections, preferences and reusable guidance in ordinary chat, or finish an explicit shadowing demonstration.
+2. The server queues conversation review automatically when a request ends. No completion-acceptance button is needed.
+3. When idle, the edge runs a bounded learner with scoped evidence and no inherited application/backend credentials. Clear teaching can update skill instructions or create instructions-only guidance; routine conversation can produce no change.
+4. The runtime checks scope, evidence, compatibility and preserved executable behavior. The learner cannot declare its own tests passed or treat an inferred chat signal as staff approval.
 5. A passing immutable version activates automatically. **Accumulated skills & learning** shows the change, evidence, and status. A later request still requires an active employee and server authorization.
 6. Use **Suspend** or **Activate this version** to stop future retrieval or roll back. Already running skill graphs retain their pinned version; cancel a running request if it must stop immediately.
+
+The separate executable-procedure learning path still requires explicitly accepted execution evidence through operator/evaluation tooling. Its API and historical acceptance records remain available; removing the chat button does not automatically approve completed work or change those admission rules. Executable candidates undergo synthetic tests that vary records, amounts and refusal conditions.
 
 Seeded source packages live in `src/edge-harness/skills/`. Installed versions live under the edge's `EAS_DATA_DIR/skills/`, with `manifest.json`, `SKILL.md`, hashes, and a local registry. Executable specifications reference trusted operations; Markdown cannot execute shell snippets or import Python. File or dependency changes invalidate the installed package until it is requalified.
 
