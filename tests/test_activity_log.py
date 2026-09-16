@@ -41,7 +41,7 @@ def test_activity_exposes_tools_errors_and_keeps_expanded_evidence(browser_serve
         requested = []
         page.on("request", lambda request: requested.append(request.url))
         page.on("pageerror", lambda error: errors.append(str(error)))
-        page.goto(ctx["url"])
+        page.goto(ctx["url"] + "/agents/development-desktop")
         expect(page.get_by_role("heading", name="Recent activity", exact=True)).to_have_count(0)
         page.wait_for_function("id => active === id", arg=latest_id)
         expect(page.locator(f'[data-message-id="request-{job_id}"]')).to_be_attached()
@@ -122,10 +122,10 @@ def test_learning_view_shows_changes_evidence_and_proposals_without_executing(br
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page(extra_http_headers={"Authorization": "Bearer test-staff"})
-        page.route("**/api/learning", lambda route: route.fulfill(json=state))
+        page.route("**/api/learning?*", lambda route: route.fulfill(json=state))
         writes = []
         page.on("request", lambda request: writes.append(request.url) if request.method == "POST" else None)
-        page.goto(browser_server["url"])
+        page.goto(browser_server["url"] + "/agents/development-desktop")
         page.locator("#learning-panel > details > summary").click()
         review = page.locator('[data-learning-id="review-fixture-review"]')
         review.locator("summary").first.click()

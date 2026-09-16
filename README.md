@@ -79,7 +79,7 @@ enterprise dev
 
 On a minimal Linux machine, install browser system dependencies with `python -m playwright install --with-deps chromium`.
 
-Open **[localhost:8000](http://127.0.0.1:8000)**. Staff sign in with email/password after an operator issues a one-time setup link; follow [fixture account setup](docs/developer-setup.md#optional-loopback-browser-fixture) in a second terminal before interactive use. The fixture API tokens are for explicitly labeled development automation, not the staff login form.
+Open **[localhost:8000](http://127.0.0.1:8000)** for the developer agent directory. Developers sign in with email/password after an operator issues a one-time setup link; follow [fixture account setup](docs/developer-setup.md#optional-loopback-browser-fixture) in a second terminal before interactive use. The fixture API tokens are for explicitly labeled development automation, not the staff login form.
 
 `enterprise dev` starts the backend and worker as separate processes. Ctrl+C stops both. To run them independently:
 
@@ -97,7 +97,7 @@ Staff can also add scoped organizational guidance for the worker to search under
 
 ## Try the demonstration
 
-Select a **Digital employee** in the console. New and migrated employees begin in **shadowing**:
+Open a **Digital employee** from the developer directory. New and migrated employees begin in **shadowing**:
 
 1. A supervisor describes a task in chat and chooses **Start demonstration**.
 2. **The human operates the agent's own computer**, through its VM console or remote desktop, using the installed apps and accounts the agent will use. This does not watch the mentor's separate computer.
@@ -245,4 +245,4 @@ For an existing Windows checkout, stop the idle worker **before** upgrading and 
 
 The native adapter targets our own DemoBooks application. Generic Windows automation and real QuickBooks integration remain separate future adapters. No real accounting integration or production readiness is claimed.
 
-Private team channels can be the main communication surface: [Discord setup](docs/discord.md). The console remains available for supervision and debugging. Future MCP integrations should use MCP Apps where supported to preserve interactive shadowing; that integration is planned, not implemented.
+Private team channels can be the main communication surface: [Discord setup](docs/discord.md). The developer console lists **all agents** at `/`, with individual debug pages at `/agents/<employee-id>` and evaluation results at `/metrics`. Inventory access uses a separate developer permission; conversations, learning and controls retain their scoped permissions. See [developer agent pages](docs/developer-setup.md#developer-agent-pages). Future MCP integrations should use MCP Apps where supported to preserve interactive shadowing; that integration is planned, not implemented.

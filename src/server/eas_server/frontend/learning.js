@@ -26,5 +26,5 @@ const learningView = (() => {
       detail.addEventListener("toggle", () => detail.open ? opened.add(detail.dataset.learningId) : opened.delete(detail.dataset.learningId));
     });
   }
-  return {render};
+  return {render, reset: () => {previous = ""; opened.clear();}};
 })();

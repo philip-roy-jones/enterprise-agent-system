@@ -224,7 +224,15 @@ def test_console_can_debug_the_same_shared_room(channel):
             )
 
         page.route("**/*", route)
-        page.goto("http://testserver/")
+        from eas_server.developer_agents import FLEET_SCOPE
+        from eas_server.security import Grant
+
+        registry = json.loads(app.state.security.path.read_text())
+        next(p for p in registry["principals"] if p["id"] == "staff")["grants"].append(
+            Grant(**FLEET_SCOPE, actions=["inspect_agents"], own_only=False).model_dump()
+        )
+        app.state.security.path.write_text(json.dumps(registry))
+        page.goto("http://testserver/agents/development-desktop")
         page.locator('#chat-workspace option[value="discord/200"]').wait_for(state="attached")
         page.locator("#chat-workspace").select_option("discord/200")
         expect(page.locator("#session-messages")).to_contain_text("Team request visible in the console")

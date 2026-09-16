@@ -46,7 +46,7 @@ def test_chat_controls_and_acceptance_stay_bound_to_their_request(browser_server
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
         try:
-            page.goto(browser_server["url"])
+            page.goto(browser_server["url"] + "/agents/development-desktop")
             expect(page.locator("#chat-composer #chat-controls")).to_be_visible()
             expect(page.locator("#review-panel")).to_have_count(0)
             expect(

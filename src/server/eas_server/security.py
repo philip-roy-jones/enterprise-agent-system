@@ -141,6 +141,10 @@ class Security:
                     for i, k, t, a, own in entries
                 ]
             )
+            # Development inventory is a separate global read permission.
+            next(p for p in data.principals if p.id == "developer").grants.append(
+                Grant(**{key: "*" for key in SCOPE}, actions=["inspect_agents"], own_only=False)
+            )
         ids = [p.id for p in data.principals]
         tokens = [p.token_sha256 for p in data.principals if p.token_sha256]
         if len(ids) != len(set(ids)) or len(tokens) != len(set(tokens)):

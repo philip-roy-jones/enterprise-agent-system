@@ -17,13 +17,13 @@ chmod 700 runtime/security
 python -m eas_server.admin --registry runtime/security/identities.json init
 python -m eas_server.admin --registry runtime/security/identities.json add-human \
   --id developer-staff --name 'Development staff' \
-  --grants docs/examples/staff-grants.json
+  --grants docs/examples/developer-grants.json
 python -m eas_server.admin --registry runtime/security/identities.json enroll-worker \
   --id finance-desktop-01 --profile docs/examples/finance-environment.json \
   --backend-url https://your-backend-host --output runtime/security/edge
 ```
 
-Use your own backend URL and stable, unique worker ID. The example gives one person Finance rights including skill lifecycle management; edit the grants deliberately for other people or reviewer access. Each additional person needs their own identity. Each desktop needs its own enrollment, even when two machines run the same profile. On Windows development hosts, use the corresponding virtual-environment executables and restrict the configuration folder with Windows ACLs instead of `chmod`.
+Use your own backend URL and stable, unique worker ID. The example gives the developer Finance rights including skill lifecycle management and global agent inventory access. Use `docs/examples/staff-grants.json` for ordinary Finance staff without inventory access; edit the grants deliberately for other people or reviewer access. Each additional person needs their own identity. Each desktop needs its own enrollment, even when two machines run the same profile. On Windows development hosts, use the corresponding virtual-environment executables and restrict the configuration folder with Windows ACLs instead of `chmod`.
 
 Create an ignored backend `.env`:
 
@@ -45,7 +45,7 @@ Staff use email/password. Issue a one-hour account setup link from the server op
 ```bash
 python -m eas_server.admin --registry runtime/security/identities.json invite-human \
   --id developer-staff --email staff@example.test --data-dir runtime \
-  --public-url https://your-backend-host --setup-file runtime/security/staff-setup-link.txt
+  --public-url https://your-backend-host --setup-file runtime/security/developer-setup-link.txt
 ```
 
 Open the protected file and give its link to the intended person through your trusted development channel. No email is sent. The person chooses a password in the browser, then signs in normally. Use the same command with a new output file to reset a password; completing a reset invalidates existing sessions. Never put passwords in shell arguments or chat. The link's credential is in a URL fragment, which the frontend removes immediately and submits in a bounded JSON request. It cannot be reused after successful setup.
@@ -111,7 +111,7 @@ Do not run a legacy `EAS-Worker`, `enterprise-harness`, or `enterprise dev` alon
 
 ## 4. Staff use and operations
 
-Open the configured HTTPS frontend and sign in with the email/password established through the setup link. The console keeps one conversation per person and work scope. Staff approve each business operation, including graph children. Reading a skill does not authorize running it. Accepting an outcome is separate from approving its actions.
+Private [Discord channels](discord.md) are the primary staff communication surface. The HTTPS frontend is a developer console: sign in with the email/password established through the setup link, then open an agent’s debug page. Private conversations remain scoped to the person and employee; channel conversations retain their shared channel identity. Active employees execute under server authorization, while shadowing employees observe explicit demonstrations. Reading a skill does not authorize running it.
 
 Skill reads require source-evidence access. Lifecycle changes additionally require `manage_skills`. Accepted work can produce an automatically validated lesson on that worker. A private lesson is not automatically shared with every employee or worker. Use Take control/Release control before interacting during active work.
 
@@ -124,6 +124,12 @@ python -m eas_server.admin --registry runtime/security/identities.json revoke --
 ```
 
 A registered environment's scope cannot be rebound to a new department while retaining its old runtime. Follow the [retirement/reprovisioning procedure](security.md#revocation-retention-and-recovery). No automatic retention/erasure schedule is enabled.
+
+## Developer agent pages
+
+`/` lists all registered agents, including paused and disabled employees. `/agents/<employee-id>` is a stable link to an individual agent’s details, scoped conversations, debug events, learning and supervisor controls. `/metrics` shows evaluation results. Directory access requires an explicit human `inspect_agents` grant with all four scope fields set to `"*"`; [developer-grants.json](examples/developer-grants.json) includes it. The permission exposes registration metadata only: it does not authorize reading conversations, controlling desktops, promoting employees or managing skills. Those still use the existing scoped grants. Removed registrations remain visible as unregistered for debugging.
+
+The loopback fixture’s `developer` identity has inventory access by default; its `staff` identity does not. Managed registries require an explicit grant. A registry change invalidates existing browser sessions, so sign in again after changing permissions.
 
 ## Upgrade from the trusted legacy worker
 
@@ -145,7 +151,7 @@ For later upgrades, drain and stop all three tasks, stage trusted source/configu
 
 Without Windows, install `pip install -r requirements-dev.txt`, copy `.env.example` to `.env`, keep `EAS_DESKTOP_ADAPTER=browser` and `EAS_MODEL_MODE=simulated`, then run `python -m playwright install chromium` and `enterprise dev`. The fixture is loopback-only and retains explicitly labeled bearer identities for automated tests. Staff still sign in with an email and password.
 
-In a second terminal with the same virtual environment and fixture configuration, create a password setup link for its existing synthetic staff identity:
+In a second terminal with the same virtual environment and fixture configuration, create a password setup link for its existing synthetic developer identity:
 
 ```bash
 python - <<'PYTHON'
@@ -158,17 +164,17 @@ from eas_server.store import Store
 settings = Settings()
 assert settings.auth_mode == "development" and not settings.identity_file, "Fixture setup only"
 security = Security(settings, Store(settings.data_dir))
-email = "staff@example.test"
-token = security.accounts.invite("staff", email)
+email = "developer@example.test"
+token = security.accounts.invite("developer", email)
 private_write(
-    settings.data_dir / "staff-setup-link.txt",
+    settings.data_dir / "developer-setup-link.txt",
     settings.public_url.rstrip("/") + "/#" + urlencode({"setup": token, "email": email}) + "\n",
 )
-print("Open runtime/staff-setup-link.txt to set your fixture password; no email was sent.")
+print("Open runtime/developer-setup-link.txt to set your fixture password; no email was sent.")
 PYTHON
 ```
 
-Open that protected file's link, set a password and sign in. Delete the consumed link file before issuing a replacement. This setup preserves the fixture's staff identity and conversation history. `/mock` is the synthetic browser accounting workspace; it is disabled on the ordinary server/edge installation.
+Open that protected file's link, set a password and sign in. Delete the consumed link file before issuing a replacement. This setup uses the existing developer identity and leaves the separate staff identity and its conversation history intact. `/mock` is the synthetic browser accounting workspace; it is disabled on the ordinary server/edge installation.
 
 This trusted developer fixture uses integrated edge execution. It tests graphs, approvals and recovery; it does not establish the Windows account boundary. Cross-process security regression tests separately exercise the planner/executor protocol with synthetic identities.
 
@@ -176,7 +182,7 @@ This trusted developer fixture uses integrated edge execution. It tests graphs, 
 
 New and migrated worker registrations appear as digital employees in **shadowing**. The existing executor, planner and admission credentials identify services of that employee; they cannot log in as humans or change lifecycle state. Human supervisors use the existing email/password login. Add `supervise` only to the intended supervisor's grants for the employee's environment; ordinary request access does not confer promotion rights.
 
-In the console, select the employee and start a demonstration by describing the task. The mentor operates **that employee's computer**, using the VM console or remote desktop. Keep that same OS session visible and unlocked. The observer never opens or focuses applications to get a better view. Start/finish are explicit capture controls; pausing the employee also stops capture. The observer may ask questions in chat. Under **Manage employee**, activation requires a supervisor's readiness rationale. Skills and observer notes cannot promote the employee.
+Open the employee’s page from the developer directory and start a demonstration by describing the task. The mentor operates **that employee's computer**, using the VM console or remote desktop. Keep that same OS session visible and unlocked. The observer never opens or focuses applications to get a better view. Start/finish are explicit capture controls; pausing the employee also stops capture. The observer may ask questions in chat. Under **Manage employee**, activation requires a supervisor's readiness rationale. Skills and observer notes cannot promote the employee.
 
 Windows uses the protected controller's screenshot endpoint. Linux requires a provisioned X11 session and executor access to its `DISPLAY`/`XAUTHORITY`; a headless worker reports capture unavailable. The browser fixture is explicitly a test viewport. No OS login, application account, permission setting, or remote desktop service is created by this feature.
 

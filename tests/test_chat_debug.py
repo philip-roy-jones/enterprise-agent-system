@@ -65,7 +65,7 @@ def test_chat_debug_history_streaming_and_reload(browser_server):
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
         try:
-            page.goto(browser_server["url"])
+            page.goto(browser_server["url"] + "/agents/development-desktop")
             page.wait_for_function("id => active === id && renderedSession !== null", arg=job["id"])
             toggle = page.locator("#debug-mode")
             transcript = page.locator("#session-messages")

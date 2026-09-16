@@ -17,7 +17,7 @@ let renderedSession = null, renderedJobs = [];
 let chatDebug = localStorage.getItem("eas-chat-debug") === "true";
 let roles = [];
 let desktopAdapter = "browser";
-let activeView = "jobs";
+let activeView = agentPages.view;
 let active = null,
   current = null,
   source = null,
@@ -45,16 +45,16 @@ async function api(path, body) {
     renderedJobs = [];
     $("chat-controls").hidden = true;
     $("session-messages").replaceChildren();
+    agentPages.clear();
     if (!$("login-dialog").open) $("login-dialog").showModal();
     throw Error("Connect to your workspace to continue.");
   }
   const data = await r.json();
-  if (!r.ok)
-    throw Error(
-      typeof data.detail === "object"
-        ? data.detail.message
-        : JSON.stringify(data.detail),
-    );
+  if (!r.ok) {
+    const error = Error(typeof data.detail === "object" ? data.detail.message : String(data.detail));
+    error.status = r.status;
+    throw error;
+  }
   return data;
 }
 async function action(fn) {
@@ -168,24 +168,6 @@ $("takeover").onclick = () =>
       {},
     ),
   );
-function selectView(view) {
-  activeView = view;
-  const metrics = view === "metrics";
-  $("chat-composer").hidden = metrics;
-  $("learning-panel").hidden = metrics;
-  $("metrics-view").hidden = !metrics;
-  for (const name of ["jobs", "metrics"]) {
-    const tab = $(name + "-tab");
-    tab.classList.toggle("nav-active", name === view);
-    if (name === view) tab.setAttribute("aria-current", "page");
-    else tab.removeAttribute("aria-current");
-  }
-  $("page-eyebrow").textContent = metrics ? "EVALUATION" : "WORKER CONSOLE";
-  $("page-title").textContent = metrics ? "Evaluation metrics" : "Work, with oversight.";
-  $("page-description").textContent = metrics
-    ? "Compare simulated and live runs. Results refresh automatically."
-    : "Teach by demonstration. Delegate work. Follow the results.";
-}
 function metricValue(name, value) {
   if (value == null) return "—";
   if (name === "completion_rate") return (value * 100).toFixed(1) + "%";
@@ -204,22 +186,23 @@ async function refreshMetrics() {
         )
         .join("")}</tbody></table></section>`;
 }
-$("metrics-tab").onclick = () => action(async () => selectView("metrics"));
-$("jobs-tab").onclick = () => action(async () => selectView("jobs"));
 async function refresh() {
   if (refreshing) return;
   refreshing = true;
   try {
     if (!roles.length) roles = await api("/api/roles");
-    const selection = await workforceView.refresh();
     const health = await api("/api/health");
     desktopAdapter = health.desktop_adapter;
     $("test-workspace").hidden = desktopAdapter !== "browser";
     $("model-label").textContent = health.model_mode === "simulated" ? "Simulated assistance" : "Live model";
-    if (!selection) return;
+    if (activeView === "metrics") { $("metrics-view").hidden = false; await refreshMetrics(); return; }
+    if (!await agentPages.load()) return;
+    const selection = await workforceView.refresh();
+    $("chat-composer").hidden = $("learning-panel").hidden = !selection;
+    $("agent-conversation-unavailable").hidden = !!selection;
+    if (!selection) { resetConversation(); return; }
     if (workforceView.render()) {
-      if (activeView === "metrics") await refreshMetrics();
-      else await refreshLearning();
+      await refreshLearning();
       return;
     }
     document.querySelector("#chat-form button").textContent = "Send";
@@ -247,21 +230,33 @@ async function refresh() {
       $("chat-controls").hidden = true;
     }
     await renderSession(session, jobs, detail);
-    if (activeView === "metrics") await refreshMetrics();
-    else await refreshLearning();
+    await refreshLearning();
   } catch (e) {
     if (!$("login-dialog").open) toast(e.message);
   } finally {
     refreshing = false;
   }
 }
-$("chat-workspace").onchange = () => {
+function resetConversation() {
   selectRequest(null);
   conversationId = null;
   requestDraft = null;
   transcriptCache.clear();
   $("session-messages").replaceChildren();
   delete $("session-messages").dataset.shadowMarkup;
+  renderedSession = null;
+  renderedJobs = [];
+  transcriptSession = null;
+  transcriptMarkup = "";
+  $("learning-content").replaceChildren();
+  learningView.reset();
+  workforceView.demo = null;
+}
+$("chat-workspace").onchange = () => {
+  resetConversation();
+  const url = new URL(location.href);
+  url.searchParams.set("conversation", $("chat-workspace").value);
+  history.replaceState(null, "", url);
   refresh();
 };
 let conversationId = null;
@@ -421,9 +416,9 @@ function renderTranscript(session, jobs) {
   $("conversation-label").textContent = "One continuous conversation · Messages stay in chronological order";
 }
 async function refreshLearning() {
-  const status = await api("/api/learning");
+  const status = await api("/api/learning?employee_id=" + encodeURIComponent(agentPages.employeeId));
   learningView.render(status);
-  document.querySelectorAll("[data-skill]").forEach(button => button.onclick=()=>action(()=>api(`/api/skills/${encodeURIComponent(button.dataset.skill)}/change`,{version:button.dataset.version || null})));
+  document.querySelectorAll("[data-skill]").forEach(button => button.onclick=()=>action(()=>api(`/api/skills/${encodeURIComponent(button.dataset.skill)}/change`,{version:button.dataset.version || null,worker_id:agentPages.employeeId})));
 }
 function renderCurrentTranscript() {
   if (renderedSession && renderedSession.conversation_id === conversationId) renderTranscript(renderedSession, renderedJobs);
@@ -437,6 +432,7 @@ function setChatDebug(enabled) {
 }
 $("debug-mode").onclick = () => setChatDebug(!chatDebug);
 setChatDebug(chatDebug);
+agentPages.init();
 async function start() {
   const setup = new URLSearchParams(location.hash.slice(1));
   if (setup.has("setup")) {

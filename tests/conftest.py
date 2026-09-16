@@ -66,6 +66,17 @@ def server(tmp_path_factory):
         .registry()
         .model_dump()
     )
+    registry["principals"][0]["grants"].append(
+        dict(
+            organization_id="*",
+            department_id="*",
+            role_id="*",
+            company_id="*",
+            actions=["inspect_agents"],
+            capabilities=[],
+            own_only=False,
+        )
+    )
     simulated = dict(
         registry["principals"][0], id="simulated-staff", name="Simulated staff", token_sha256=None
     )

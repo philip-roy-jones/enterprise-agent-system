@@ -50,6 +50,9 @@ def create_app(settings=None):
     from eas_server.channels import install_channels
 
     install_channels(app, security)
+    from eas_server.developer_agents import install_developer_agents
+
+    install_developer_agents(app, security)
     static = Path(__file__).parent / "frontend"
     if mock is not None:
         app.mount("/fixture-static", StaticFiles(directory=fixture_static), name="fixture-static")
@@ -81,6 +84,8 @@ def create_app(settings=None):
             content={"detail": {"type": type(error).__name__, "message": str(error)}},
         )
 
+    @app.get("/agents/{employee_id}")
+    @app.get("/metrics")
     @app.get("/")
     def index():
         return console_page(static)
@@ -329,8 +334,31 @@ def create_app(settings=None):
         return [{"id": key, "requests": list(reversed(jobs))} for key, jobs in groups.items()]
 
     @app.get("/api/learning", dependencies=[Depends(staff)])
-    def learning():
-        return security.learning(current_principal.get())
+    def learning(employee_id: str | None = None):
+        person = current_principal.get()
+        result = security.learning(person)
+        if employee_id is None:
+            return result
+        jobs = {j["id"]: j for j in security.jobs(person)}
+        result["queue"] = [
+            item
+            for item in result["queue"]
+            if (
+                item.get("target_worker_id")
+                or item.get("worker_id")
+                or jobs.get(item.get("job_id"), {}).get("employee_id")
+                or jobs.get(item.get("job_id"), {}).get("desktop_id")
+            )
+            == employee_id
+        ]
+        for registry in result["registries"]:
+            registry["versions"] = [v for v in registry["versions"] if v.get("worker_id") == employee_id]
+            versions = {(v["skill_id"], v["version"]) for v in registry["versions"]}
+            registry["history"] = [
+                h for h in registry.get("history", []) if (h.get("skill_id"), h.get("version")) in versions
+            ]
+            registry["active"] = {k: v for k, v in registry.get("active", {}).items() if (k, v) in versions}
+        return result
 
     @app.post("/api/skills/{skill_id}/change", dependencies=[Depends(staff)])
     async def skill_change(skill_id: str, request: Request):

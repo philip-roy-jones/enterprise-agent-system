@@ -136,7 +136,7 @@ def test_browser_streams_reconnects_and_recovers_partial_text(browser_server):
         page = browser.new_page(extra_http_headers={"Authorization": "Bearer test-staff"})
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
-        page.goto(server["url"])
+        page.goto(server["url"] + "/agents/development-desktop")
         page.locator("#chat-request").wait_for()
         page.wait_for_function("id => active === id && renderedSession !== null", arg=job["id"])
         # Disable polling: token updates must arrive through SSE itself.

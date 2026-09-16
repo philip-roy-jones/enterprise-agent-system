@@ -59,6 +59,8 @@ def check_server(folder):
             "/static/activity.js",
             "/static/learning.js",
             "/static/employees.js",
+            "/static/agents.js",
+            "/agents/development-desktop",
             "/static/style.css",
         ]:
             with urllib.request.urlopen(base + path) as response:

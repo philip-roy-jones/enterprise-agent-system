@@ -36,7 +36,7 @@ def test_chat_replaces_assessment_form_and_existing_assessments_remain_in_metric
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(extra_http_headers={"Authorization": "Bearer test-staff"})
         page = context.new_page()
-        page.goto(browser_server["url"])
+        page.goto(browser_server["url"] + "/agents/development-desktop")
         page.locator("#chat-request").wait_for()
         assert page.locator("#assessment-form").count() == 0
         assert not page.locator("#review-panel").is_visible()

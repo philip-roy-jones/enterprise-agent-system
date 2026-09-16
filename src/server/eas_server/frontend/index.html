@@ -7,7 +7,7 @@
       name="description"
       content="Supervise an enterprise digital worker and teach it to handle new situations."
     />
-    <title>Enterprise Agent System · Worker console</title>
+    <title>Enterprise Agent System · Developer console</title>
     <link rel="stylesheet" href="/static/style.css" />
   </head>
   <body>
@@ -16,13 +16,13 @@
         <a class="brand" href="/"
           >▤ <span class="platform-name">Enterprise<br />Agent System</span></a
         >
-        <p class="eyebrow">OPERATIONS</p>
-        <button class="nav-active" id="jobs-tab" aria-current="page">◫ &nbsp; Worker console</button
+        <p class="eyebrow">DEVELOPMENT</p>
+        <a id="jobs-tab" href="/">◫ &nbsp; Agents</a
         ><a id="test-workspace" href="/mock" target="_blank" hidden>▥ &nbsp; Browser test workspace ↗</a
-        ><button id="metrics-tab">▥ &nbsp; Evaluation metrics</button>
+        ><a id="metrics-tab" href="/metrics">▥ &nbsp; Evaluation metrics</a>
         <div class="sidebar-bottom">
           <span class="worker-avatar">W1</span
-          ><strong>Development workers</strong
+          ><strong>Developer console</strong
           ><small>One active request per desktop</small
           ><span id="model-label" class="badge">Simulated assistance</span>
           <small id="signed-in-as"></small><button id="sign-out" type="button" hidden>Sign out</button>
@@ -36,21 +36,31 @@
           ><span class="environment">SYNTHETIC ENVIRONMENT</span>
         </header>
         <main class="console">
+          <a id="agent-back" class="back-link" href="/" hidden>← All agents</a>
           <div class="title-row">
             <div>
-              <div class="eyebrow" id="page-eyebrow">WORKER CONSOLE</div>
-              <h1 id="page-title">Work, with oversight.</h1>
+              <div class="eyebrow" id="page-eyebrow">DEVELOPER CONSOLE</div>
+              <h1 id="page-title">Agents</h1>
               <p class="muted" id="page-description">
-                Teach by demonstration. Delegate work. Follow the results.
+                Inspect registered edge agents and open their debug pages.
               </p>
             </div>
           </div>
-          <section class="panel" id="chat-composer">
+          <section id="agent-directory" aria-label="Agent directory" hidden>
+            <p id="agent-count" class="hint" role="status">Loading agents…</p>
+            <div id="agent-grid" class="agent-grid"></div>
+            <div id="no-agents" class="panel empty-agents" hidden><h2>No agents registered</h2><p class="muted">Enroll an edge worker to see it here.</p></div>
+          </section>
+          <section id="agent-unavailable" class="panel" hidden><h2 id="agent-unavailable-title"></h2><p id="agent-unavailable-message" class="muted"></p></section>
+          <div id="agent-channels" class="agent-channels" aria-label="Connected channels" hidden></div>
+          <details id="agent-details" class="panel" hidden><summary>Agent details</summary><div id="agent-details-content"></div></details>
+          <p id="agent-conversation-unavailable" class="hint" hidden>Your account can inspect this agent's registration but has no access to its conversations or controls.</p>
+          <section class="panel" id="chat-composer" hidden>
             <div class="chat-heading">
-              <h2>Talk to your worker</h2>
+              <h2>Conversation & activity</h2>
               <button type="button" id="debug-mode" aria-pressed="false" aria-controls="session-messages">Debug mode</button>
             </div>
-            <label>Digital employee<select id="chat-workspace" aria-label="Digital employee"></select></label>
+            <label id="conversation-picker">Conversation<select id="chat-workspace" aria-label="Conversation"></select></label>
             <p id="employee-status" class="hint" role="status"></p>
             <details id="employee-management" hidden><summary>Manage employee</summary>
               <form id="employee-state-form" class="employee-state-form">
@@ -76,7 +86,7 @@
             </form>
             <p id="conversation-label" class="hint"></p>
           </section>
-          <section class="panel" id="learning-panel"><details><summary>Accumulated skills & learning</summary><div id="learning-content"></div></details></section>
+          <section class="panel" id="learning-panel" hidden><details><summary>Accumulated skills & learning</summary><div id="learning-content"></div></details></section>
           <div id="metrics-view" hidden></div>
         </main>
         <footer class="app-footer">
@@ -103,6 +113,7 @@
     <script src="/static/learning.js"></script>
     <script src="/static/screenshots.js"></script>
     <script src="/static/chat-stream.js"></script>
+    <script src="/static/agents.js"></script>
     <script src="/static/employees.js"></script>
     <script src="/static/app.js"></script>
   </body>

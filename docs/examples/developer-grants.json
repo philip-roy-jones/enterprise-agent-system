@@ -1,0 +1,34 @@
+[
+  {
+    "organization_id": "acme",
+    "department_id": "finance",
+    "role_id": "invoice_correction",
+    "company_id": "ACME",
+    "actions": [
+      "request",
+      "read",
+      "approve",
+      "control",
+      "accept",
+      "skills",
+      "supervise"
+    ],
+    "capabilities": [
+      "read",
+      "navigate",
+      "draft"
+    ],
+    "own_only": true
+  },
+  {
+    "organization_id": "*",
+    "department_id": "*",
+    "role_id": "*",
+    "company_id": "*",
+    "actions": [
+      "inspect_agents"
+    ],
+    "capabilities": [],
+    "own_only": false
+  }
+]

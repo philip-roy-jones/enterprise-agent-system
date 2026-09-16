@@ -5,7 +5,7 @@ const workforceView = {
     return this.choices.find(choice => choice.key === $("chat-workspace").value);
   },
   async refresh() {
-    this.employees = await api("/api/employees");
+    this.employees = (await api("/api/employees")).filter(e => e.id === agentPages.employeeId);
     this.choices = this.employees.flatMap(employee => employee.profiles.map(profile => ({
       key: `${employee.id}/${profile.role_id}/${profile.company_id}`,
       employee, ...profile, employee_id: employee.id,
@@ -15,13 +15,15 @@ const workforceView = {
       const employee = this.employees.find(e => e.id === channel.employee_id);
       return employee ? [{...channel, employee, key:`discord/${channel.channel_id}`}]: [];
     }));
-    const options = this.choices.map(c => `<option value="${esc(c.key)}">${esc(c.channel_id ? "#"+c.name+" · Discord" : c.employee.name+" · "+c.department_id)}</option>`).join("");
+    const options = this.choices.map(c => `<option value="${esc(c.key)}">${esc(c.channel_id ? "#"+c.name+" · Discord" : "Private chat · "+c.department_id+" · "+c.company_id)}</option>`).join("");
     if (options !== this.markup) {
-      const previous = $("chat-workspace").value;
+      const previous = $("chat-workspace").value || new URLSearchParams(location.search).get("conversation");
       $("chat-workspace").innerHTML = options;
       if (this.choices.some(c => c.key === previous)) $("chat-workspace").value = previous;
       this.markup = options;
     }
+    $("conversation-picker").hidden = this.choices.length < 2;
+    agentPages.channels(this.choices);
     const selected = this.scope();
     $("employee-management").hidden = !selected?.employee.can_supervise;
     $("employee-status").textContent = selected ? `${selected.employee.state} · ${selected.employee.state === "active" ? "Works autonomously within assigned permissions" : selected.employee.state === "shadowing" ? "Observes only during a demonstration you start" : "Execution and observation stopped"}` : "No authorized digital employees";
