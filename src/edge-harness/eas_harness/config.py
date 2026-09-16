@@ -29,6 +29,8 @@ class Settings:
     windows_token: str = field(default=os.getenv("EAS_WINDOWS_TOKEN", ""), repr=False)
     desktop_agent_url: str = os.getenv("EAS_DESKTOP_AGENT_URL", "http://127.0.0.1:8766")
     desktop_agent_token: str = field(default=os.getenv("EAS_DESKTOP_AGENT_TOKEN", ""), repr=False)
+    mediator_url: str = os.getenv("EAS_MEDIATOR_URL", "")
+    mediator_token: str = field(default=os.getenv("EAS_MEDIATOR_TOKEN", ""), repr=False)
     desktop_input_mode: str = os.getenv("EAS_DESKTOP_INPUT_MODE", "accessibility")
     campaign_url: str = os.getenv("EAS_CAMPAIGN_URL", "http://127.0.0.1:8770")
     campaign_token: str = field(default=os.getenv("EAS_CAMPAIGN_TOKEN", ""), repr=False)

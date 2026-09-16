@@ -44,6 +44,13 @@ def main():
     worker.add_argument("--backend-url", required=True)
     worker.add_argument("--output", type=Path, required=True)
     worker.add_argument("--development", action="store_true")
+    mediator = commands.add_parser(
+        "enroll-mediator", help="Enroll an application mediator for an existing employee"
+    )
+    mediator.add_argument("--id", required=True, help="Existing physical desktop/employee identity")
+    mediator.add_argument("--backend-url", required=True)
+    mediator.add_argument("--output", type=Path, required=True)
+    mediator.add_argument("--development", action="store_true")
     revoke = commands.add_parser("revoke")
     revoke.add_argument("--id", required=True, help="Person, service principal, or entire worker ID")
     args = parser.parse_args()
@@ -97,6 +104,49 @@ def main():
         registry.principals.append(person)
         if token:
             private_write(args.development_token_file, token + "\n")
+    elif args.command == "enroll-mediator":
+        from urllib.parse import urlsplit
+
+        if not args.development and urlsplit(args.backend_url).scheme != "https":
+            raise ValueError("Managed mediator enrollment requires HTTPS")
+        executor = next(
+            (p for p in registry.principals if p.kind == "executor" and p.worker_id == args.id and p.enabled),
+            None,
+        )
+        if not executor or any(p.id == args.id + "-mediator" for p in registry.principals):
+            raise ValueError("An enabled employee without an existing mediator is required")
+        office_token, local_token = secrets.token_urlsafe(48), secrets.token_urlsafe(48)
+        registry.principals.append(
+            Principal(
+                id=args.id + "-mediator",
+                name=args.id + " application mediator",
+                kind="mediator",
+                worker_id=args.id,
+                token_sha256=token_hash(office_token),
+                grants=[
+                    g.model_copy(update={"actions": ["mediate"]})
+                    for g in executor.grants
+                    if "execute" in g.actions
+                ],
+            )
+        )
+        private_write(
+            args.output / "mediator.env",
+            "".join(
+                k + "=" + v + "\n"
+                for k, v in {
+                    "EAS_OFFICE_URL": args.backend_url,
+                    "EAS_MEDIATOR_OFFICE_TOKEN": office_token,
+                    "EAS_MEDIATOR_TOKEN": local_token,
+                    "EAS_NATIVE_URL": "http://127.0.0.1:8766",
+                    "EAS_SECURITY_PROFILE": "development" if args.development else "managed",
+                }.items()
+            ),
+        )
+        private_write(
+            args.output / "executor-mediator.env",
+            "EAS_MEDIATOR_URL=http://127.0.0.1:8768\nEAS_MEDIATOR_TOKEN=" + local_token + "\n",
+        )
     else:
         from urllib.parse import urlsplit
 

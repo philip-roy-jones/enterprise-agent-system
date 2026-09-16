@@ -169,6 +169,8 @@ public sealed class AccountingWindow : Form
             Label("Purchase order " + inv.po_id, 310, 172); Label(Money(inv.po_amount), 310, 203, 23, true);
             Label("Discrepancy", 665, 172); Label(Money(inv.amount - inv.po_amount), 665, 203, 23, true);
             Label("Correction draft", 24, 288, 16, true);
+            var bank = Label("Vendor bank account: 000123456789 (synthetic)", 24, 250);
+            bank.Name = "vendor-bank-account";
             string amountLabel = s.variant == "renamed" ? "Adjusted total" : "Correction amount";
             int amountX = s.variant == "layout" ? 660 : 24, noteX = s.variant == "layout" ? 24 : 310;
             Label(amountLabel, amountX, 340);

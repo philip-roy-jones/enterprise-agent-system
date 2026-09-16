@@ -20,7 +20,7 @@ function renderScreenshot(attachment) {
     return `<g fill="none" stroke="${color}" stroke-width="${stroke}">${shape}</g>${label}`;
   }).join("");
   const captured = new Date(attachment.captured_at*1000);
-  return `<figure class="chat-screenshot"><div class="chat-screenshot-image" style="--preview-width:${280*width/height}px"><img loading="lazy" width="${width}" height="${height}" src="/api/artifacts/${esc(attachment.screenshot)}" alt="${esc(attachment.caption)}"/><svg viewBox="0 0 ${width} ${height}" aria-hidden="true">${shapes}</svg></div><figcaption>${esc(attachment.caption)}<small>Captured ${esc(captured.toLocaleString())} · ${attachment.surface === "desktop" ? "Entire desktop" : "Browser test viewport"}${shapes ? " · Agent annotations" : ""}</small><button type="button" class="screenshot-size" aria-expanded="false">Enlarge image</button></figcaption></figure>`;
+  return `<figure class="chat-screenshot"><div class="chat-screenshot-image" style="--preview-width:${280*width/height}px"><img loading="lazy" width="${width}" height="${height}" src="/api/artifacts/${esc(attachment.screenshot)}" alt="${esc(attachment.caption)}"/><svg viewBox="0 0 ${width} ${height}" aria-hidden="true">${shapes}</svg></div><figcaption>${esc(attachment.caption)}<small>Captured ${esc(captured.toLocaleString())} · ${attachment.surface === "desktop" ? "Entire desktop" : attachment.surface === "mediated_application" ? "Mediated application view" : "Browser test viewport"}${shapes ? " · Agent annotations" : ""}</small><button type="button" class="screenshot-size" aria-expanded="false">Enlarge image</button></figcaption></figure>`;
 }
 
 document.addEventListener("click", event => {

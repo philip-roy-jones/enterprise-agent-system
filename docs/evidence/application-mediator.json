@@ -1,0 +1,63 @@
+{
+  "kind": "actual Windows deployment and live model; automated staff test request",
+  "model_mode": "live",
+  "job_id": "13b7ab2a8d6f413987275e3a49d471ff",
+  "status": "completed",
+  "model_calls": 4,
+  "answer": "The current amount of invoice **INV-1042** is **$1,480.00 USD**.",
+  "mediated_inputs": [
+    {
+      "invocation": "13b7ab2a8d6f413987275e3a49d471ff:agent:call_QhPNlXpj8blGp6VdlETUCTqd",
+      "policy_revision": "83f64df3f50e56d8af81a71b0456c05486680f2ea8587b4f68072c25297ec6fc",
+      "reporter": "windows-finance-01-mediator",
+      "revision": "83f41a34e0a484f1ce8d0bddc5e912d87c646fe4edb252be9dfe9da4fe26efe0",
+      "target": "invoices"
+    },
+    {
+      "invocation": "13b7ab2a8d6f413987275e3a49d471ff:agent:call_QhPNlXpj8blGp6VdlETUCTqd",
+      "policy_revision": "83f64df3f50e56d8af81a71b0456c05486680f2ea8587b4f68072c25297ec6fc",
+      "reporter": "windows-finance-01-mediator",
+      "revision": "d3fc98ee7a45b177898ace53c766445c5ccb3a186c08dc1325d63b6b57189018",
+      "target": "open-INV-1042"
+    }
+  ],
+  "profile": "demobooks-v1",
+  "restricted_areas": 1,
+  "synthetic_bank_value_disclosed": false,
+  "business_writes": 0,
+  "rendering": "accessibility_projection",
+  "installed_service_checks": {
+    "independent_environment": true,
+    "raw_token_removed_from_executor": true,
+    "local_and_native_credentials_distinct": true,
+    "missing_assignment_denied": true,
+    "arbitrary_endpoints_denied": true,
+    "mediator_credential_rejected_by_native_controller": true
+  },
+  "central_inspector": {
+    "initially_collapsed": true,
+    "image_loaded": true,
+    "control_descriptions_present": true,
+    "page_errors": []
+  },
+  "validation": {
+    "regression_cases_passed": 271,
+    "regression_method": "Full-suite attempt followed by passing reruns of corrected fixtures and remaining modules; overlapping cases counted once.",
+    "fixes_during_validation": [
+      "Simulated mentor fixture needed request authority in addition to supervise.",
+      "Historical chat browser test updated to the agent show route."
+    ],
+    "mediation_tests_passed": 18,
+    "python_lint_and_format": "passed",
+    "frontend_syntax": "passed",
+    "native_windows_builds": "passed",
+    "standalone_mediator_install": "passed"
+  },
+  "native_projection_probe": {
+    "model_used": false,
+    "company_verified": true,
+    "bank_value_withheld": true,
+    "read_only_save_disabled": true,
+    "input_sent": false
+  }
+}

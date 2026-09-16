@@ -189,7 +189,7 @@ def test_console_returns_to_one_chat_and_keeps_history(browser_server):
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(extra_http_headers={"Authorization": "Bearer test-staff"})
         page = context.new_page()
-        page.goto(browser_server["url"])
+        page.goto(browser_server["url"] + "/agents/development-desktop")
         expect(page.locator("#chat-request")).to_be_visible()
         assert page.locator("#chat-invoice").count() == 0
         assert page.locator("#new-conversation").count() == 0

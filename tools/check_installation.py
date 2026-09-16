@@ -139,8 +139,22 @@ def check_harness(folder):
 def main():
     with tempfile.TemporaryDirectory(prefix="eas-installation-") as directory:
         folder = Path(directory)
-        {"server": check_server, "edge-harness": check_harness}[sys.argv[1]](folder)
+        {"server": check_server, "edge-harness": check_harness, "application-mediator": check_mediator}[
+            sys.argv[1]
+        ](folder)
     print(f"{sys.argv[1]} standalone installation passed")
+
+
+def check_mediator(folder):
+    for module in ["eas_server", "eas_harness", "enterprise_dev", "langgraph", "deepagents"]:
+        assert importlib.util.find_spec(module) is None, module
+    import httpx
+    from eas_mediator.app import create_app
+
+    app = create_app(
+        native=httpx.Client(), office=httpx.Client(), token="x" * 40, ledger_path=folder / "inputs.sqlite"
+    )
+    assert app.state.mediator.ledger
 
 
 if __name__ == "__main__":

@@ -35,8 +35,8 @@ class Operation:
 
 OPERATIONS = {
     "capture_screen": Operation(
-        "Capture the entire interactive desktop, including other visible windows, for this conversation",
-        "A timestamped screenshot of all monitors; browser fixtures capture only their test viewport",
+        "Capture the permitted visual surface for this conversation; mediated applications disclose only their filtered view",
+        "A timestamped image labeled desktop, browser_fixture, or mediated_application; never assume it shows the whole screen",
         input_model=Empty,
         output_model=ScreenCapture,
         conditions="Server-authorized read of the assigned worker desktop; no record required",

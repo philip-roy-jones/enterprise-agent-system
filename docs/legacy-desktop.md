@@ -12,7 +12,7 @@ Publish both Windows executables:
 
 ```bash
 dotnet publish src/test-software/demobooks/DemoBooks/DemoBooks.csproj -c Release -r win-x64 --self-contained true -o src/test-software/demobooks/publish
-dotnet publish src/edge-harness/windows/DesktopAgent/DesktopAgent.csproj -c Release -r win-x64 --self-contained true -o src/edge-harness/windows/desktop-publish
+dotnet publish src/application-mediator/windows/DesktopAgent/DesktopAgent.csproj -c Release -r win-x64 --self-contained true -o src/application-mediator/windows/desktop-publish
 ```
 
 Copy both published directories and the installers to the Windows machine. In PowerShell, install DemoBooks with its application API disabled and install the independent controller:
@@ -27,6 +27,8 @@ Both tasks launch manually in the logged-in user's interactive session. Neither 
 Run LangGraph and the Deep Agent harness **on the same Windows machine** as the controller. Follow the [two-machine developer setup](developer-setup.md) to install the Python worker and connect it to the backend. Its desktop controller URL stays `http://127.0.0.1:8766`; no desktop port forwarding is needed.
 
 The private controller token is in `%LOCALAPPDATA%\EnterpriseAgentSystem\DesktopAgent\data\bridge.token`. Configure it only on the Windows worker. Set `EAS_DESKTOP_INPUT_MODE=mouse_keyboard` for actual clicks and typing, or `accessibility` for control patterns. The controller belongs to the automation infrastructure; DemoBooks' application API on port 8765 remains disabled.
+
+For filtered observations and office-authorized controls, install the separate [Application Mediator](application-mediator.md). The harness then connects to mediator port 8768 and the native token belongs only in mediator configuration. The raw connection described above is an unmediated test setup.
 
 ## Observation, approvals, and verification
 

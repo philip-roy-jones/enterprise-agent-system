@@ -10,7 +10,7 @@ class ScreenCapture(WireModel):
     width: int = Field(gt=0, le=20000)
     height: int = Field(gt=0, le=20000)
     captured_at: float
-    surface: Literal["desktop", "browser_fixture"]
+    surface: Literal["desktop", "browser_fixture", "mediated_application"]
 
 
 class Annotation(WireModel):
