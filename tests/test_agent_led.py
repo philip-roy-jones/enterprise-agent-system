@@ -1,7 +1,6 @@
 """Real separate processes; all staff decisions and model behavior explicitly simulated."""
 
 import time
-from conftest import pending
 
 
 def test_historical_release_cannot_configure_new_requests(store):
@@ -35,6 +34,7 @@ def test_malformed_recovery_click_returns_to_model_before_any_approval(store, jo
     from eas_harness.coordinator import Coordinator, SimulatedCoordinator
     from eas_harness.execution import ExecutionLayer
     from test_execution import FakeAdapter
+    from conftest import staged_authorization
 
     settings = SimpleNamespace(
         data_dir=tmp_path, model_mode="simulated", model_id="", model_provider="", max_model_calls=4
@@ -72,12 +72,14 @@ def test_malformed_recovery_click_returns_to_model_before_any_approval(store, jo
     coordinator = Coordinator(
         settings, store, ExecutionLayer(store, FakeAdapter()), InMemorySaver(), InMemorySaver()
     )
-    coordinator.tick(store.get_job(job["id"]))
+    with staged_authorization(store, handled=True):
+        # The coordinator handles the transport interruption itself.
+        coordinator.tick(store.get_job(job["id"]))
     current = store.get_job(job["id"])
-    assert current["status"] == "running" and current["execution_state"] == "awaiting_approval"
+    assert current["status"] == "running" and current["execution_state"] == "awaiting_recovery"
     assert current["skill_runs"] == {"existing-workflow": run}
     approvals = store.approvals(job["id"])
-    assert len(approvals) == 1 and approvals[0]["status"] == "pending"
+    assert len(approvals) == 1 and approvals[0]["status"] == "authorized"
     assert approvals[0]["arguments"] == {"target": "invoices", "x": None, "y": None}
     assert not any(e["kind"] == "action_started" for e in store.events(job["id"]))
     assert len([e for e in store.events(job["id"]) if e["kind"] == "tool_arguments_rejected"]) == 1
@@ -90,7 +92,7 @@ def finish(ctx, job_id):
     while time.monotonic() < deadline:
         d = client.get("/api/jobs/" + job_id).json()
         if d["job"]["status"] == "completed":
-            return d, names
+            return d, [a["name"] for a in d["approvals"] if a["status"] == "executed"]
         assert d["job"]["status"] not in {"failed", "denied", "rejected", "cancelled"}, d["job"]
         for a in d["approvals"]:
             if a["status"] == "pending":
@@ -105,7 +107,6 @@ def test_agent_workflow_has_child_approvals(browser_server):
     r = ctx["client"].post("/api/jobs", json={"invoice_id": "INV-1042"})
     r.raise_for_status()
     job_id = r.json()["id"]
-    assert pending(ctx["client"], job_id)["name"] == "read_skill"
     d, names = finish(ctx, job_id)
     assert names == [
         "read_skill",
@@ -135,10 +136,10 @@ def test_agent_unknown_report(browser_server):
     assert d["job"]["verified_report"]["invoice_id"] == "INV-1043"
 
 
-def test_auto_is_rejected(browser_server):
+def test_strict_is_retired(browser_server):
     assert (
         browser_server["client"]
-        .post("/api/jobs", json={"invoice_id": "INV-1042", "selected_mode": "auto"})
+        .post("/api/jobs", json={"invoice_id": "INV-1042", "selected_mode": "strict"})
         .status_code
         == 422
     )
@@ -164,7 +165,11 @@ def test_learning_accumulates_and_pins(browser_server):
         r.raise_for_status()
         d, names = finish(ctx, r.json()["id"])
         client.post("/api/jobs/" + d["job"]["id"] + "/accept").raise_for_status()
-        return d, names, learning_result(ctx, d["job"]["id"])
+        return (
+            d,
+            [a["name"] for a in d["approvals"] if a["status"] == "executed"],
+            learning_result(ctx, d["job"]["id"]),
+        )
 
     first, names, learn = run("Report the discrepancy without saving", "INV-1042")
     assert learn["status"] == "activated", learn
@@ -239,11 +244,6 @@ def test_runtime_final_verification_needs_approval_when_model_stops_early(store,
         return {"verified": True, "acceptance_required": True}
 
     monkeypatch.setattr(coordinator.skills, "operation", complete)
-    coordinator.tick(store.get_job(job["id"]))
-    assert not verified and store.get_job(job["id"])["status"] == "running"
-    approval = store.approvals(job["id"])[0]
-    assert approval["name"] == "complete"
-    store.decide(approval["id"], {"decision": "approve"}, actor="simulated-staff")
     coordinator.tick(store.get_job(job["id"]))
     assert len(verified) == 1 and store.get_job(job["id"])["status"] == "completed"
     assert store.get_job(job["id"])["operation_trace"][-1]["operation"] == "complete"
@@ -338,7 +338,9 @@ def test_completed_child_workflow_returns_to_agent_for_remaining_work(store, job
     assert all(r["state"] == "completed" for r in current["skill_runs"].values())
     approvals = store.approvals(job["id"])
     assert sum(a["name"] == "run_skill" for a in approvals) == 2
-    assert all(a["status"] == "executed" and a.get("decision") for a in approvals)
+    assert all(
+        a["status"] == "executed" and a.get("authorization") and a.get("decision") is None for a in approvals
+    )
     store.accept(job["id"])
     with store.db() as db:
         evidence, _ = evidence_for(store.learning_episode(db, job["id"]), coordinator.library)

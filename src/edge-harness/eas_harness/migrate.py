@@ -53,6 +53,31 @@ def migrate(old_root, settings):
                             or path.read_text(encoding="utf-8") != contents
                         ):
                             raise ValueError("Legacy resource changed")
+                    if not spec["evidence_ids"]:
+                        # Upgrade only the exact trusted bundled seed; preserve
+                        # the old immutable version as inactive history.
+                        from eas_harness.skill_library import SCOPE
+
+                        library.seed(
+                            {**{k: spec[k] for k in SCOPE}, "app_version": spec["application_version"]}
+                        )
+                        active = next(
+                            (
+                                v
+                                for v in library.metadata()["versions"]
+                                if v["skill_id"] == skill_id and v["active"]
+                            ),
+                            None,
+                        )
+                        if active and active["version"] != version:
+                            report["requalified"].append(
+                                {
+                                    "skill_id": skill_id,
+                                    "version": active["version"],
+                                    "checks": "Trusted bundled seed upgrade",
+                                }
+                            )
+                            continue
                     checks = subprocess_json("eas_harness.admission_process", spec)
                     digest = hashlib.sha256(canonical(spec).encode()).hexdigest()
                     entry = {

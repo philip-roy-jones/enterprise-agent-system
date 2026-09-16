@@ -14,6 +14,7 @@ WORKER_METHODS = {
     "transfer",
     "boundary",
     "proposal",
+    "authorize_operation",
     "approvals",
     "stale_approval",
     "begin_action",

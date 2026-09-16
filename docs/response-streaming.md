@@ -1,5 +1,7 @@
 # Response streaming
 
+> Current execution policy: [digital employees](plans/digital-employees.md) use shadowing / active / paused. Active work uses server authorization without per-operation staff approval. Historical Strict-policy descriptions below remain as background where noted.
+
 The edge consumes LangGraph's public coordinator message chunks while retaining synchronous checkpoints and the same stateful approval interrupts. The model still finishes proposing a tool call before it can reach the execution layer. Streaming text does not approve or execute an action.
 
 Only text from the tagged foreground model node is forwarded. Tool argument fragments, reasoning blocks, and separate judgments are excluded. The first text chunk is sent immediately; subsequent chunks use small transport batches, normally around 50 milliseconds. This is actual model output, without a simulated typing animation. The implementation uses the existing [LangGraph messages and state streaming API](https://docs.langchain.com/oss/python/langgraph/streaming).

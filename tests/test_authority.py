@@ -21,33 +21,38 @@ def proposal(store, job, invocation="one", kind="node"):
     )
 
 
-def test_strict_requires_approval_even_when_ui_is_bypassed(store, job):
+def test_authorization_required_even_when_ui_is_bypassed(store, job):
     with pytest.raises(Stale, match="Approval required"):
         store.begin_action(job["id"], "script", store.lease()["epoch"], "one", {})
 
 
 def test_auto_never_auto_approves_assistant_tools(store, job):
-    with pytest.raises(ValueError, match="Auto mode has been removed"):
-        store.mode(job["id"], "auto")
+    with pytest.raises(ValueError, match="Auto"):
+        store.mode(job["id"], "strict")
     store.boundary(job["id"])
     lease = store.transfer(job["id"], "assistant")
     with pytest.raises(Stale, match="Approval required"):
         store.begin_action(job["id"], "assistant", lease["epoch"], "tool", {})
-    assert store.get_job(job["id"])["effective_mode"] == "strict"
+    assert store.get_job(job["id"])["effective_mode"] == "auto"
 
 
-def test_strict_survives_ownership_changes(store, job):
+def test_auto_retains_authority_checks_across_handoffs(store, job):
     store.transfer(job["id"], "assistant")
     store.transfer(job["id"], "staff")
     store.transfer(job["id"], "script")
-    assert store.boundary(job["id"])["effective_mode"] == "strict"
+    assert store.boundary(job["id"])["effective_mode"] == "auto"
 
 
 @pytest.mark.parametrize("queued", [True, False])
 def test_legacy_auto_jobs_are_retired(store, job, queued):
     with store.db() as db:
         original = store._job(db, job["id"])
-        original.update(selected_mode="auto", effective_mode="auto", status="queued" if queued else "running")
+        original.update(
+            execution_policy=2,
+            selected_mode="auto",
+            effective_mode="auto",
+            status="queued" if queued else "running",
+        )
         store._put(db, original)
         if queued:
             lease = json.loads(db.execute("SELECT data FROM lease").fetchone()[0])
@@ -100,8 +105,17 @@ def test_handoff_invalidates_queued_actions_and_old_epoch(store, job):
 
 
 def test_handoff_refuses_inflight_operation(store, job):
-    a = proposal(store, job)
-    store.decide(a["id"], {"decision": "approve"})
+    a = store.authorize_operation(
+        job["id"],
+        "one",
+        {
+            "kind": "node",
+            "name": "observe_app",
+            "arguments": {},
+            "epoch": store.lease()["epoch"],
+            "observation": {"revision": "current"},
+        },
+    )
     store.begin_action(
         job["id"],
         "script",
@@ -140,7 +154,16 @@ def test_approval_persists_across_reconnect(store, job):
 
 
 def test_invocation_binding_prevents_cross_operation_approval(store, job):
-    a = proposal(store, job)
-    store.decide(a["id"], {"decision": "approve"})
+    a = store.authorize_operation(
+        job["id"],
+        "one",
+        {
+            "kind": "node",
+            "name": "observe_app",
+            "arguments": {},
+            "epoch": store.lease()["epoch"],
+            "observation": {"revision": "current"},
+        },
+    )
     with pytest.raises(Stale, match="mismatch"):
         store.begin_action(job["id"], "script", store.lease()["epoch"], "different", {}, a["id"])

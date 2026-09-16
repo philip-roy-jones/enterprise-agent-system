@@ -131,33 +131,22 @@ class ExecutionLayer:
             operation_spec=operation.public(),
             signature=signature,
         )
-        require = True
-        approval_id = None
-        if require:
-            approval = self.store.proposal(job_id, invocation, proposal)
-            if approval["status"] == "pending":
-                raise Paused(approval["id"])
-            if approval["status"] == "executing":
-                # A crash interrupted this invocation. New authority, fresh state, same business idempotency key.
-                self.store.stale_approval(approval["id"])
-                raise Paused("Reconcile interrupted invocation")
-            if (
-                approval["epoch"] != lease["epoch"]
-                or approval["observation"]["revision"] != observation.revision
-                or approval["signature"] != signature
-            ):
-                self.store.stale_approval(approval["id"])
-                raise Paused("Observation changed; a fresh approval is required")
-            approval_id = approval["id"]
-            arguments = approval.get("corrected_arguments", arguments)
-            # Corrected arguments have the same executable schema as model proposals.
-            try:
-                operation.input_model.model_validate(arguments)
-            except ValidationError as error:
-                raise PermissionError(f"Corrected arguments are outside the {name} contract") from error
-        for field, value in bound_inputs.items():
-            if field in arguments and arguments[field] != value:
-                raise PermissionError(f"Corrected {field} differs from the authorized job")
+        # The historical ledger field is retained; this records employee policy,
+        # never a fabricated human approval or a blanket skill permission.
+        authorization = self.store.authorize_operation(job_id, invocation, proposal)
+        if authorization["status"] == "executing":
+            self.store.stale_approval(authorization["id"])
+            raise Paused("Reconcile interrupted invocation")
+        if authorization["status"] != "authorized":
+            raise PermissionError("Operation lacks current employee authority")
+        if (
+            authorization["epoch"] != lease["epoch"]
+            or authorization["observation"]["revision"] != observation.revision
+            or authorization["signature"] != signature
+        ):
+            self.store.stale_approval(authorization["id"])
+            raise Stale("Observation changed; a fresh authorization is required")
+        approval_id = authorization["id"]
         action = dict(name=name, arguments=arguments, observation_revision=observation.revision)
         self.store.begin_action(job_id, owner, lease["epoch"], invocation, action, approval_id)
         # A primitive click/edit is bound to this exact screen. Composite

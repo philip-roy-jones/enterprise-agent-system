@@ -52,8 +52,9 @@ class Packages:
             self.security.authorize(principal, "admit", spec)
             if not spec["evidence_ids"]:
                 seed = json.loads(files("eas_shared").joinpath("finance_seed.json").read_text())
+                legacy_seed = json.loads(files("eas_shared").joinpath("finance_seed_legacy.json").read_text())
                 body = {k: v for k, v in spec.items() if k not in {*SCOPE, "application_version"}}
-                if body != seed:
+                if body != seed and (body != legacy_seed or item.get("active")):
                     raise PermissionError("Only a registered bundled package may omit teaching evidence")
             if (
                 hashlib.sha256(canonical(spec).encode()).hexdigest() != item["version"]
@@ -66,6 +67,10 @@ class Packages:
                 if any(job[k] != spec[k] for k in SCOPE):
                     raise PermissionError("Publication cannot broaden teaching scope")
                 if self.chat_evidence(principal, evidence_id, spec):
+                    continue
+                if job.get("execution_engine") == "shadow-1":
+                    if not self.demonstration_evidence(principal, job, spec):
+                        raise PermissionError("Demonstration supports admitted guidance only")
                     continue
                 if (
                     any(job[k] != spec[k] for k in SCOPE)
@@ -113,6 +118,34 @@ class Packages:
                     (principal.worker_id, e["skill_id"], e["version"], canonical(e)),
                 )
         return {**metadata, "versions": [{k: v for k, v in e.items() if k != "package"} for e in entries]}
+
+    def demonstration_evidence(self, principal, job, spec):
+        if (
+            spec["steps"]
+            or job["status"] != "completed"
+            or not job.get("accepted")
+            or job.get("acceptance_provenance") != "human_demonstration"
+        ):
+            return False
+        with self.store.db() as db:
+            row = db.execute("SELECT data FROM maintenance WHERE id=?", ("shadow-" + job["id"],)).fetchone()
+        item = json.loads(row[0]) if row else {}
+        result = item.get("result", {})
+        candidate = result.get("candidate")
+        if (
+            item.get("worker_id") != principal.worker_id
+            or item.get("status") != "completed"
+            or result.get("status") != "activated"
+            or not candidate
+        ):
+            return False
+        candidate = SkillSpec.model_validate(candidate).model_dump()
+        return (
+            not candidate["steps"]
+            and job["id"] in candidate["evidence_ids"]
+            and hashlib.sha256(canonical(candidate).encode()).hexdigest() == result.get("version")
+            and all(candidate[k] == spec[k] for k in (*SCOPE, "skill_id", "steps", "amount_labels"))
+        )
 
     def allowed(self, person, item):
         if not person.permits("skills", item):

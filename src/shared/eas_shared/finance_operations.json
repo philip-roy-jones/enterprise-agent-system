@@ -87,9 +87,9 @@
   },
   "assist": {
     "conditions": "Fresh observation; authorized company and invoice",
-    "description": "Ask the supervised assistant to investigate the interruption; every tool requires its own approval",
+    "description": "Ask the assistant to investigate the interruption; every tool requires current authority",
     "desktop": true,
-    "expected": "A proposed resolution with separately approved tools",
+    "expected": "A proposed resolution with separately authorized tools",
     "input_schema": {
       "additionalProperties": false,
       "properties": {
@@ -138,7 +138,7 @@
     "timeout_seconds": 10
   },
   "capture_screen": {
-    "conditions": "Staff approval to read the assigned worker desktop; no record required",
+    "conditions": "Server-authorized read of the assigned worker desktop; no record required",
     "description": "Capture the entire interactive desktop, including other visible windows, for this conversation",
     "desktop": true,
     "expected": "A timestamped screenshot of all monitors; browser fixtures capture only their test viewport",
@@ -1027,14 +1027,14 @@
           "title": "Acceptance Required",
           "type": "boolean"
         },
-        "staff_verified_outcome": {
+        "reported_outcome": {
           "minLength": 1,
-          "title": "Staff Verified Outcome",
+          "title": "Reported Outcome",
           "type": "string"
         }
       },
       "required": [
-        "staff_verified_outcome",
+        "reported_outcome",
         "acceptance_required"
       ],
       "title": "Reviewed",
@@ -1047,7 +1047,7 @@
   },
   "run_skill": {
     "conditions": "Fresh observation; authorized company and invoice",
-    "description": "Start this versioned workflow; each internal operation needs separate approval",
+    "description": "Start this versioned workflow; each internal operation needs separate authorization",
     "desktop": false,
     "expected": "Only this invocation and scope are authorized",
     "input_schema": {
@@ -1373,7 +1373,7 @@
     "conditions": "Unbound conversational request; authorized company and role",
     "description": "Use the disclosed invoice for the work requested in this conversation",
     "desktop": false,
-    "expected": "The request is bound to this invoice; application actions each require their own approval",
+    "expected": "The request is bound to this invoice; application actions each require server authorization",
     "input_schema": {
       "additionalProperties": false,
       "properties": {
@@ -1414,7 +1414,7 @@
     "conditions": "Fresh observation; authorized company and invoice",
     "description": "Enter the disclosed text in a correction draft field",
     "desktop": true,
-    "expected": "Draft field has the approved text",
+    "expected": "Draft field has the validated text",
     "input_schema": {
       "additionalProperties": false,
       "properties": {
@@ -1472,7 +1472,7 @@
     "timeout_seconds": 10
   },
   "share_screenshot": {
-    "conditions": "Previously approved capture in this request; same staff conversation",
+    "conditions": "Previously authorized capture in this request; same staff conversation",
     "description": "Send the disclosed screenshot, caption and annotations to this staff conversation",
     "desktop": false,
     "expected": "An immutable chat attachment; annotations describe the capture, not current application state",

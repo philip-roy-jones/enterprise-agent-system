@@ -8,6 +8,9 @@ version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = ["enterprise-agent-contracts==0.1.0", "fastapi>=0.115", "uvicorn>=0.34", "python-dotenv>=1", "PyJWT[crypto]>=2.12,<3", "argon2-cffi>=23.1,<26", "jsonschema>=4.23,<5", "httpx>=0.28,<1"]
 
+[project.optional-dependencies]
+discord = ["discord.py>=2.6,<3"]
+
 [tool.setuptools]
 include-package-data = false
 
@@ -18,6 +21,7 @@ namespaces = false
 
 [project.scripts]
 enterprise-server = "eas_server.cli:main"
+enterprise-discord = "eas_server.discord_bridge:main"
 
 [tool.setuptools.package-data]
 eas_server = ["frontend/*"]

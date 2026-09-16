@@ -130,7 +130,7 @@ def test_accepted_observation_and_later_negative_feedback_enter_learning(store, 
         "outcome-review",
         "review_discovery",
         args,
-        lambda a: {"staff_verified_outcome": a["assistant_report"], "acceptance_required": True},
+        lambda a: {"reported_outcome": a["assistant_report"], "acceptance_required": True},
     )
     store.update_job(job["id"], {"status": "completed", "result_kind": "reviewed_outcome"})
     store.accept(job["id"])
@@ -139,7 +139,7 @@ def test_accepted_observation_and_later_negative_feedback_enter_learning(store, 
         episode = store.learning_episode(db, job["id"])
     evidence, _ = evidence_for(episode, SkillLibrary(tmp_path))
     assert evidence["kind"] == "guidance" and evidence["steps"] == []
-    assert evidence["verification"]["staff_verified_outcome"] == args["assistant_report"]
+    assert evidence["verification"]["reported_outcome"] == args["assistant_report"]
     assert evidence["approved_actions"][0]["name"] == "observe_app"
     assess_action(
         store,
@@ -275,7 +275,8 @@ def test_judgment_receives_explicit_totals_and_abstention_escalates(store, job, 
 
 def test_judgment_approval_discloses_and_binds_the_exact_model_context(store, job):
     from eas_harness.judgment import judge
-    from eas_harness.errors import Paused
+    from conftest import staged_authorization
+    from eas_shared.types import Stale
 
     class Adapter:
         def observe(self):
@@ -297,21 +298,19 @@ def test_judgment_approval_discloses_and_binds_the_exact_model_context(store, jo
             lambda _: judge(settings, store, store.get_job(job["id"]), store.get_job(job["id"])["expected"]),
         )
 
-    with pytest.raises(Paused):
+    with staged_authorization(store):
         run()
     approval = store.approvals(job["id"])[-1]
     assert approval["inputs"]["judgment"]["context"]["comparison"]["invoice_amount"] == 97500
-    store.decide(approval["id"], {"decision": "approve"}, actor="simulated-staff")
     store.update_job(job["id"], {"expected": {**comparison, "difference": 8000}})
-    with pytest.raises(Paused):
+    with pytest.raises(Stale):
         run()
     assert not any(e["kind"] == "judgment_request" for e in store.events(job["id"]))
     assert store.approvals(job["id"])[-1]["status"] == "stale"
-    with pytest.raises(Paused):
+    with staged_authorization(store):
         run()
     fresh = store.approvals(job["id"])[-1]
-    assert fresh["id"] != approval["id"] and fresh["status"] == "pending"
-    store.decide(fresh["id"], {"decision": "approve"}, actor="simulated-staff")
+    assert fresh["id"] != approval["id"] and fresh["status"] == "authorized"
     run()
     sent = next(e["data"] for e in store.events(job["id"]) if e["kind"] == "judgment_request")
     assert sent["context"] == fresh["inputs"]["judgment"]["context"]
@@ -400,18 +399,30 @@ def test_supporting_file_read_has_its_own_approval(store, job, tmp_path, monkeyp
         InMemorySaver(),
         InMemorySaver(),
     )
-    c.tick(store.get_job(job["id"]))
+    from conftest import staged_authorization
+
+    with staged_authorization(store, handled=True):
+        c.tick(store.get_job(job["id"]))
     a = store.approvals(job["id"])[0]
-    assert a["name"] == "read_skill" and a["status"] == "pending"
+    assert a["name"] == "read_skill" and a["status"] == "authorized"
     assert a["arguments"]["version"] == version
-    store.decide(a["id"], {"decision": "approve"}, actor="simulated-staff")
+    original = store.begin_action
+
+    def stage_resource(*args, **kwargs):
+        if args[4]["name"] == "read_skill_resource":
+            from eas_harness.errors import Paused
+
+            raise Paused("Simulated interruption")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(store, "begin_action", stage_resource)
     c.tick(store.get_job(job["id"]))
-    pending = [a for a in store.approvals(job["id"]) if a["status"] == "pending"]
-    assert len(pending) == 1 and pending[0]["name"] == "read_skill_resource"
-    assert pending[0]["arguments"]["version"] == version
+    records = [a for a in store.approvals(job["id"]) if a["status"] == "authorized"]
+    assert len(records) == 1 and records[0]["name"] == "read_skill_resource"
+    assert records[0]["arguments"]["version"] == version
     assert not any(
         e["kind"] == "agent_tool_result" and e["data"]["name"] == "read_skill_resource"
         for e in store.events(job["id"])
     )
-    store.decide(pending[0]["id"], {"decision": "reject"}, actor="simulated-staff")
-    assert store.get_job(job["id"])["status"] == "rejected"
+    store.stop(job["id"])
+    assert store.approvals(job["id"])[-1]["status"] == "stale"

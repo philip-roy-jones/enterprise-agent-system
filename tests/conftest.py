@@ -6,6 +6,7 @@ import sys
 import time
 import httpx
 import pytest
+from contextlib import contextmanager
 from enterprise_dev.config import Settings
 from eas_server.store import Store
 from eas_shared.types import JobInput
@@ -104,6 +105,11 @@ def server(tmp_path_factory):
     else:
         backend.terminate()
         pytest.fail((data_dir / "backend.log").read_text())
+    client.post(
+        "/api/employees/development-desktop/state",
+        headers={"Authorization": "Bearer test-developer"},
+        json={"state": "active", "reason": "Simulated supervisor activates the controlled test fixture"},
+    ).raise_for_status()
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         executor_port = s.getsockname()[1]
@@ -225,16 +231,43 @@ def pending(client, job_id):
 
 
 def approve_operation(layer, *args, **kwargs):
-    """Explicit simulated staff decision through the real approval ledger."""
+    """Legacy helper name; run through real policy authorization, no fake staff decision."""
+    return layer.run(*args, **kwargs)
+
+
+def create_active_app(settings):
+    """Explicit simulated supervisor activation for tests of active execution."""
+    from eas_server.backend import create_app
+
+    app = create_app(settings)
+    security = app.state.security
+    security.workforce.change(
+        security.get("developer"),
+        "development-desktop",
+        {"state": "active", "reason": "Simulated supervisor; controlled test fixture"},
+    )
+    return app
+
+
+@contextmanager
+def staged_authorization(store, *, handled=False):
+    """Simulate a disconnect between authorization and begin_action, with no effects."""
     from eas_harness.errors import Paused
 
+    original = store.begin_action
+    called = []
+
+    def disconnect(*args, **kwargs):
+        called.append(True)
+        raise Paused("Simulated disconnect before execution")
+
+    store.begin_action = disconnect
     try:
-        return layer.run(*args, **kwargs)
-    except Paused:
-        approval = next(
-            a
-            for a in layer.store.approvals(args[0])
-            if a["status"] == "pending" and a["invocation"] == args[1]
-        )
-        layer.store.decide(approval["id"], {"decision": "approve"}, actor="simulated-staff")
-        return layer.run(*args, **kwargs)
+        if handled:
+            yield
+            assert called, "Fixture did not reach the execution boundary"
+        else:
+            with pytest.raises(Paused):
+                yield
+    finally:
+        store.begin_action = original

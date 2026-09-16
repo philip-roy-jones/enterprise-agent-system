@@ -45,6 +45,7 @@ ARITY = {
     "transfer": (2, 3),
     "boundary": (1, 1),
     "proposal": (3, 3),
+    "authorize_operation": (3, 3),
     "approvals": (1, 1),
     "stale_approval": (1, 1),
     "begin_action": (5, 6),
@@ -106,6 +107,15 @@ EXECUTOR_UPDATES = PLANNER_UPDATES | {
 }
 RESERVED_EVENTS = {
     "job_created",
+    "operation_authorized",
+    "employee_stopped",
+    "shadow_started",
+    "shadow_observation",
+    "shadow_notes",
+    "shadow_model_call",
+    "shadow_unavailable",
+    "mentor_message",
+    "mentor_outcome",
     "record_selected",
     "approval_policy_migrated",
     "worker_restarted",
@@ -165,6 +175,8 @@ def install_worker_api(app, security):
             "id": p.id,
             "kind": p.kind,
             "worker_id": p.worker_id,
+            "employee_id": p.worker_id,
+            "employee": security.workforce.get(p.worker_id),
             "protocol": 2,
             "environment_revision": environment_revision(p),
         }
@@ -220,11 +232,12 @@ def install_worker_api(app, security):
             if lease.get("job_id") != job_id:
                 raise HTTPException(404, "Assignment is no longer current")
             if not receipt:
+                security.workforce.guard(p.worker_id)
+                if job.get("execution_engine") == "shadow-1":
+                    raise HTTPException(403, "Observation-only demonstration")
                 requester = security.get(job["staff_id"])
                 security.request(requester, job)
-                for a in store.approvals(job_id):
-                    if a["status"] == "executing":
-                        security.authorize(security.get(a["decision"]["actor"]), "approve", job)
+
         return job
 
     def validate_proposal(job, proposal):
@@ -273,6 +286,7 @@ def install_worker_api(app, security):
             "update_job": [1],
             "event": [2],
             "proposal": [2],
+            "authorize_operation": [2],
             "begin_action": [4],
             "finish_action": [2],
             "report_capability_gap": [1],
@@ -293,6 +307,9 @@ def install_worker_api(app, security):
         ):
             raise HTTPException(403, "Invalid service ownership transition")
         if method == "claim":
+            security.workforce.sync()
+            if security.workforce.get(p.worker_id)["state"] != "active":
+                return None
             # The caller's process nonce never determines its authenticated machine identity.
             authorized_scope = scope(p, "execute")
 
@@ -318,7 +335,10 @@ def install_worker_api(app, security):
         if method == "lease":
             lease = store.lease()
             if lease.get("job_id"):
-                assigned(p, lease["job_id"])
+                job = store.get_job(lease["job_id"])
+                if not p.permits("execute", job) or job.get("desktop_id") != p.worker_id:
+                    raise HTTPException(404, "Desktop unavailable")
+                lease = {**lease, "job_status": job["status"]}
             return lease
         if method == "learning_claim":
             return store.learning_claim(
@@ -376,6 +396,7 @@ def install_worker_api(app, security):
                 }
             invocation_index = {
                 "proposal": 1,
+                "authorize_operation": 1,
                 "begin_action": 3,
                 "begin_window_recovery": 3,
                 "finish_action": 1,
@@ -389,6 +410,8 @@ def install_worker_api(app, security):
             if method == "package_access":
                 return security.packages.get(p, job, args[1], args[2])
             if method == "proposal":
+                raise HTTPException(410, "Human action approvals are retired")
+            if method == "authorize_operation":
                 validate_proposal(job, args[2])
             if method == "event":
                 if isinstance(args[1], str) and args[1] in {
@@ -486,7 +509,9 @@ def install_worker_api(app, security):
         if p.kind != "executor":
             raise HTTPException(403, "Executor identity required")
         job_id = request.headers.get("x-eas-job")
-        assigned(p, job_id)
+        shadow = security.workforce.shadow(p, job_id)
+        if not shadow:
+            assigned(p, job_id)
         data = await request.body()
         if len(data) > 5_000_000 or not data.startswith(b"\x89PNG\r\n\x1a\n"):
             raise ValueError("A PNG below 5 MB is required")

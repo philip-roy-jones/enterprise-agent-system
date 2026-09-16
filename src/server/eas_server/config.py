@@ -9,6 +9,7 @@ load_dotenv(Path(os.getenv("EAS_ENV_FILE", ".env")))
 
 @dataclass
 class Settings:
+    discord_channels_file: str = os.getenv("EAS_DISCORD_CHANNELS_FILE", "")
     auth_mode: str = os.getenv("EAS_AUTH_MODE", "development")
     identity_file: str = os.getenv("EAS_IDENTITY_FILE", "")
     public_url: str = os.getenv("EAS_PUBLIC_URL", "http://127.0.0.1:8000")

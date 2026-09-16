@@ -40,8 +40,8 @@ class ExecutionGrants:
         job_id, owner, epoch, invocation, action, approval_id = args
         job = self.store.check(job_id, owner, epoch)
         a = next((a for a in self.store.approvals(job_id) if a["id"] == approval_id), None)
-        if not a or a["status"] not in {"approved", "corrected"} or a["invocation"] != invocation:
-            raise Stale("An available staff approval is required")
+        if not a or a["status"] != "authorized" or a["invocation"] != invocation:
+            raise Stale("Current employee policy authorization is required")
         if (
             action
             != {
@@ -51,7 +51,7 @@ class ExecutionGrants:
             }
             or a["epoch"] != epoch
         ):
-            raise Stale("Action differs from the approved operation")
+            raise Stale("Action differs from the authorized operation")
         from eas_server.worker_api import contracts_for
         from jsonschema import Draft202012Validator
 
@@ -63,7 +63,7 @@ class ExecutionGrants:
         ):
             raise Stale("Operation contract or permission changed")
         if not Draft202012Validator(contract["input_schema"]).is_valid(action["arguments"]):
-            raise Stale("Approved arguments do not satisfy the operation contract")
+            raise Stale("Authorized arguments do not satisfy the operation contract")
         targets = {
             **job.get("inputs", {}),
             **{
@@ -73,22 +73,28 @@ class ExecutionGrants:
         }
         for field, target in targets.items():
             if field in action["arguments"] and target is not None and action["arguments"][field] != target:
-                raise Stale("Approved target is outside the request's scope")
+                raise Stale("Authorized target is outside the request's scope")
         if action["name"] in {"read_skill", "read_skill_resource", "run_skill"}:
             package = self.security.packages.get(
                 p, job, action["arguments"]["skill_id"], action["arguments"]["version"]
             )
             if action["name"] != "read_skill_resource" and not package.get("active"):
                 raise Stale("Skill was suspended before execution")
-        approver = self.security.get(a["decision"]["actor"])
-        self.security.authorize(approver, "approve", job)
+        authority = a.get("authorization", {})
+        if authority.get("kind") != "employee_policy" or authority.get("employee_id") != p.worker_id:
+            raise Stale("Operation lacks this employee authority")
+        employee = self.security.workforce.guard(
+            p.worker_id, expected_revision=authority["employee_revision"]
+        )
         now = int(time.time())
         payload = dict(
             iss="enterprise-agent-system",
             aud=p.id,
             worker_id=p.worker_id,
             sub=job["staff_id"],
-            approver=approver.id,
+            actor=employee["id"],
+            authorization="employee_policy",
+            employee_revision=employee["revision"],
             iat=now,
             exp=now + 30,
             jti=secrets.token_hex(16),
@@ -146,6 +152,9 @@ class ExecutionGrants:
             raise Stale("Execution grant scope changed")
 
         def consume(db, job, lease):
+            self.security.workforce.guard(
+                p.worker_id, db=db, expected_revision=payload.get("employee_revision")
+            )
             if (
                 payload.get("skill_bindings") != self.bindings(job)
                 or payload["policy"] != self.security.revision()

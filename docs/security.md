@@ -1,5 +1,7 @@
 # Authorization and worker security
 
+> Current execution policy: [digital employees](plans/digital-employees.md) use shadowing / active / paused. Active work uses server authorization without per-operation staff approval. Historical Strict-policy descriptions below remain as background where noted.
+
 This is prototype security engineering, not an enterprise-readiness claim. The [implementation plan](plans/security-boundaries-and-authorization.md) defines the threat model; the [validation record](security-validation.md) distinguishes automated checks, actual Windows probes, and untested deployments.
 
 ## Authority and access

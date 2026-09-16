@@ -18,7 +18,7 @@ def secured(tmp_path):
     for name, kind, actions, worker in [
         ("alice", "human", ["request", "read", "approve", "control", "accept", "skills"], None),
         ("bob", "human", ["request", "read", "approve", "control", "accept", "skills"], None),
-        ("reviewer", "human", ["read", "approve"], None),
+        ("reviewer", "human", ["read", "approve", "supervise"], None),
         ("sales", "human", ["request", "read"], None),
         ("exec-a", "executor", ["execute"], "desktop-a"),
         ("exec-b", "executor", ["execute"], "desktop-b"),
@@ -47,6 +47,12 @@ def secured(tmp_path):
     policy.write_text(json.dumps({"principals": people}))
     app = create_app(Settings(data_dir=tmp_path, identity_file=str(policy), desktop_adapter="browser"))
     client = TestClient(app)
+    for worker in ("desktop-a", "desktop-b"):
+        app.state.security.workforce.change(
+            app.state.security.get("reviewer"),
+            worker,
+            {"state": "active", "reason": "Simulated supervisor activates test employee"},
+        )
 
     def headers(who):
         return {"Authorization": "Bearer test-" + who, "X-EAS-Protocol": "2"}
@@ -59,7 +65,11 @@ def secured(tmp_path):
 
 def new_job(secured, who="alice"):
     _, client, headers, _, _ = secured
-    response = client.post("/api/jobs", headers=headers(who), json={"invoice_id": "INV-1042"})
+    response = client.post(
+        "/api/jobs",
+        headers=headers(who),
+        json={"invoice_id": "INV-1042", "employee_id": "desktop-b" if who == "bob" else "desktop-a"},
+    )
     response.raise_for_status()
     return response.json()
 
@@ -83,12 +93,9 @@ def proposed(secured):
         expected=op["expected"],
     )
     invocation = job["id"] + ":call-1"
-    a = rpc("exec-a", "proposal", job["id"], invocation, proposal)
+    a = rpc("exec-a", "authorize_operation", job["id"], invocation, proposal)
     a.raise_for_status()
     approval = a.json()
-    client.post(
-        "/api/approvals/" + approval["id"], headers=headers("alice"), json={"decision": "approve"}
-    ).raise_for_status()
     args = [
         job["id"],
         lease["owner"],
@@ -413,3 +420,18 @@ def test_public_response_chunks_are_assignment_bound_and_bounded(secured):
     )
     assert client.get(f"/api/jobs/{job['id']}/stream", headers=headers("bob")).status_code == 404
     assert client.get(f"/api/jobs/{job['id']}/stream", headers=headers("sales")).status_code == 404
+
+
+def test_pause_revokes_unused_grant_and_resume_cannot_resurrect_it(secured):
+    app, c, h, rpc, _ = secured
+    job, args = proposed(secured)
+    grant = c.post("/api/execution/grant", headers=h("exec-a"), json={"args": args}).json()["grant"]
+    for mode in ("paused", "active"):
+        c.post(
+            "/api/employees/desktop-a/state",
+            headers=h("reviewer"),
+            json={"state": mode, "reason": "Simulated supervisor revocation test"},
+        ).raise_for_status()
+        assert rpc("exec-a", "begin_action", *args, grant=grant).status_code >= 400
+    assert app.state.store.get_job(job["id"])["status"] == "cancelled"
+    assert app.state.store.lease().get("inflight") is None

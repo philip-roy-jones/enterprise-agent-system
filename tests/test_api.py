@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from eas_server.backend import create_app
+from conftest import create_active_app as create_app
 from eas_server.config import Settings
 import pytest
 
@@ -38,7 +38,7 @@ def test_default_mode_and_scoped_permissions(tmp_path):
         headers={"Authorization": "Bearer local-staff-demo"},
     )
     job = client.post("/api/jobs", json={"invoice_id": "INV-1042"}).json()
-    assert job["selected_mode"] == job["effective_mode"] == "strict"
+    assert job["selected_mode"] == job["effective_mode"] == "auto"
     assert (
         client.post("/api/jobs", json={"invoice_id": "INV-1042", "permissions": ["admin"]}).status_code == 403
     )

@@ -137,7 +137,7 @@ class Completed(Contract):
 
 
 class Reviewed(Contract):
-    staff_verified_outcome: str = Field(min_length=1)
+    reported_outcome: str = Field(min_length=1)
     acceptance_required: Literal[True]
 
 

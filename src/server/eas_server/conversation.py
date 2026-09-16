@@ -52,7 +52,20 @@ class Conversation:
                         and previous["created_at"] < job["created_at"]
                         and all(
                             previous.get(k) == job.get(k)
-                            for k in ("organization_id", "department_id", "role_id", "company_id", "staff_id")
+                            for k in (
+                                "organization_id",
+                                "department_id",
+                                "role_id",
+                                "company_id",
+                                "employee_id",
+                            )
+                        )
+                        and (
+                            previous.get("staff_id") == job.get("staff_id")
+                            or (
+                                (job.get("communication") or {}).get("kind") == "discord"
+                                and previous.get("communication") == job.get("communication")
+                            )
                         )
                     ):
                         turn = {k: previous[k] for k in ("id", "task", "record_id", "status")}
@@ -73,8 +86,10 @@ class Conversation:
                 "revision": messages[-1]["seq"] if messages else 0,
             }
 
-    def message(self, job_id, message):
+    def message(self, job_id, message, *, actor=None):
         message = StaffMessage.model_validate(message).model_dump()
+        if actor is not None:
+            message["actor"] = actor
         if not message["text"].strip():
             raise ValueError("Message cannot be blank")
         with self.store.db() as db:

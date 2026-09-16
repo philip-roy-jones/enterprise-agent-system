@@ -95,7 +95,7 @@ def serve():
             if response.exists():
                 continue
             try:
-                if path.is_symlink() or path.stat().st_size > 100000:
+                if path.is_symlink() or path.stat().st_size > 600000:
                     raise ValueError("Invalid learner request")
                 payload = json.loads(path.read_text(encoding="utf-8"))
                 result = subprocess_json(

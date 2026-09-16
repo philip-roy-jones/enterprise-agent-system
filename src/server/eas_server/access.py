@@ -30,7 +30,7 @@ def install_access(app, security):
             token = current.set(p)
             if p.kind != "human":
                 desktop_token = desktop_context.set(p.worker_id)
-            if path.startswith("/api/worker") or path.startswith("/api/execution"):
+            if path.startswith(("/api/worker", "/api/execution", "/api/employee-observation")):
                 if p.kind == "human":
                     raise HTTPException(403, "Service identity required")
                 if request.headers.get("x-eas-protocol") != "2":

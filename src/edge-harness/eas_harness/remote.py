@@ -35,6 +35,9 @@ class RemoteStore:
                         algorithms=["EdDSA"],
                         audience=grant["audience"],
                         issuer="enterprise-agent-system",
+                        # Small cross-machine clock skew only. The server still
+                        # consumes the grant against its own clock with no grace.
+                        leeway=2,
                     )
                     if claims["job_id"] != args[0] or claims["invocation"] != args[3]:
                         raise PermissionError("Grant differs from the requested invocation")

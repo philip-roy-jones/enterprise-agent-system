@@ -1,4 +1,4 @@
-"""Operator live evaluation; all approvals are explicitly simulated staff."""
+"""Operator live evaluation; outcome assessments and acceptance use explicitly simulated staff."""
 
 import argparse
 import json
@@ -23,7 +23,7 @@ def main(argv=None):
     p.add_argument("--no-learn", action="store_true")
     a = p.parse_args(argv)
     if not a.simulate_staff:
-        p.error("--simulate-staff is required; this driver submits synthetic staff decisions")
+        p.error("--simulate-staff is required; this driver submits synthetic staff outcome assessments")
     if not a.name.replace("-", "").replace("_", "").isalnum():
         p.error("Use a simple evaluation name")
     s = Settings()
@@ -34,7 +34,14 @@ def main(argv=None):
     client = httpx.Client(
         base_url=s.backend_url, headers={"Authorization": "Bearer " + s.developer_token}, timeout=25
     )
-    response = client.post("/api/jobs", json={"invoice_id": a.invoice, "task": a.task})
+    response = client.post(
+        "/api/jobs",
+        json={
+            "invoice_id": a.invoice,
+            "task": a.task,
+            "permissions": ["read", "navigate", "draft"] if a.kind == "correction" else ["read", "navigate"],
+        },
+    )
     response.raise_for_status()
     jid = response.json()["id"]
     print("Request", a.name, jid, flush=True)
@@ -50,43 +57,6 @@ def main(argv=None):
         job = data["job"]
         if job["status"] in {"completed", "failed", "denied", "rejected", "cancelled"}:
             break
-        for approval in data["approvals"]:
-            if approval["status"] != "pending":
-                continue
-            name = approval["name"]
-            arguments = approval["arguments"]
-            allowed = a.kind == "correction" or name not in {"prepare", "save", "save_draft", "set_field"}
-            if name == "run_skill" and a.kind != "correction":
-                status = client.get("/api/learning").json()
-                spec = next(
-                    (
-                        v
-                        for r in status["registries"]
-                        for v in r["versions"]
-                        if v["skill_id"] == arguments["skill_id"] and v["version"] == arguments["version"]
-                    ),
-                    None,
-                )
-                allowed = bool(spec and "save" not in spec["steps"])
-            decision = {
-                "decision": "approve" if allowed else "reject",
-                "explanation": "Simulated staff decision for synthetic longitudinal evaluation; scope checked by test driver.",
-            }
-            if allowed and a.kind == "correction" and name == "set_field" and job.get("expected"):
-                expected = job["expected"]
-                desired = (
-                    f"{expected['amount'] / 100:.2f}" if arguments["field"] == "amount" else expected["note"]
-                )
-                if arguments["value"] != desired:
-                    decision.update(
-                        decision="correct",
-                        arguments={**arguments, "value": desired},
-                        explanation="Simulated staff correction: use the verified purchase-order amount as dollars in the visible amount field, and preserve the verified explanation and unique request reference.",
-                    )
-            r = client.post("/api/approvals/" + approval["id"], json=decision)
-            if r.status_code not in {200, 409}:
-                r.raise_for_status()
-            print("Simulated staff", name, decision["decision"], flush=True)
         if any(q["status"] == "pending" for q in data["conversation"]["questions"]):
             failure = "Unscripted staff question"
             client.post(f"/api/jobs/{jid}/cancel").raise_for_status()
@@ -224,12 +194,14 @@ def main(argv=None):
         "learning": learning,
         "judgments": [e for e in data["events"] if e["kind"].startswith("judgment_")],
         "metrics": {
-            "approval_requests": len(data["approvals"]),
+            "policy_authorizations": len(data["approvals"]),
             "executed_operations": len(executed),
-            "approval_coverage": all(
-                x.get("decision", {}).get("decision") in {"approve", "correct"} for x in executed
+            "authorization_coverage": all(
+                x.get("authorization", {}).get("kind") == "employee_policy" for x in executed
             ),
-            "staff_corrections": sum(x.get("decision", {}).get("decision") == "correct" for x in executed),
+            "staff_corrections": sum(
+                (x.get("decision") or {}).get("decision") == "correct" for x in executed
+            ),
             "teaching_messages": bool(a.guidance),
             "recoveries": len(recoveries),
             "repeated_mistakes": sum(max(0, n - 1) for n in reasons.values()),

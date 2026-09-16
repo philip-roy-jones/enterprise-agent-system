@@ -8,7 +8,7 @@ from enterprise_dev.config import Settings
 from eas_harness.execution import ExecutionLayer
 from test_assistant import BatchModel, ReadAdapter
 from fastapi.testclient import TestClient
-from eas_server.backend import create_app
+from conftest import create_active_app as create_app
 
 from eas_server.conversation import Conversation
 from eas_shared.types import JobInput, Stale, Stopped
@@ -18,7 +18,7 @@ def ask_approved(store, job, question="Which explanation should the draft includ
     store.transfer(job["id"], "assistant")
     epoch = store.lease()["epoch"]
     args = {"question": question}
-    approval = store.proposal(
+    approval = store.authorize_operation(
         job["id"],
         "question-tool",
         {
@@ -29,7 +29,6 @@ def ask_approved(store, job, question="Which explanation should the draft includ
             "observation": {"revision": "fixture"},
         },
     )
-    store.decide(approval["id"], {"decision": "approve"})
     store.begin_action(
         job["id"],
         "assistant",
@@ -68,7 +67,7 @@ def test_question_and_answer_survive_reconnect_and_duplicate_submission(store, j
     assert len(restored["messages"]) == 1
     assert restored["questions"][0]["answer"] == message["text"]
     assert restored["questions"][0]["status"] == "answered"
-    assert store.get_job(job["id"])["effective_mode"] == "strict"
+    assert store.get_job(job["id"])["effective_mode"] == "auto"
     with pytest.raises(Stale):
         Conversation(store).message(job["id"], message | {"text": "Different content"})
 
@@ -90,7 +89,7 @@ def test_late_answer_does_not_revive_cancelled_job(store, job):
 
 
 def test_staff_guidance_invalidates_queued_proposals_without_approving_them(store, job):
-    approval = store.proposal(
+    approval = store.authorize_operation(
         job["id"],
         "pending",
         {
@@ -150,12 +149,6 @@ def test_agent_question_waits_without_model_calls_then_resumes_with_staff_answer
 
     result = run_assistant(agent(), {}, "question-flow", store, job["id"])
     assert result.get("__interrupt__")
-    assert Conversation(store).read(job["id"])["questions"] == []
-    approval = store.approvals(job["id"])[0]
-    assert approval["name"] == "ask_staff"
-    store.decide(approval["id"], {"decision": "approve"})
-    result = run_assistant(agent(), {}, "question-flow", store, job["id"])
-    assert result.get("__interrupt__")
     question = Conversation(store).read(job["id"])["questions"][0]
     assert question["status"] == "pending" and store.get_job(job["id"])["model_calls"] == 1
     assert run_assistant(agent(), {}, "question-flow", store, job["id"]).get("__interrupt__")
@@ -185,8 +178,10 @@ def test_new_guidance_discards_queued_tools_and_reaches_the_next_model_turn(stor
         job["id"],
         "guidance",
     )
-    assert run_assistant(agent, {}, "guidance", store, job["id"]).get("__interrupt__")
-    store.decide(store.approvals(job["id"])[0]["id"], {"decision": "approve"})
+    from conftest import staged_authorization
+
+    with staged_authorization(store, handled=True):
+        assert run_assistant(agent, {}, "guidance", store, job["id"]).get("__interrupt__")
     Conversation(store).message(job["id"], {"text": "Reconsider the proposed actions before proceeding."})
     result = run_assistant(agent, {}, "guidance", store, job["id"])
     assert not result.get("__interrupt__") and not adapter.executed

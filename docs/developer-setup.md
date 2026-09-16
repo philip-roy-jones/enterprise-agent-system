@@ -171,3 +171,19 @@ PYTHON
 Open that protected file's link, set a password and sign in. Delete the consumed link file before issuing a replacement. This setup preserves the fixture's staff identity and conversation history. `/mock` is the synthetic browser accounting workspace; it is disabled on the ordinary server/edge installation.
 
 This trusted developer fixture uses integrated edge execution. It tests graphs, approvals and recovery; it does not establish the Windows account boundary. Cross-process security regression tests separately exercise the planner/executor protocol with synthetic identities.
+
+## Employee lifecycle and migration
+
+New and migrated worker registrations appear as digital employees in **shadowing**. The existing executor, planner and admission credentials identify services of that employee; they cannot log in as humans or change lifecycle state. Human supervisors use the existing email/password login. Add `supervise` only to the intended supervisor's grants for the employee's environment; ordinary request access does not confer promotion rights.
+
+In the console, select the employee and start a demonstration by describing the task. The mentor operates **that employee's computer**, using the VM console or remote desktop. Keep that same OS session visible and unlocked. The observer never opens or focuses applications to get a better view. Start/finish are explicit capture controls; pausing the employee also stops capture. The observer may ask questions in chat. Under **Manage employee**, activation requires a supervisor's readiness rationale. Skills and observer notes cannot promote the employee.
+
+Windows uses the protected controller's screenshot endpoint. Linux requires a provisioned X11 session and executor access to its `DISPLAY`/`XAUTHORITY`; a headless worker reports capture unavailable. The browser fixture is explicitly a test viewport. No OS login, application account, permission setting, or remote desktop service is created by this feature.
+
+Upgrade the server, shared contracts and all edge packages together, including the isolated learner's installation. `Pillow` is now a harness dependency for bounded observer images. Stop/drain old worker processes before deployment. Historical unfinished requests are cancelled; their approvals and uncertain-write receipts are retained. Existing employees start in shadowing and require explicit supervisor activation. Changed trusted dependencies require existing learned packages to be requalified with the existing maintenance/migration procedure. Never reclassify previous human approvals as automatic policy decisions.
+
+The legacy database table and some protocol fields retain the name `approvals` for historical compatibility. New records have `authorization.kind=employee_policy`, `decision=null`, and an employee revision; they are not fabricated human approvals. Every actual operation still consumes an exact, short-lived server grant. Pausing revokes subsequent effects but cannot undo an external side effect already committed; an in-flight write must still be reconciled.
+
+Keep server and worker clocks synchronized (Windows Time or an equivalent NTP service). Grants are short-lived. The edge allows two seconds of clock difference during its preliminary signature check; authoritative expiry and one-time consumption remain enforced on the server without grace. A clock failure stops the operation rather than bypassing authorization.
+
+For private team communication, see [Discord setup](discord.md). The optional bridge runs on the server, not inside each employee's VM. Future MCP Apps support is described in the [digital-employee plan](plans/digital-employees.md#future-mcp-apps-direction-not-implemented-in-this-delivery).

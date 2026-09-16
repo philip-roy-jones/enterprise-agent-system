@@ -92,6 +92,10 @@ class Security:
         from eas_server.accounts import Accounts
 
         self.accounts = Accounts(self)
+        from eas_server.employees import Workforce
+
+        self.workforce = Workforce(self)
+        store.workforce = self.workforce
 
     def registry(self):
         if self.path:

@@ -172,7 +172,7 @@ class LearningStore:
                     )
                 db.execute("UPDATE maintenance SET data=? WHERE id=?", (canonical(item), row["id"]))
                 if item["status"] == "running":
-                    if item["kind"] in {"learn", "review", "chat_review"}:
+                    if item["kind"] in {"learn", "review", "chat_review", "shadow_review"}:
                         job = self._job(db, item["job_id"])
                         item["episode"] = self.learning_episode(db, job["id"])
                         item["related"] = [

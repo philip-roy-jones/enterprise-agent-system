@@ -88,12 +88,14 @@ class Store(LearningStore):
 
         role = get_role(inputs.get("role_id", "invoice_correction"))
         inputs = role.normalize(inputs, allow_unbound=ongoing)
-        if inputs.get("selected_mode", "strict") != "strict":
-            raise ValueError("Auto mode has been removed; staff approval is required")
-        inputs["selected_mode"] = "strict"
+        if inputs.get("selected_mode", "auto") != "auto":
+            raise ValueError("Auto is the only execution policy; use employee shadowing for onboarding")
+        inputs["selected_mode"] = "auto"
         inputs["staff_id"] = staff_id
         request_fields = (
             "conversation_id",
+            "communication",
+            "employee_id",
             "staff_id",
             "task",
             "organization_id",
@@ -132,6 +134,7 @@ class Store(LearningStore):
                 effective_mode=inputs["selected_mode"],
                 controller="script",
                 execution_engine="agent-led-1",
+                execution_policy=3,
                 conversation_request=ongoing,
                 request_payload=request_payload,
                 created_at=time.time(),
@@ -144,7 +147,9 @@ class Store(LearningStore):
                 expected=None,
                 mutation="not_attempted",
                 model_mode=model_mode,
-                app_version="demobooks-windows-1"
+                app_version="campaign-desk-1"
+                if role.id == "campaign_review"
+                else "demobooks-windows-1"
                 if inputs.get("application") == "DemoBooks Desktop (Windows)"
                 else "mock-1",
                 accepted=False,
@@ -252,8 +257,8 @@ class Store(LearningStore):
             job = self._job(db, job_id)
             if job["status"] in TERMINAL:
                 raise Stopped(job["status"])
-            if "effective_mode" in updates and updates["effective_mode"] != "strict":
-                raise ValueError("Only Strict approval is supported")
+            if "effective_mode" in updates and updates["effective_mode"] != "auto":
+                raise ValueError("Auto is the only execution policy")
             job.update(updates)
             if job["status"] in TERMINAL:
                 self._invalidate(db, job_id)
@@ -312,14 +317,15 @@ class Store(LearningStore):
     def _invalidate(self, db, job_id):
         for row in db.execute("SELECT id,data FROM approvals WHERE job_id=?", (job_id,)).fetchall():
             a = json.loads(row["data"])
-            if a["status"] in {"pending", "approved", "corrected"}:
+            if a["status"] in {"pending", "approved", "corrected", "authorized"}:
                 a["status"] = "stale"
                 db.execute("UPDATE approvals SET data=? WHERE id=?", (canonical(a), row["id"]))
 
     def claim(self, worker_id, scope=None):
         def authorized(job):
             return scope is None or (
-                job["organization_id"] == scope["organization_id"]
+                (not job.get("employee_id") or job["employee_id"] == desktop_context.get())
+                and job["organization_id"] == scope["organization_id"]
                 and job["role_id"] in scope["role_ids"]
                 and ("predicate" not in scope or scope["predicate"](job))
             )
@@ -335,14 +341,19 @@ class Store(LearningStore):
                     return None
                 if job["status"] not in TERMINAL:
                     if (
-                        job.get("selected_mode") != "strict"
-                        or job.get("effective_mode") != "strict"
-                        or job.get("pending_mode") == "auto"
+                        job.get("selected_mode") != "auto"
+                        or job.get("effective_mode") != "auto"
+                        or job.get("execution_policy") != 3
                     ):
-                        job.update(status="cancelled", error="Auto mode retired; submit a new Strict request")
+                        job.update(
+                            status="cancelled",
+                            error="Historical execution policy retired; submit a new Auto request",
+                        )
                         self._invalidate(db, job["id"])
                         self._put(db, job)
-                        self._event(db, job["id"], "approval_policy_migrated", {"policy": "strict"})
+                        self._event(
+                            db, job["id"], "approval_policy_migrated", {"policy": "auto", "version": 3}
+                        )
                         return None
                     if not authorized(job):
                         return None
@@ -370,13 +381,15 @@ class Store(LearningStore):
             if job is None:
                 return None
             if (
-                job.get("selected_mode") != "strict"
-                or job.get("effective_mode") != "strict"
-                or job.get("pending_mode") == "auto"
+                job.get("selected_mode") != "auto"
+                or job.get("effective_mode") != "auto"
+                or job.get("execution_policy") != 3
             ):
-                job.update(status="cancelled", error="Auto mode retired; submit a new Strict request")
+                job.update(
+                    status="cancelled", error="Historical execution policy retired; submit a new Auto request"
+                )
                 self._put(db, job)
-                self._event(db, job["id"], "approval_policy_migrated", {"policy": "strict"})
+                self._event(db, job["id"], "approval_policy_migrated", {"policy": "auto", "version": 3})
                 return None
             job.update(status="running", execution_state="running", started_at=time.time())
             if lease.get("desktop_id"):
@@ -467,6 +480,10 @@ class Store(LearningStore):
             return job
 
     def _check(self, job, lease, owner, epoch):
+        if job.get("execution_engine") == "shadow-1":
+            raise Stopped("Shadowing cannot execute business operations")
+        if job.get("execution_policy") != 3:
+            raise Stopped("Historical execution policy cannot resume")
         if job["status"] in TERMINAL:
             raise Stopped(job["status"])
         if job["started_at"] and time.time() - job["started_at"] > job["timeout"]:
@@ -494,14 +511,14 @@ class Store(LearningStore):
             self._invalidate(db, job_id)
             lease.update(owner=owner, epoch=lease["epoch"] + 1, expires=time.time() + 30)
             self._set_lease(db, lease)
-            job.update(controller=owner, effective_mode="strict")
+            job.update(controller=owner, effective_mode="auto")
             self._put(db, job)
             self._event(db, job_id, "control_transferred", dict(owner=owner, epoch=lease["epoch"]))
             return lease
 
     def mode(self, job_id, mode):
-        if mode != "strict":
-            raise ValueError("Auto mode has been removed; staff approval is required")
+        if mode != "auto":
+            raise ValueError("Auto is the only execution policy")
         with self.db() as db:
             job = self._job(db, job_id)
             if job["status"] in TERMINAL:
@@ -514,7 +531,9 @@ class Store(LearningStore):
     def boundary(self, job_id):
         with self.db() as db:
             job = self._job(db, job_id)
-            job.update(selected_mode="strict", effective_mode="strict", pending_mode=None)
+            if job.get("execution_policy") != 3 or job.get("execution_engine") == "shadow-1":
+                raise Stopped("Request is not authorized for autonomous execution")
+            job.update(selected_mode="auto", effective_mode="auto", pending_mode=None)
             self._put(db, job)
             return job
 
@@ -528,6 +547,46 @@ class Store(LearningStore):
             self._invalidate(db, job_id)
             self._event(db, job_id, status, {})
             return job
+
+    def authorize_operation(self, job_id, invocation, proposal, *, employee=None):
+        """Record policy authorization; never synthesize a human decision."""
+        with self.db() as db:
+            job = self._job(db, job_id)
+            lease = self._lease(db, job)
+            self._check(job, lease, lease["owner"], proposal["epoch"])
+            if lease["owner"] == "staff":
+                raise Stale("Staff has desktop control")
+            if hasattr(self, "workforce"):
+                employee = self.workforce.guard(job.get("desktop_id"), db=db)
+            for row in db.execute(
+                "SELECT data FROM approvals WHERE job_id=? AND invocation=? ORDER BY rowid DESC",
+                (job_id, invocation),
+            ):
+                previous = json.loads(row[0])
+                if previous["status"] in {"authorized", "executing"}:
+                    return previous
+            record = dict(
+                proposal,
+                id=uid(),
+                job_id=job_id,
+                invocation=invocation,
+                status="authorized",
+                created_at=time.time(),
+                decision=None,
+                executed_action=None,
+                observed_result=None,
+                authorization={
+                    "kind": "employee_policy",
+                    "employee_id": employee["id"] if employee else job.get("desktop_id", "local-fixture"),
+                    "employee_revision": employee["revision"] if employee else 0,
+                    "requested_by": job["staff_id"],
+                },
+            )
+            db.execute(
+                "INSERT INTO approvals VALUES(?,?,?,?)", (record["id"], job_id, invocation, canonical(record))
+            )
+            self._event(db, job_id, "operation_authorized", record)
+            return record
 
     def proposal(self, job_id, invocation, proposal):
         with self.db() as db:
@@ -634,6 +693,8 @@ class Store(LearningStore):
             job = self._job(db, job_id)
             lease = self._lease(db, job)
             self._check(job, lease, owner, epoch)
+            if hasattr(self, "workforce"):
+                self.workforce.guard(job.get("desktop_id"), db=db)
             if authorization:
                 authorization(db, job, lease)
             if lease["inflight"] and lease["inflight"] != invocation:
@@ -642,7 +703,7 @@ class Store(LearningStore):
                 a = json.loads(
                     db.execute("SELECT data FROM approvals WHERE id=?", (approval_id,)).fetchone()[0]
                 )
-                if a["status"] not in {"approved", "corrected"} or a["epoch"] != epoch:
+                if a["status"] != "authorized" or a["epoch"] != epoch:
                     raise Stale("Approval unavailable or consumed")
                 if a["invocation"] != invocation or a["job_id"] != job_id:
                     raise Stale("Approval invocation mismatch")
@@ -691,18 +752,22 @@ class Store(LearningStore):
         job = self.get_job(job_id)
         approvals = self.approvals(job_id)
         executed = {a["name"] for a in approvals if a["status"] == "executed"}
-        if any(a["status"] in {"pending", "approved", "corrected", "executing"} for a in approvals):
+        if any(
+            a["status"] in {"pending", "approved", "corrected", "authorized", "executing"} for a in approvals
+        ):
             raise Stale("Outstanding business operation")
         if "complete" in executed:
             kind = "verified_work"
         elif "review_discovery" in executed:
-            kind = "reviewed_outcome"
+            kind = "reported_outcome"
         elif job.get("record_lookup"):
             kind = "record_unavailable"
         elif not executed - {"select_record", "capture_screen", "share_screenshot"}:
             kind = "conversation"
         else:
-            raise PermissionError("Business completion requires verified execution or staff outcome review")
+            raise PermissionError(
+                "Business completion requires verified execution or an evidenced agent report"
+            )
         if any(
             r["state"] not in {"completed", "record_unavailable"} for r in job.get("skill_runs", {}).values()
         ):
@@ -743,7 +808,7 @@ class Store(LearningStore):
             if (
                 job.get("operation_trace")
                 and (job.get("verified_report") or job["mutation"] == "confirmed_succeeded")
-            ) or (job.get("result_kind") == "reviewed_outcome" and reviewed):
+            ) or (job.get("result_kind") in {"reviewed_outcome", "reported_outcome"} and reviewed):
                 item = dict(
                     id=job_id,
                     kind="learn",

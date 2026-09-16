@@ -3,7 +3,7 @@
 import pytest
 from playwright.sync_api import expect, sync_playwright
 
-from conftest import pending, wait_for
+from conftest import wait_for
 from eas_shared.types import JobInput
 
 
@@ -23,12 +23,23 @@ def test_chat_controls_and_acceptance_stay_bound_to_their_request(browser_server
         store.update_job(job["id"], {"status": "completed", "result_kind": kind})
         store.event(job["id"], "assistant_message", {"text": f"Simulated answer: {task}"})
         completed.append(job)
+    import signal
+
+    browser_server["worker"].send_signal(signal.SIGSTOP)
     response = client.post(
         "/api/chat", json={"invoice_id": "INV-1043", "task": "Report the discrepancy without saving"}
     )
     response.raise_for_status()
     job_id = response.json()["job"]["id"]
-    pending(client, job_id)
+    # Hold the test worker to inspect control/acceptance UI without racing Auto.
+    from eas_server.store import desktop_context
+
+    token = desktop_context.set("development-desktop")
+    try:
+        store.claim("simulated-control-fixture")
+    finally:
+        desktop_context.reset(token)
+
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page(extra_http_headers={"Authorization": "Bearer test-staff"})
@@ -37,7 +48,7 @@ def test_chat_controls_and_acceptance_stay_bound_to_their_request(browser_server
         try:
             page.goto(browser_server["url"])
             expect(page.locator("#chat-composer #chat-controls")).to_be_visible()
-            expect(page.locator("#chat-composer #review-panel")).to_be_visible()
+            expect(page.locator("#review-panel")).to_have_count(0)
             expect(
                 page.locator("#active-job, #job-id, #job-title, #job-status, #empty, #message-form")
             ).to_have_count(0)
@@ -78,7 +89,7 @@ def test_chat_controls_and_acceptance_stay_bound_to_their_request(browser_server
                 takeover.click()
             assert released.value.status == 200
             expect(takeover).to_have_text("Take control")
-            expect(page.locator("#review-panel")).to_be_visible(timeout=15000)
+            expect(page.locator("#review-panel")).to_have_count(0)
             page.set_viewport_size({"width": 390, "height": 844})
             assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
             with page.expect_response(f"**/api/jobs/{job_id}/cancel") as cancelled:
@@ -88,6 +99,7 @@ def test_chat_controls_and_acceptance_stay_bound_to_their_request(browser_server
             expect(page.locator("#review-panel")).to_be_hidden()
             expect(transcript).to_contain_text("Work stopped.")
             assert store.get_job(job_id)["status"] == "cancelled"
+            browser_server["worker"].send_signal(signal.SIGCONT)
             page.locator("#chat-request").fill("Hello")
             with page.expect_response("**/api/chat") as greeting_response:
                 page.locator("#chat-form button.primary").click()
@@ -102,6 +114,7 @@ def test_chat_controls_and_acceptance_stay_bound_to_their_request(browser_server
             expect(transcript.locator(f'[data-accept-request="{completed[2]["id"]}"]')).to_be_attached()
             assert not errors
         finally:
+            browser_server["worker"].send_signal(signal.SIGCONT)
             browser.close()
             if store.get_job(job_id)["status"] not in {
                 "completed",

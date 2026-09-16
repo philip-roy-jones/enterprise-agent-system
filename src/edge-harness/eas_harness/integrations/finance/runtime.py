@@ -157,5 +157,5 @@ class FinanceOperations:
             # Staff reviews free-form outcomes explicitly.
             if not job.get("assistant_report"):
                 raise Recovery("unfamiliar", "The assistant has not supplied an outcome to review")
-            return {"staff_verified_outcome": job["assistant_report"], "acceptance_required": True}
+            return {"reported_outcome": job["assistant_report"], "acceptance_required": True}
         raise ValueError(name)

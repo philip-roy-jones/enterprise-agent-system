@@ -39,7 +39,7 @@ OPERATIONS = {
         "A timestamped screenshot of all monitors; browser fixtures capture only their test viewport",
         input_model=Empty,
         output_model=ScreenCapture,
-        conditions="Staff approval to read the assigned worker desktop; no record required",
+        conditions="Server-authorized read of the assigned worker desktop; no record required",
     ),
     "share_screenshot": Operation(
         "Send the disclosed screenshot, caption and annotations to this staff conversation",
@@ -47,11 +47,11 @@ OPERATIONS = {
         desktop=False,
         input_model=ShareScreenshot,
         output_model=ToolResult,
-        conditions="Previously approved capture in this request; same staff conversation",
+        conditions="Previously authorized capture in this request; same staff conversation",
     ),
     "select_record": Operation(
         "Use the disclosed invoice for the work requested in this conversation",
-        "The request is bound to this invoice; application actions each require their own approval",
+        "The request is bound to this invoice; application actions each require server authorization",
         desktop=False,
         conditions="Unbound conversational request; authorized company and role",
         input_model=Invoice,
@@ -106,8 +106,8 @@ OPERATIONS = {
         "navigate",
     ),
     "assist": Operation(
-        "Ask the supervised assistant to investigate the interruption; every tool requires its own approval",
-        "A proposed resolution with separately approved tools",
+        "Ask the assistant to investigate the interruption; every tool requires current authority",
+        "A proposed resolution with separately authorized tools",
     ),
     "resume": Operation(
         "Re-observe after assistance or handoff and reconcile saved results before resuming",
@@ -129,7 +129,7 @@ OPERATIONS = {
     ),
     "set_field": Operation(
         "Enter the disclosed text in a correction draft field",
-        "Draft field has the approved text",
+        "Draft field has the validated text",
         "draft",
         mutation=True,
     ),
@@ -162,7 +162,7 @@ for name, schema, description in [
     (
         "run_skill",
         SkillRun,
-        "Start this versioned workflow; each internal operation needs separate approval",
+        "Start this versioned workflow; each internal operation needs separate authorization",
     ),
     (
         "resume_skill",

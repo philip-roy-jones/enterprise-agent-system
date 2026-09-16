@@ -10,43 +10,12 @@ from enterprise_dev.config import Settings
 
 def drive(client, job_id, correction=False, timeout=90):
     deadline = time.monotonic() + timeout
-    corrected = False
     while time.monotonic() < deadline:
         data = client.get(f"/api/jobs/{job_id}").json()
         if data["job"]["status"] in {"completed", "failed", "denied", "rejected", "cancelled"}:
             if data["job"]["status"] != "completed":
-                raise RuntimeError(json.dumps(data["job"], indent=2))
-            client.post(f"/api/jobs/{job_id}/accept").raise_for_status()
+                raise AssertionError(data["job"])
             return data
-        for approval in data["approvals"]:
-            if approval["status"] != "pending":
-                continue
-            decision = {
-                "decision": "approve",
-                "explanation": "Automated staff simulator in synthetic demonstration",
-            }
-            if (
-                correction
-                and not corrected
-                and approval["kind"] == "tool"
-                and approval["name"] == "set_field"
-            ):
-                field = approval["arguments"].get("field")
-                expected_value = {
-                    "amount": f"{data['job']['expected']['amount'] / 100:.2f}",
-                    "note": data["job"]["expected"]["note"],
-                }.get(field)
-                decision.update(
-                    decision="correct",
-                    arguments=dict(approval["arguments"], value=expected_value)
-                    if expected_value is not None
-                    else approval["arguments"],
-                    explanation="Simulated staff confirms the semantic field and correct amount",
-                )
-                corrected = True
-            r = client.post(f"/api/approvals/{approval['id']}", json=decision)
-            if r.status_code not in {200, 409}:
-                r.raise_for_status()
         time.sleep(0.15)
     raise TimeoutError(f"Job {job_id} did not finish")
 
@@ -54,24 +23,29 @@ def drive(client, job_id, correction=False, timeout=90):
 def main(argv):
     p = argparse.ArgumentParser()
     p.add_argument(
-        "--simulate-staff", action="store_true", help="Explicitly authorize synthetic test-driver approvals"
+        "--simulate-staff", action="store_true", help="Explicitly authorize synthetic supervisor activation"
     )
     p.add_argument("--output", default="runtime/demo-report.json")
     args = p.parse_args(argv)
     if not args.simulate_staff:
-        p.error(
-            "This scripted demo submits decisions. Use --simulate-staff, or use the console for real staff review."
-        )
+        p.error("This demo simulates supervisor activation. Use --simulate-staff explicitly.")
     settings = Settings()
     client = httpx.Client(
         base_url=settings.backend_url, headers={"Authorization": f"Bearer {settings.staff_token}"}, timeout=20
     )
+    if client.get("/api/health").json()["desktop_adapter"] != "browser":
+        p.error("This demonstration is restricted to the synthetic browser fixture")
+    client.post(
+        "/api/employees/development-desktop/state",
+        headers={"Authorization": "Bearer " + settings.developer_token},
+        json={"state": "active", "reason": "Explicit simulated supervisor activation for the synthetic demo"},
+    ).raise_for_status()
     results = []
     scenarios = [
-        ("Known procedure / Strict", "strict", {}, "INV-1042"),
-        ("Known procedure / another record", "strict", {}, "INV-1043"),
-        ("Changed field / supervised assistance", "strict", {"variant": "renamed"}, "INV-1044"),
-        ("Interrupted save / reconciliation", "strict", {"interrupt_save": True}, "INV-1042"),
+        ("Known procedure / Auto", "auto", {}, "INV-1042"),
+        ("Known procedure / another record", "auto", {}, "INV-1043"),
+        ("Changed field / supervised assistance", "auto", {"variant": "renamed"}, "INV-1044"),
+        ("Interrupted save / reconciliation", "auto", {"interrupt_save": True}, "INV-1042"),
     ]
     for title, mode, scenario, invoice in scenarios:
         client.post(
@@ -102,11 +76,11 @@ def main(argv):
                 fallback_count=job["fallback_count"],
                 model_calls=job["model_calls"],
                 effective_mode=job["effective_mode"],
-                approval_requests=len(data["approvals"]),
+                policy_authorizations=len(data["approvals"]),
                 execution_seconds=job["elapsed_seconds"],
             )
         )
-        print(f"✓ {title}: {job['id']} ({len(data['approvals'])} decisions)", flush=True)
+        print(f"✓ {title}: {job['id']} ({len(data['approvals'])} server authorizations)", flush=True)
     path = Path(args.output)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(

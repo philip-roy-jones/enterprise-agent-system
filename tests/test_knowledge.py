@@ -4,11 +4,10 @@ from langchain_core.messages import AIMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langgraph.checkpoint.memory import InMemorySaver
 from eas_harness.assistance import build_assistant, run_assistant
-from eas_server.backend import create_app
+from conftest import create_active_app as create_app
 from enterprise_dev.config import Settings
 from eas_harness.execution import ExecutionLayer
 from eas_shared.types import JobInput
-from eas_harness.errors import Paused
 from test_assistant import BatchModel, ReadAdapter
 
 
@@ -40,10 +39,6 @@ def approved_search(store, job, query="invoice"):
             kind="tool",
         )
 
-    with pytest.raises(Paused):
-        invoke()
-    approval = store.approvals(job["id"])[-1]
-    store.decide(approval["id"], {"decision": "approve"})
     return invoke()["value"]["documents"]
 
 
@@ -147,14 +142,8 @@ def test_assistant_knowledge_read_waits_for_staff_in_strict(store, job, monkeypa
         "knowledge",
     )
     result = run_assistant(agent, {}, "knowledge", store, job["id"])
-    assert result.get("__interrupt__")
-    assert not any(e["kind"] == "knowledge_retrieved" for e in store.events(job["id"]))
-    approval = store.approvals(job["id"])[0]
-    assert approval["name"] == "search_knowledge"
-    store.decide(approval["id"], {"decision": "approve"})
-    result = run_assistant(agent, {}, "knowledge", store, job["id"])
     assert not result.get("__interrupt__")
     message = next(m for m in result["messages"] if isinstance(m, ToolMessage))
     assert doc["id"] in message.content
     assert not adapter.executed  # Guidance came from the backend, not a desktop/application API.
-    assert store.get_job(job["id"])["effective_mode"] == "strict"
+    assert store.get_job(job["id"])["effective_mode"] == "auto"

@@ -59,17 +59,11 @@ def test_batched_model_tools_each_require_their_own_approval(store, job, monkeyp
         Settings(model_mode="simulated"), store, layer, InMemorySaver(), job["id"], "batch"
     )
     result = run_assistant(agent, {}, "batch", store, job["id"])
-    assert result.get("__interrupt__")
-    approvals = store.approvals(job["id"])
-    assert len(approvals) == 2 and not adapter.executed
-    store.decide(approvals[0]["id"], {"decision": "approve"})
-    result = run_assistant(agent, {}, "batch", store, job["id"])
-    assert result.get("__interrupt__") and len(adapter.executed) == 1
-    assert store.approvals(job["id"])[1]["status"] == "pending"
-    store.decide(approvals[1]["id"], {"decision": "approve"})
-    result = run_assistant(agent, {}, "batch", store, job["id"])
-    assert not result.get("__interrupt__") and len(adapter.executed) == 2
-    assert store.get_job(job["id"])["effective_mode"] == "strict"
+    assert not result.get("__interrupt__")
+    records = store.approvals(job["id"])
+    assert len(records) == 2 and len(adapter.executed) == 2
+    assert all(r["status"] == "executed" and r["decision"] is None and r["authorization"] for r in records)
+    assert store.get_job(job["id"])["effective_mode"] == "auto"
 
 
 class SlowSqliteSaver(SqliteSaver):
@@ -97,13 +91,9 @@ def exercise_slow_checkpoints(data_dir):
                 Settings(model_mode="simulated"), store, layer, SlowSqliteSaver(connection), job["id"], "slow"
             )
             result = run_assistant(agent, {}, "slow", store, job["id"])
-        assert len(adapter.executed) == step
+        assert len(adapter.executed) == 2
         pending = [a for a in store.approvals(job["id"]) if a["status"] == "pending"]
-        if step < 2:
-            assert result.get("__interrupt__") and len(pending) == 2 - step
-            store.decide(pending[0]["id"], {"decision": "approve"})
-        else:
-            assert not result.get("__interrupt__") and not pending
+        assert not result.get("__interrupt__") and not pending
 
 
 def test_slow_sqlite_checkpoints_finish_and_resume_approved_tools(tmp_path):

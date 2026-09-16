@@ -1,5 +1,7 @@
 # Ubuntu Marketing worker
 
+> Current execution policy: [digital employees](plans/digital-employees.md) use shadowing / active / paused. Active work uses server authorization without per-operation staff approval. Historical Strict-policy descriptions below remain as background where noted.
+
 The developer machine hosts the server/frontend. Ubuntu hosts the edge harness's isolated planner, executor and learner, plus **Campaign Desk**, an independent read-only synthetic application. No Finance application, Finance credential or private Finance skill is installed on this worker.
 
 This setup exercises API-based application use. It does not claim Linux desktop-click automation or compatibility with every legacy application.

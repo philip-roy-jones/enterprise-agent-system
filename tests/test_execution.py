@@ -4,8 +4,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from eas_harness.execution import ExecutionLayer
 from eas_shared.types import Observation, Stale, Recovery
-from eas_harness.errors import Paused
-from conftest import approve_operation
+from conftest import approve_operation, staged_authorization
 
 
 def node_args(job, **extra):
@@ -24,27 +23,26 @@ class FakeAdapter:
 def test_stale_observation_requires_fresh_proposal(store, job):
     adapter = FakeAdapter()
     layer = ExecutionLayer(store, adapter)
-    with pytest.raises(Paused):
+    with staged_authorization(store):
         layer.run(job["id"], "test", "validate", node_args(job), lambda a: adapter.calls.append(a))
-    approval = store.approvals(job["id"])[0]
-    store.decide(approval["id"], {"decision": "approve"})
     adapter.revision = "changed"
-    with pytest.raises(Paused):
+    with pytest.raises(Stale):
         layer.run(job["id"], "test", "validate", node_args(job), lambda a: adapter.calls.append(a))
     assert adapter.calls == []
     assert store.approvals(job["id"])[0]["status"] == "stale"
 
 
-def test_auto_mode_cannot_release_already_queued_node(store, job):
-    adapter = FakeAdapter()
-    layer = ExecutionLayer(store, adapter)
-    with pytest.raises(ValueError, match="Auto mode has been removed"):
-        store.mode(job["id"], "auto")
-    with pytest.raises(Paused):
-        layer.run(job["id"], "test", "validate", node_args(job), lambda a: adapter.calls.append(a))
-    with pytest.raises(Paused):
-        layer.run(job["id"], "test", "validate", node_args(job), lambda a: adapter.calls.append(a))
-    assert adapter.calls == []
+def test_historical_policy_cannot_run_under_auto(store, job):
+    with store.db() as db:
+        historical = store._job(db, job["id"])
+        historical["execution_policy"] = 2
+        store._put(db, historical)
+    from eas_shared.types import Stopped
+
+    with pytest.raises(Stopped):
+        ExecutionLayer(store, FakeAdapter()).run(
+            job["id"], "test", "validate", node_args(job), lambda _: pytest.fail("Historical work executed")
+        )
 
 
 def test_shared_layer_replays_completed_result_without_executing_twice(store, job):
@@ -65,7 +63,7 @@ def test_shared_layer_replays_completed_result_without_executing_twice(store, jo
 def test_changed_arguments_cannot_reuse_approval(store, job):
     adapter = FakeAdapter()
     layer = ExecutionLayer(store, adapter)
-    with pytest.raises(Paused):
+    with staged_authorization(store):
         layer.run(
             job["id"],
             "test",
@@ -73,9 +71,7 @@ def test_changed_arguments_cannot_reuse_approval(store, job):
             node_args(job, reason="original"),
             lambda a: adapter.calls.append(a),
         )
-    a = store.approvals(job["id"])[0]
-    store.decide(a["id"], {"decision": "approve"})
-    with pytest.raises(Paused):
+    with pytest.raises(Stale):
         layer.run(
             job["id"],
             "test",
@@ -87,7 +83,7 @@ def test_changed_arguments_cannot_reuse_approval(store, job):
 
 
 def test_backend_revalidates_exact_action_arguments(store, job):
-    a = store.proposal(
+    a = store.authorize_operation(
         job["id"],
         "one",
         {
@@ -98,7 +94,6 @@ def test_backend_revalidates_exact_action_arguments(store, job):
             "observation": {"revision": "one"},
         },
     )
-    store.decide(a["id"], {"decision": "approve"})
     with pytest.raises(Stale, match="differs"):
         store.begin_action(
             job["id"],
@@ -155,30 +150,19 @@ def test_parallel_graph_tasks_serialize_desktop_access(store, job):
     assert store.lease()["inflight"] is None
 
 
-def test_corrected_tool_arguments_cannot_change_record_scope(store, job):
+def test_model_arguments_cannot_change_record_scope(store, job):
     layer = ExecutionLayer(store, FakeAdapter())
     store.transfer(job["id"], "assistant")
-    with pytest.raises(Paused):
+    with pytest.raises(PermissionError, match="invoice_id"):
         layer.run(
             job["id"],
             "scoped",
             "validate",
-            node_args(job),
-            lambda a: pytest.fail("Unapproved action"),
+            node_args(job, invoice_id="INV-1043"),
+            lambda _: pytest.fail("Cross-record action"),
             kind="tool",
         )
-    approval = store.approvals(job["id"])[0]
-    store.decide(approval["id"], {"decision": "correct", "arguments": node_args(job, invoice_id="INV-1043")})
-    with pytest.raises(PermissionError, match="Corrected invoice_id"):
-        layer.run(
-            job["id"],
-            "scoped",
-            "validate",
-            node_args(job),
-            lambda a: pytest.fail("Cross-record action"),
-            kind="tool",
-        )
-    assert not any(e["kind"] == "action_started" for e in store.events(job["id"]))
+    assert not store.approvals(job["id"])
 
 
 def test_composite_operation_called_as_tool_can_make_declared_navigation(store, job):

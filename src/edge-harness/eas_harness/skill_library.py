@@ -155,9 +155,24 @@ class SkillLibrary:
             return
         # Trusted bundled procedure, not learned evidence. Never overwrite a learned revision.
         name = "invoice_correction"
+        previous = ""
         with self.db() as db:
             if db.execute("SELECT 1 FROM versions WHERE id=?", (name,)).fetchone():
-                return
+                from importlib.resources import files
+
+                legacy = json.loads(files("eas_shared").joinpath("finance_seed_legacy.json").read_text())
+                active = db.execute(
+                    "SELECT v.version,v.spec FROM versions v JOIN active a ON a.id=v.id AND a.version=v.version WHERE v.id=?",
+                    (name,),
+                ).fetchone()
+                if not active:
+                    return
+                spec = json.loads(active[1])
+                if {
+                    k: v for k, v in spec.items() if k not in {*SCOPE, "application_version"}
+                } != legacy or any(spec[k] != job[k] for k in SCOPE):
+                    return
+                previous = active[0]
         folder = Path(__file__).resolve().parent.parent / "skills" / name
         if not folder.exists():
             folder = Path(sys.prefix) / "share" / "enterprise-agent-system" / "skills" / name
@@ -167,7 +182,7 @@ class SkillLibrary:
             application_version=job["app_version"],
             **{k: job[k] for k in SCOPE},
         )
-        self.install(data, seed=True)
+        self.install(data, seed=True, expected_previous=previous)
 
     def get(self, skill_id, version, job, *, active_only=False):
         with self.db() as db:

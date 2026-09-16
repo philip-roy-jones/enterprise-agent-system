@@ -58,6 +58,7 @@ def check_server(folder):
             "/static/app.js",
             "/static/activity.js",
             "/static/learning.js",
+            "/static/employees.js",
             "/static/style.css",
         ]:
             with urllib.request.urlopen(base + path) as response:
@@ -66,6 +67,13 @@ def check_server(folder):
         request = urllib.request.Request(base + "/api/roles", headers=headers)
         with urllib.request.urlopen(request) as response:
             assert json.load(response)[0]["id"] == "invoice_correction"
+        request = urllib.request.Request(
+            base + "/api/employees/development-desktop/state",
+            headers={**headers, "Authorization": "Bearer local-developer-demo"},
+            data=json.dumps({"state": "active", "reason": "Simulated isolated-installation check"}).encode(),
+        )
+        with urllib.request.urlopen(request) as response:
+            assert json.load(response)["state"] == "active"
         request = urllib.request.Request(
             base + "/api/jobs", headers=headers, data=json.dumps({"invoice_id": "INV-1042"}).encode()
         )

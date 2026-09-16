@@ -1,5 +1,7 @@
 # Architecture and trust boundaries
 
+> Current execution policy: [digital employees](plans/digital-employees.md) use shadowing / active / paused. Active work uses server authorization without per-operation staff approval. Historical Strict-policy descriptions below remain as background where noted.
+
 The accepted [agent-led plan](plans/agent-led-learning-plan.md) replaces the original graph-first and Auto-mode design.
 
 ## Software boundaries

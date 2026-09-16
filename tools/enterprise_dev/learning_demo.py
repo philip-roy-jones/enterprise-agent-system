@@ -1,4 +1,4 @@
-"""A single bounded learning/reuse run with explicitly simulated staff decisions."""
+"""A single bounded learning/reuse run with explicitly simulated staff outcome acceptance."""
 
 import argparse
 import json
@@ -9,7 +9,7 @@ import httpx
 from enterprise_dev.config import Settings
 
 
-def run(client, task, invoice, *, guidance=None, correct_field=False, timeout=240):
+def run(client, task, invoice, *, guidance=None, timeout=240):
     response = client.post("/api/jobs", json={"invoice_id": invoice, "task": task})
     response.raise_for_status()
     job_id = response.json()["id"]
@@ -19,29 +19,10 @@ def run(client, task, invoice, *, guidance=None, correct_field=False, timeout=24
             json={"text": guidance, "message_id": "simulated-teaching-guidance"},
         ).raise_for_status()
     deadline = time.monotonic() + timeout
-    corrected = False
     while time.monotonic() < deadline:
         data = client.get("/api/jobs/" + job_id).json()
         if data["job"]["status"] in {"completed", "failed", "denied", "cancelled", "rejected"}:
             break
-        for approval in data["approvals"]:
-            if approval["status"] != "pending":
-                continue
-            decision = {
-                "decision": "approve",
-                "explanation": "Explicit simulated staff decision for synthetic learning evaluation",
-            }
-            if correct_field and not corrected and approval["name"] == "set_field":
-                decision.update(
-                    decision="correct",
-                    arguments=approval["arguments"],
-                    explanation="Simulated staff confirms the observed field and verified value",
-                )
-                corrected = True
-            result = client.post("/api/approvals/" + approval["id"], json=decision)
-            if result.status_code not in {200, 409}:
-                result.raise_for_status()
-            print("Simulated staff:", approval["name"], decision["decision"], flush=True)
         question = next((q for q in data["conversation"]["questions"] if q["status"] == "pending"), None)
         if question:
             # Do not invent domain answers to make an evaluation pass.
@@ -86,10 +67,14 @@ def run(client, task, invoice, *, guidance=None, correct_field=False, timeout=24
         "skill_runs": job.get("skill_runs", {}),
         "operations": job.get("operation_trace", []),
         "metrics": {
-            "approval_requests": len(data["approvals"]),
+            "policy_authorizations": len(data["approvals"]),
             "executed_operations": len(executed),
-            "approval_coverage": all(a.get("decision") for a in executed),
-            "staff_corrections": sum(a.get("decision", {}).get("decision") == "correct" for a in executed),
+            "authorization_coverage": all(
+                a.get("authorization", {}).get("kind") == "employee_policy" for a in executed
+            ),
+            "staff_corrections": sum(
+                (a.get("decision") or {}).get("decision") == "correct" for a in executed
+            ),
             "recoveries": len(recoveries),
             "repeated_mistakes": sum(max(0, n - 1) for n in reasons.values()),
             "model_calls": job["model_calls"],
@@ -116,18 +101,15 @@ def main(argv):
     p.add_argument("--task", required=True)
     p.add_argument("--invoice", default="INV-1042")
     p.add_argument("--guidance")
-    p.add_argument("--correct-field", action="store_true")
     p.add_argument("--output", required=True)
     args = p.parse_args(argv)
     if not args.simulate_staff:
-        p.error("This driver submits decisions; --simulate-staff is required")
+        p.error("This driver submits outcome acceptance; --simulate-staff is required")
     settings = Settings()
     with httpx.Client(
         base_url=settings.backend_url, headers={"Authorization": "Bearer " + settings.staff_token}, timeout=20
     ) as client:
-        result = run(
-            client, args.task, args.invoice, guidance=args.guidance, correct_field=args.correct_field
-        )
+        result = run(client, args.task, args.invoice, guidance=args.guidance)
     path = Path(args.output)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(result, indent=2) + "\n")

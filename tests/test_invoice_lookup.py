@@ -84,8 +84,9 @@ def test_model_can_answer_from_observation_without_a_workflow(store, job, tmp_pa
             assert f"${amount / 100:,.2f}" in approval["arguments"]["assistant_report"]
             assert current["status"] != "completed"  # The answer still needs staff's decision.
         store.decide(approval["id"], {"decision": "approve"}, actor="simulated-staff")
+    names = [a["name"] for a in store.approvals(job["id"]) if a["status"] == "executed"]
     assert names == ["establish", "observe_app", "review_discovery"]
-    assert current["status"] == "completed" and current["result_kind"] == "reviewed_outcome"
+    assert current["status"] == "completed" and current["result_kind"] == "reported_outcome"
     assert current["expected"] is None and not current.get("skill_runs")
     assert current["mutation"] == "not_attempted" and not current["accepted"]
     assert f"${amount / 100:,.2f}" in current["assistant_report"]

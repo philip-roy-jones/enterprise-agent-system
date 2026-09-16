@@ -14,7 +14,7 @@ const activityView = (() => {
   };
   const names = {
     agent_tool_call:"Agent tool call", agent_tool_result:"Tool returned to agent",
-    action_started:"Approved operation started", action_result:"Operation result",
+    operation_authorized:"Server authorized operation", action_started:"Authorized operation started", action_result:"Operation result",
     model_step:"Model call", model_response:"Model response", assistant_message:"Agent explanation / answer",
     approval_requested:"Awaiting staff approval", staff_decision:"Staff decision",
     record_unavailable:"Record lookup stopped", tool_arguments_rejected:"Invalid proposal — nothing executed",

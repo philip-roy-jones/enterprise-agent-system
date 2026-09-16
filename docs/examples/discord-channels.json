@@ -1,0 +1,14 @@
+[
+  {
+    "guild_id": "111111111111111111",
+    "channel_id": "222222222222222222",
+    "name": "Finance team",
+    "employee_id": "finance-desktop-01",
+    "organization_id": "acme",
+    "role_id": "invoice_correction",
+    "company_id": "ACME",
+    "members": {
+      "333333333333333333": "staff"
+    }
+  }
+]

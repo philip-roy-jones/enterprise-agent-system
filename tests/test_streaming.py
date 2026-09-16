@@ -113,7 +113,8 @@ def test_partial_failure_excludes_reasoning_tool_arguments_and_other_models(stor
 
 
 @pytest.mark.browser
-def test_browser_streams_reconnects_and_recovers_partial_text(server):
+def test_browser_streams_reconnects_and_recovers_partial_text(browser_server):
+    server = browser_server
     import json
     import httpx
     from playwright.sync_api import sync_playwright, expect
@@ -221,9 +222,12 @@ def test_streamed_tool_arguments_finish_before_the_stateful_approval(store, tmp_
         InMemorySaver(),
         InMemorySaver(),
     )
-    coordinator.tick(store.get_job(job["id"]))
+    from conftest import staged_authorization
+
+    with staged_authorization(store, handled=True):
+        coordinator.tick(store.get_job(job["id"]))
     approvals = store.approvals(job["id"])
-    assert len(approvals) == 1 and approvals[0]["status"] == "pending"
+    assert len(approvals) == 1 and approvals[0]["status"] == "authorized"
     assert approvals[0]["arguments"] == {"invoice_id": "INV-1042"}
     events = store.events(job["id"])
     assert not any(e["kind"] == "action_started" for e in events)
@@ -231,6 +235,6 @@ def test_streamed_tool_arguments_finish_before_the_stateful_approval(store, tmp_
         "".join(e["data"]["text"] for e in events if e["kind"] == "assistant_message_delta")
         == "Checking the requested record."
     )
-    store.decide(approvals[0]["id"], {"decision": "reject"}, actor="simulated-staff")
-    assert store.get_job(job["id"])["status"] == "rejected"
+    store.stop(job["id"])
+    assert store.get_job(job["id"])["status"] == "cancelled"
     assert store.get_job(job["id"])["record_id"] is None

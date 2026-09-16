@@ -1,5 +1,7 @@
 # Conversation learning and screenshots
 
+> Current execution policy: [digital employees](plans/digital-employees.md) use shadowing / active / paused. Active work uses server authorization without per-operation staff approval. Historical Strict-policy descriptions below remain as background where noted.
+
 Staff teach by chatting. The frontend no longer has an operation assessment form or an idle Live workspace card. The operation review panel appears when an approval is pending, retaining the exact proposed inputs and the ability to correct a click target.
 
 ## Conversation review

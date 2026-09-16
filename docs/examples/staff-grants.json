@@ -4,8 +4,20 @@
     "department_id": "finance",
     "role_id": "invoice_correction",
     "company_id": "ACME",
-    "actions": ["request", "read", "approve", "control", "accept", "skills"],
-    "capabilities": ["read", "navigate", "draft"],
+    "actions": [
+      "request",
+      "read",
+      "approve",
+      "control",
+      "accept",
+      "skills",
+      "supervise"
+    ],
+    "capabilities": [
+      "read",
+      "navigate",
+      "draft"
+    ],
     "own_only": true
   }
 ]

@@ -170,7 +170,7 @@ class Executor(FinanceOperations):
 
             return screen_tool(self.store, self.layer.adapter, job_id, name, args)
         if name == "review_discovery":
-            return {"staff_verified_outcome": args["assistant_report"], "acceptance_required": True}
+            return {"reported_outcome": args["assistant_report"], "acceptance_required": True}
         if name == "select_record":
             return self.store.bind_record(job_id, args[get_role(job["role_id"]).record_field])
         if name == "read_skill":
@@ -263,7 +263,7 @@ def serve(settings=None):
             try:
                 with executor.lock:
                     lease = executor.store.lease()
-                    if not lease.get("job_id") or executor.store.get_job(lease["job_id"])["status"] in {
+                    if not lease.get("job_id") or lease.get("job_status") in {
                         "completed",
                         "failed",
                         "denied",
@@ -279,6 +279,9 @@ def serve(settings=None):
 
     if settings.learning_enabled:
         threading.Thread(target=maintenance, daemon=True).start()
+    from eas_harness.shadow import observe_forever
+
+    threading.Thread(target=observe_forever, args=(settings,), daemon=True).start()
     server = ThreadingHTTPServer(("127.0.0.1", settings.executor_port), Handler)
     try:
         server.serve_forever()

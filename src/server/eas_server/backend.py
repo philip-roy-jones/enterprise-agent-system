@@ -44,6 +44,12 @@ def create_app(settings=None):
     security = Security(settings, store)
     app.state.security = security
     install_access(app, security)
+    from eas_server.employees import install_employees
+
+    install_employees(app, security)
+    from eas_server.channels import install_channels
+
+    install_channels(app, security)
     static = Path(__file__).parent / "frontend"
     if mock is not None:
         app.mount("/fixture-static", StaticFiles(directory=fixture_static), name="fixture-static")
@@ -206,16 +212,41 @@ def create_app(settings=None):
         from eas_server.roles import get_role
 
         values = get_role(body.role_id).normalize(body.model_dump(), allow_unbound=True)
-        key = {k: values[k] for k in ("organization_id", "department_id", "role_id", "company_id")}
+        security.workforce.resolve(current_principal.get(), values, active=False)
+        key = {
+            k: values[k] for k in ("organization_id", "department_id", "role_id", "company_id", "employee_id")
+        }
         security.request(current_principal.get(), values)
         key["staff_id"] = actor
+        legacy = {k: v for k, v in key.items() if k != "employee_id"}
+        legacy_id = "ongoing-" + hashlib.sha256(json.dumps(legacy, sort_keys=True).encode()).hexdigest()
+        previous = [
+            j
+            for j in security.jobs(current_principal.get())
+            if j.get("conversation_id") == legacy_id and j.get("staff_id") == actor
+        ]
+        owners = {j.get("employee_id") or j.get("desktop_id") for j in previous} - {None}
+        if owners == {values["employee_id"]}:
+            return legacy_id
         return "ongoing-" + hashlib.sha256(json.dumps(key, sort_keys=True).encode()).hexdigest()
 
     @app.get("/api/chat")
-    def current_chat(role_id: str = "invoice_correction", company_id: str = "ACME", actor=Depends(staff)):
+    def current_chat(
+        role_id: str = "invoice_correction",
+        company_id: str = "ACME",
+        employee_id: str | None = None,
+        organization_id: str = "acme",
+        actor=Depends(staff),
+    ):
         from eas_server.roles import get_role
 
-        body = JobInput(role_id=role_id, department_id=get_role(role_id).department_id, company_id=company_id)
+        body = JobInput(
+            role_id=role_id,
+            department_id=get_role(role_id).department_id,
+            company_id=company_id,
+            employee_id=employee_id,
+            organization_id=organization_id,
+        )
         conversation_id = chat_scope(body, actor)
         requests = [
             j
@@ -237,6 +268,7 @@ def create_app(settings=None):
             raise ValueError("A chat message is required")
         values = get_role(body.role_id).normalize(body.model_dump(), allow_unbound=True)
         security.request(current_principal.get(), values)
+        security.workforce.resolve(current_principal.get(), values)
         values["conversation_id"] = chat_scope(body, actor)
         values["request_id"] = values.get("request_id") or uid()
         # A retried guidance delivery stays guidance even after its request ends.
@@ -328,7 +360,9 @@ def create_app(settings=None):
         from eas_server.roles import get_role
 
         values = get_role(body.role_id).normalize(body.model_dump())
-        security.request(current_principal.get(), values)
+        security.workforce.resolve(current_principal.get(), values)
+        if str(values.get("conversation_id", "")).startswith("discord-"):
+            raise HTTPException(403, "Discord conversations are managed by their channel binding")
         if values.get("conversation_id"):
             with store.db() as db:
                 existing = db.execute(
@@ -433,7 +467,12 @@ def create_app(settings=None):
         jobs = security.jobs(current_principal.get())
         results = {}
         for mode in ["simulated", "live"]:
-            selected = [j for j in jobs if j["model_mode"] == mode]
+            selected = [
+                j for j in jobs if j["model_mode"] == mode and j.get("execution_engine") != "shadow-1"
+            ]
+            demonstrations = [
+                j for j in jobs if j["model_mode"] == mode and j.get("execution_engine") == "shadow-1"
+            ]
             approvals = [a for j in selected for a in store.approvals(j["id"])]
             assessments = [assessment_metrics(store.events(j["id"])) for j in selected]
             results[mode] = {
@@ -443,7 +482,11 @@ def create_app(settings=None):
                 "completion_rate": sum(j["status"] == "completed" for j in selected) / len(selected)
                 if selected
                 else None,
-                "approval_requests": len(approvals),
+                "approval_requests": sum(not a.get("authorization") for a in approvals),
+                "policy_authorizations": sum(bool(a.get("authorization")) for a in approvals),
+                "demonstration_sessions": len(demonstrations),
+                "desktop_samples": sum(j["shadow_frames"] for j in demonstrations),
+                "observer_model_calls": sum(j["shadow_reviews"] for j in demonstrations),
                 "corrections": sum(
                     a.get("decision", {}).get("decision") == "correct" for a in approvals if a.get("decision")
                 ),

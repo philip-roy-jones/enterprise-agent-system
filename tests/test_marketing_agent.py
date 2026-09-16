@@ -66,7 +66,7 @@ def test_marketing_chat_learns_and_reuses_a_skill_with_child_approvals(store, tm
             current = store.get_job(job["id"])
             if current["status"] == "completed":
                 assert current["campaign_id"] == record
-                return current, decisions
+                return current, [a["name"] for a in store.approvals(job["id"]) if a["status"] == "executed"]
             coordinator.tick(current)
             for approval in store.approvals(job["id"]):
                 if approval["status"] == "pending":

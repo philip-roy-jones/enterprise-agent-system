@@ -1,11 +1,12 @@
 from typing import Any, Literal
 from pydantic import BaseModel, Field
 
-Mode = Literal["strict"]
+Mode = Literal["auto"]
 TERMINAL = {"completed", "cancelled", "rejected", "denied", "failed"}
 
 
 class JobInput(BaseModel):
+    employee_id: str | None = Field(default=None, pattern=r"^[a-zA-Z0-9_-]{1,80}$")
     conversation_id: str | None = Field(default=None, pattern=r"^[a-zA-Z0-9_-]{1,80}$")
     request_id: str | None = Field(default=None, pattern=r"^[a-zA-Z0-9_-]{1,80}$")
     organization_id: str = "acme"
@@ -15,7 +16,7 @@ class JobInput(BaseModel):
     company_id: str | None = None
     invoice_id: str | None = Field(default=None, pattern=r"^INV-\d{4}$")
     task: str | None = None
-    selected_mode: Mode = "strict"
+    selected_mode: Mode = "auto"
     permissions: list[str] | None = None
 
 

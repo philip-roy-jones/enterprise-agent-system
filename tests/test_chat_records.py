@@ -4,8 +4,7 @@ import time
 import pytest
 from eas_shared.types import JobInput, Recovery, Stopped
 from eas_harness.execution import ExecutionLayer
-from eas_harness.errors import Paused
-from conftest import pending
+from conftest import staged_authorization
 from test_agent_led import finish
 
 
@@ -44,23 +43,12 @@ def test_record_binding_requires_exact_approved_call_and_is_retry_safe(store, un
         store.bind_record(job["id"], "INV-1043")
     with pytest.raises(Recovery, match="No record is selected"):
         layer.run(job["id"], "click", "click", {"target": "invoice-INV-1043"}, lambda _: {}, kind="tool")
-    with pytest.raises(Paused):
-        select(layer, job)
-    approval = store.approvals(job["id"])[0]
-    assert approval["inputs"]["record_id"] == "INV-1043" and not approval["observation"]["screenshot"]
-    store.decide(
-        approval["id"],
-        {"decision": "correct", "arguments": {"invoice_id": "INV-1044"}},
-        actor="simulated-staff",
-    )
-    with pytest.raises(PermissionError):
-        store.bind_record(job["id"], "INV-1044")  # Approved, but not executing yet.
     result = select(layer, job)
-    assert result["value"]["data"]["invoice_id"] == "INV-1044"
+    assert result["value"]["data"]["invoice_id"] == "INV-1043"
     assert select(layer, job) == result
     assert store.create_job(payload, ongoing=True)["id"] == job["id"]
     current = store.get_job(job["id"])
-    assert current["record_id"] == current["invoice_id"] == current["inputs"]["invoice_id"] == "INV-1044"
+    assert current["record_id"] == current["invoice_id"] == current["inputs"]["invoice_id"] == "INV-1043"
     assert current["request_payload"]["inputs"]["invoice_id"] is None
     with pytest.raises(PermissionError):
         select(layer, current, "INV-1042", "retarget")
@@ -73,9 +61,7 @@ def test_record_binding_requires_exact_approved_call_and_is_retry_safe(store, un
 def test_denied_selection_has_no_record_or_desktop_effect(store, unbound):
     job, _ = unbound
     layer = ExecutionLayer(store, NoDesktop())
-    with pytest.raises(Paused):
-        select(layer, job)
-    store.decide(store.approvals(job["id"])[0]["id"], {"decision": "reject"}, actor="simulated-staff")
+    store.stop(job["id"])
     with pytest.raises(Stopped):
         select(layer, job)
     assert store.get_job(job["id"])["record_id"] is None
@@ -84,10 +70,9 @@ def test_denied_selection_has_no_record_or_desktop_effect(store, unbound):
 def test_binding_rpc_cannot_substitute_approved_record(store, unbound):
     job, _ = unbound
     layer = ExecutionLayer(store, NoDesktop())
-    with pytest.raises(Paused):
+    with staged_authorization(store):
         select(layer, job)
     approval = store.approvals(job["id"])[0]
-    store.decide(approval["id"], {"decision": "approve"}, actor="simulated-staff")
     store.begin_action(
         job["id"],
         "assistant",
@@ -108,14 +93,9 @@ def test_binding_rpc_cannot_substitute_approved_record(store, unbound):
 def test_corrected_record_commit_survives_worker_losing_the_response(store, unbound):
     job, _ = unbound
     layer = ExecutionLayer(store, NoDesktop())
-    with pytest.raises(Paused):
+    with staged_authorization(store):
         select(layer, job)
     approval = store.approvals(job["id"])[0]
-    store.decide(
-        approval["id"],
-        {"decision": "correct", "arguments": {"invoice_id": "INV-1044"}},
-        actor="simulated-staff",
-    )
     store.begin_action(
         job["id"],
         "assistant",
@@ -123,15 +103,15 @@ def test_corrected_record_commit_survives_worker_losing_the_response(store, unbo
         "select",
         {
             "name": "select_record",
-            "arguments": {"invoice_id": "INV-1044"},
+            "arguments": {"invoice_id": "INV-1043"},
             "observation_revision": approval["observation"]["revision"],
         },
         approval["id"],
     )
-    store.bind_record(job["id"], "INV-1044")
+    store.bind_record(job["id"], "INV-1043")
     # The worker loses its RPC response here, before it can do any bookkeeping.
     assert store.lease()["inflight"] is None
-    assert select(ExecutionLayer(store, NoDesktop()), job)["value"]["data"]["invoice_id"] == "INV-1044"
+    assert select(ExecutionLayer(store, NoDesktop()), job)["value"]["data"]["invoice_id"] == "INV-1043"
     assert store.approvals(job["id"])[0]["status"] == "executed"
     assert len([e for e in store.events(job["id"]) if e["kind"] == "record_selected"]) == 1
 
@@ -172,22 +152,12 @@ def test_natural_language_record_is_correctable_and_active_chat_needs_no_selecto
     response = c.post("/api/chat", json=payload)
     response.raise_for_status()
     job_id = response.json()["job"]["id"]
-    approval = pending(c, job_id)
-    assert approval["name"] == "select_record" and approval["arguments"] == {"invoice_id": "INV-1043"}
-    ctx["store"].decide(
-        approval["id"],
-        {"decision": "correct", "arguments": {"invoice_id": "INV-1044"}},
-        actor="simulated-staff",
-    )
-    approval = pending(c, job_id)
-    assert approval["inputs"]["invoice_id"] == "INV-1044"
-    assert c.post("/api/chat", json=payload).json()["job"]["id"] == job_id
     guidance = {"task": "Please continue without saving", "request_id": "natural-language-guidance"}
     r = c.post("/api/chat", json=guidance)
     r.raise_for_status()
     assert r.json()["kind"] == "guidance"
     data, _ = finish(ctx, job_id)
-    assert data["job"]["verified_report"]["invoice_id"] == "INV-1044"
+    assert data["job"]["verified_report"]["invoice_id"] == "INV-1043"
     assert data["job"]["mutation"] == "not_attempted"
     model_steps = [e["data"] for e in data["events"] if e["kind"] == "model_step"]
     assert any(s["record_id"] is None and "select_record" in s["available_tools"] for s in model_steps)

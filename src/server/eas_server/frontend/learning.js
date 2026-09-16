@@ -9,7 +9,7 @@ const learningView = (() => {
     const container = document.getElementById("learning-content");
     const versions = status.registries.flatMap(r => r.versions || []);
     const reviews = status.queue.slice(0,30);
-    const markup = `<p>Chat corrections can improve skill instructions; accepted work can teach executable procedures. Every business operation still requires approval.</p>` +
+    const markup = `<p>Chat corrections can improve skill instructions; accepted work can teach executable procedures. Active employees execute under server-authorized permissions.</p>` +
       (versions.length ? `<div class="learning-versions">${versions.map(v => `<details data-learning-id="version-${esc(v.version)}"><summary><strong>${esc(v.title)}</strong> · ${v.active ? "Active" : "Available for rollback"} · ${v.steps.length ? "Workflow" : "Guidance"} · ${esc(v.version.slice(0,12))}</summary><p>${esc(v.description)}</p><p>${esc(v.steps.join(" → ") || "Natural-language guidance using individually approved tools")}</p><h4>Instructions</h4>${json(v.instructions || "Instructions are available through the skill read log.")}<p>Supporting files: ${esc((v.resources || []).join(", ") || "None")}</p><p>Teaching evidence: ${evidence(v.evidence_ids)}</p><button data-skill="${esc(v.skill_id)}" data-version="${v.active ? "" : esc(v.version)}">${v.active ? "Suspend" : "Activate this version"}</button></details>`).join("")}</div>` : "<p>No skills published by the edge yet.</p>") +
       `<h3>Learning reviews</h3>` + (reviews.length ? reviews.map(q => {
         const r = q.result || {}, changes = r.changes, checks = r.checks;

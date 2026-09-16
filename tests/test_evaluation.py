@@ -1,6 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
-from eas_server.backend import create_app
+from conftest import create_active_app as create_app
 from eas_server.config import Settings
 from eas_server.evaluation import assess_action, assessment_metrics
 from eas_shared.types import JobInput

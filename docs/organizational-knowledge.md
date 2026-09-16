@@ -1,5 +1,7 @@
 # Scoped organizational guidance
 
+> Current execution policy: [digital employees](plans/digital-employees.md) use shadowing / active / paused. Active work uses server authorization without per-operation staff approval. Historical Strict-policy descriptions below remain as background where noted.
+
 The backend stores immutable guidance documents separately from execution episodes. Each document has an organization and optional department, role, and company restrictions. A missing optional restriction deliberately shares it more broadly within that organization. A role restriction must name its matching department. Documents never cross organization boundaries.
 
 Authorized staff can add a document with `POST /api/knowledge`. For example, from the backend checkout:

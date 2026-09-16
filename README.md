@@ -2,7 +2,7 @@
 
 # Enterprise Agent System
 
-**A conversational digital worker that uses durable skills and learns from supervised work.**
+**Digital employees that learn by shadowing humans and work autonomously within assigned permissions.**
 
 Python · LangGraph · Deep Agents · OpenRouter · Windows UI Automation · FastAPI
 
@@ -12,25 +12,25 @@ Python · LangGraph · Deep Agents · OpenRouter · Windows UI Automation · Fas
 
 ---
 
-Enterprise Agent System is a department-agnostic platform for supervised digital workers. Departments supply role-specific skills, tools, permissions, and knowledge scopes; the platform provides job dispatch, approvals, evidence, recovery, and versioned learning.
+Enterprise Agent System is a department-agnostic prototype for digital employees. Departments supply role-specific skills, tools, permissions, and knowledge scopes; the platform provides employee identity, dispatch, server authorization, evidence, recovery, and versioned learning.
 
 **This is an experimental prototype.** I'm sharing it to get my ideas out there and explore how supervised digital workers could work. I know it isn't ready for me to dogfood in day-to-day work or for a business to adopt. The demonstrations, tests, and documented limitations reflect an idea in development, not a finished product.
 
-I started this because I haven't found a good option for enterprise computer-use agents that brings together reliability, security, and a feedback cycle that learns from humans. I want to explore how tested procedures, supervised assistance, and human corrections could lead to reusable skills that remain supervised when they reach future runs. Those are the goals behind this prototype, not qualities I'm claiming it has already achieved.
+I started this because I haven't found a good option for enterprise computer-use agents that brings together reliability, security, and a feedback cycle that learns from humans. I want to explore how tested procedures, supervised assistance, and human corrections could lead to reusable skills that operate within explicitly assigned permissions. Those are the goals behind this prototype, not qualities I'm claiming it has already achieved.
 
-The first runnable example is a Finance skill: a worker opens a synthetic invoice, compares it with a purchase order, identifies a discrepancy, and saves and verifies a correction draft. Staff can approve each operation, supervise unfamiliar situations, correct proposed actions, or take over the desktop.
+The first runnable example is a Finance skill: a worker opens a synthetic invoice, compares it with a purchase order, identifies a discrepancy, and saves and verifies a correction draft. A supervisor onboards the employee, decides when it may work independently, and can pause it or take over its desktop.
 
-Staff talk to a Deep Agent on the edge machine. It reads relevant skills and invokes their optional checkpointed LangGraph graphs, or composes approved operations when no procedure fits. **Strict is the only execution policy:** reading a skill, running its graph, and executing each operation require separate staff decisions.
+Staff talk to a Deep Agent on the edge machine. It reads relevant skills and invokes their optional checkpointed LangGraph graphs, or composes authorized operations when no procedure fits. **Auto is the only execution policy.** The server authorizes each operation against the requesting person and the active employee; there are no per-operation approval prompts.
 
-Accepted, verified work enters a durable learning queue. A separate model context proposes guidance or a declarative skill graph; trusted runtime checks validate it before automatic activation. Skills can accumulate procedures, observed field handling, and corrected instructions. Repeated failures and later feedback also trigger reviews. Skills cannot add arbitrary Python, grant permissions, or remove approvals. Future requests pin an immutable version; staff can suspend or roll back versions.
+Accepted, verified work enters a durable learning queue. A separate model context proposes guidance or a declarative skill graph; trusted runtime checks validate it before automatic activation. Skills can accumulate procedures, observed field handling, and corrected instructions. Repeated failures and later feedback also trigger reviews. Skills cannot add arbitrary Python, grant permissions, or activate an employee. Future requests pin an immutable version; staff can suspend or roll back versions.
 
 Staff can teach through ordinary chat. After a request ends, a separate edge reviewer looks for corrections, preferences and reusable lessons, links them to the conversation evidence, and can update skill instructions after runtime validation. No assessment form is needed. Inferred feedback is labeled separately from verified outcomes, and chat cannot add executable graph steps. [Conversation learning and screenshots](docs/conversation-learning-and-screenshots.md) describes the boundaries.
 
-Agent replies stream into chat as the model generates them. Reconnecting resumes from the last received event; completed replies replace their partial text, and interrupted replies remain labeled. Streaming does not change approval requirements. See [response streaming](docs/response-streaming.md) for implementation and validation.
+Agent replies stream into chat as the model generates them. Reconnecting resumes from the last received event; completed replies replace their partial text, and interrupted replies remain labeled. Streaming does not change execution authority. See [response streaming](docs/response-streaming.md) for implementation and validation.
 
-The agent can capture the entire Windows desktop and send an annotated screenshot in chat. Each capture and share requires approval; attachments retain their capture time. The browser test fixture captures only its own viewport. The Ubuntu Marketing worker uses an application API and does not currently expose an interactive desktop screenshot tool.
+The agent can capture the entire Windows desktop and send an annotated screenshot in chat. An active employee needs server authority for capture and sharing; attachments retain their capture time. The browser test fixture captures only its own viewport. The Ubuntu Marketing worker uses an application API and does not currently expose an interactive desktop screenshot tool.
 
-This implements the direction in the [agent-led learning plan](docs/plans/agent-led-learning-plan.md), which supersedes the graph-first ordering, Auto mode, and mandatory learned-package PR review in the [original specification](docs/plans/original-prompt.txt). Earlier reviewed releases and PRs remain historical evidence; they are not silently activated by this change.
+The [digital-employee validation](docs/digital-employee-validation.md) records the current tests, installed-worker checks and integration limits. The [digital-employee plan](docs/plans/digital-employees.md) supersedes the Strict-only policy. It builds on the [agent-led learning plan](docs/plans/agent-led-learning-plan.md), which replaced the graph-first ordering and mandatory learned-package PR review in the [original specification](docs/plans/original-prompt.txt). Earlier reviewed releases and PRs remain historical evidence; they are not silently activated by this change.
 
 The accepted learning milestone is complete for this prototype: its baseline passed **214 regression tests**, and live Windows runs demonstrate teaching, revision, reuse after restart, prior-case checks and rollback for two workflow families, plus guidance-only learning. The [validation record](docs/cumulative-learning-validation.md) includes the failed attempts and the limits of these results. Staff decisions in the demonstrations were simulated.
 
@@ -38,15 +38,15 @@ The accepted learning milestone is complete for this prototype: its baseline pas
 
 ![Enterprise Agent System console showing an example Finance workflow approval](docs/images/console.png)
 
-Staff return to one ongoing conversation. The edge manages its working context using notes and searchable history; earlier details remain available after a context reset. Internal execution records still keep each request's approvals, cancellation and evidence separate. See [persistent sessions](docs/plans/persistent-session-context.md).
+Staff return to one ongoing conversation. The edge manages its working context using notes and searchable history; earlier details remain available after a context reset. Internal execution records still keep each request's authorizations, cancellation and evidence separate. See [persistent sessions](docs/plans/persistent-session-context.md).
 
-Chat does not require a record selector. Say, for example, “Compare invoice INV-1043 with its purchase order without saving.” The agent identifies the target from the conversation or asks for clarification, then proposes that record for staff approval. The current Finance example binds one invoice per work request; subsequent application operations still require their own approvals. Ordinary conversation has no default invoice.
+Chat does not require a record selector. Say, for example, “Compare invoice INV-1043 with its purchase order without saving.” The agent identifies the target from the conversation or asks for clarification, then selects that record through a scoped server-authorized operation. The current Finance example binds one invoice per work request; subsequent operations receive their own exact server grants. Ordinary conversation has no default invoice.
 
-The agent should choose capabilities that match the requested outcome; a related skill does not have to run. It can use approved operations and observations without a skill graph. The short-lived hand-coded invoice-price shortcut has been removed: application procedures belong in learned skills, while the harness enforces execution and approvals. Learning composes a bounded set of installed Finance operations and can derive guidance from accepted observed answers. It cannot generate arbitrary new capabilities; insufficient evidence can produce no change. A record missing from the visible invoice list produces a clear lookup result.
+The agent should choose capabilities that match the requested outcome; a related skill does not have to run. It can use approved operations and observations without a skill graph. The short-lived hand-coded invoice-price shortcut has been removed: application procedures belong in learned skills, while the harness enforces execution authority. Learning composes a bounded set of installed Finance operations and can derive guidance from accepted observed answers. It cannot generate arbitrary new capabilities; insufficient evidence can produce no change. A record missing from the visible invoice list produces a clear lookup result.
 
-Turn on **Debug mode** above the chat to see recorded model calls, tool arguments and results, approvals, errors and observation evidence alongside the messages in chronological order. **Execution details** holds the latest status, execution ID, graph version and skill progress. One click expands an event to show its details; it stays open as replies stream. Chat messages appear once; debug entries omit copies of the model's public reply, including in expanded metadata. The toggle is remembered in your browser. Each request has an episode export link while debugging. A skill name identifies a package; `run_skill` is the tool that executes its graph, whose internal operations appear separately. This displays public explanations and recorded evidence, not private model reasoning, and does not change access or approval rules.
+Turn on **Debug mode** above the chat to see recorded model calls, tool arguments and results, authorization records, errors and observation evidence alongside the messages in chronological order. **Execution details** holds the latest status, execution ID, graph version and skill progress. One click expands an event to show its details; it stays open as replies stream. Chat messages appear once; debug entries omit copies of the model's public reply, including in expanded metadata. The toggle is remembered in your browser. Each request has an episode export link while debugging. A skill name identifies a package; `run_skill` is the tool that executes its graph, whose internal operations appear separately. This displays public explanations and recorded evidence, not private model reasoning, and does not change access rules.
 
-While work is active, **Stop** and **Take control / Release control** appear beside the chat composer. Operation approvals appear in the chat panel, and **Accept completed work** appears inline with a result when outcome acceptance is needed. Each acceptance applies to that specific result, including older results in the conversation. Completed conversations leave no separate execution card or disabled controls.
+While work is active, **Stop** and **Take control / Release control** appear beside the chat composer. **Accept completed work** appears inline with a result when outcome acceptance is needed. Each acceptance applies to that specific result, including older results in the conversation. Completed conversations leave no separate execution card or disabled controls.
 
 ## Developer setup
 
@@ -93,32 +93,29 @@ enterprise-harness
 
 The browser test workspace is at **[localhost:8000/mock](http://127.0.0.1:8000/mock)** in browser mode only. Windows deployments disable it. Use **Take control** before interacting with an active worker's desktop. Use **Release control** to resume automation.
 
-Staff can also add scoped organizational guidance for the worker to search with individual approval. See [knowledge setup and access boundaries](docs/organizational-knowledge.md).
+Staff can also add scoped organizational guidance for the worker to search under its assigned permissions. See [knowledge setup and access boundaries](docs/organizational-knowledge.md).
 
 ## Try the demonstration
 
-Describe a request in **Talk to your worker**, including the record in ordinary language when needed. The agent proposes its target for approval or asks a clarification. A conversation can contain several requests; each has its own budget and desktop lease. Choose the department with **Workspace** and describe the work in chat. Synthetic fault scenarios are exercised through the development test drivers.
+Select a **Digital employee** in the console. New and migrated employees begin in **shadowing**:
 
-| Try this | What you should see |
-| --- | --- |
-| “Prepare a correction draft” | The agent requests the correction skill, invokes its workflow, and asks approval for each child operation |
-| “Report the discrepancy without saving” | Supervised inspection and independently verified reporting; no draft is saved |
-| “Report and classify the discrepancy without saving” | A separate judgment node uses only the disclosed comparison evidence |
-| Changed amount field label | Approved observation and editing, followed by resuming the same skill run |
-| Unfamiliar dialog | A separately approved recovery action |
-| Interrupted Save confirmation | Reconciliation using the original operation identity; no blind second Save |
-| Covered or minimized Windows app | Application activation before the next preview |
-| Reject, cancel, or take control | Execution stops or pauses; existing authority cannot be reused |
+1. A supervisor describes a task in chat and chooses **Start demonstration**.
+2. **The human operates the agent's own computer**, through its VM console or remote desktop, using the installed apps and accounts the agent will use. This does not watch the mentor's separate computer.
+3. The observer samples that desktop, takes public notes and asks questions in the chat. It cannot click, type, focus windows or run skills during shadowing. Screenshots are sent to the configured model provider only during the explicit demonstration.
+4. The mentor explains the result and chooses **Finish demonstration**. The isolated learner may derive a guidance-only skill after runtime validation. Screen samples cannot certify an executable graph or prove competence.
+5. Under **Manage employee**, a supervisor selects **Active** and records a readiness assessment. The employee can now execute requests autonomously within its existing permissions. **Paused** stops new execution and observation; switching state cancels unfinished work rather than silently resuming it under new authority.
 
-Approve a meaningful registered operation, which may contain disclosed navigation clicks. A skill approval is never blanket approval of its children. Guidance in chat is not approval. Outcome acceptance is separate from approving actions.
+Windows capture uses the installed desktop controller. Linux shadowing requires an accessible X11 graphical session (`DISPLAY` and, where required, `XAUTHORITY` configured for the executor). A headless Campaign Desk API worker can execute Marketing requests but has no desktop to shadow until one is provisioned. Browser tests capture only the synthetic fixture viewport. Sampling is bounded to 180 frames and 12 observer model attempts per demonstration, with a 30-minute time limit; it is not a lossless click recorder.
 
-For a repeatable browser walkthrough, run `enterprise demo --simulate-staff` while `enterprise dev` is running. This explicitly simulated staff driver submits decisions on synthetic jobs. Model provenance is recorded separately.
+When active, describe the requested work and record in ordinary chat. The agent can ask for clarification, compose tools, use an existing skill, recover from changed UI state, and reconcile uncertain saves. **Stop** cancels the request; **Take control** and **Release control** transfer desktop ownership. Outcome acceptance remains optional feedback for learning, separate from permission to act.
+
+For a repeatable synthetic walkthrough, `enterprise demo --simulate-staff` uses an explicitly simulated supervisor. Model provenance remains separate from human simulation. Earlier validation documents describe the policy that was in effect when those runs occurred; they do not attest the new lifecycle.
 
 ## How it works
 
 ```mermaid
 flowchart LR
-    Staff[Conversation and approval console] <--> Server[Dispatch, evidence and metadata]
+    Staff[Conversation and employee supervision] <--> Server[Dispatch, evidence and metadata]
     Server <--> Agent
     Server -->|Exact signed grants| Authority
     subgraph Edge[Edge harness on Windows]
@@ -139,7 +136,7 @@ The execution ledger, fresh observations, exclusive desktop lease, fencing epoch
 
 See [architecture](docs/architecture.md), [department boundaries](docs/departments.md), and [library API verification](docs/api-verification.md). One VM is enough for this synthetic development example. Staff identities and security boundaries do not imply one VM per employee.
 
-The [security implementation](docs/security.md) adds individual identities, server-enforced resource permissions, exact signed execution grants, protected context and skill delivery, and separate planner/learner accounts on Windows and Ubuntu. The current regression suite passed **240 tests**, alongside actual Windows/Ubuntu access probes, live skill reuse and restart checks, and browser password setup/sign-in. Business operations remain Strict. The [security validation record](docs/security-validation.md) records actual account isolation, live learning and multi-host checks separately from simulated tests and remaining fleet limitations. Organizational SSO is intentionally outside the prototype; staff use email/password and workers retain separate service credentials.
+The [security implementation](docs/security.md) adds individual identities, server-enforced resource permissions, exact signed execution grants, protected context and skill delivery, and separate planner/learner accounts on Windows and Ubuntu. The current regression suite passed **240 tests**, alongside actual Windows/Ubuntu access probes, live skill reuse and restart checks, and browser password setup/sign-in. Those results predate the new employee lifecycle; they do not validate autonomous production use. The [security validation record](docs/security-validation.md) records actual account isolation, live learning and multi-host checks separately from simulated tests and remaining fleet limitations. Organizational SSO is intentionally outside the prototype; staff use email/password and workers retain separate service credentials.
 
 ## Teach a reusable improvement
 
@@ -147,14 +144,14 @@ The [security implementation](docs/security.md) adds individual identities, serv
 2. Select **Accept completed work**. The server queues the evidence once.
 3. When idle, the edge runs a bounded learner with scoped evidence and no inherited application/backend credentials. It proposes a skill or reports no justified change.
 4. The runtime checks scope, evidence, operation order, compatibility, and prior behavior. Synthetic cases vary records and amounts and exercise refusal conditions. The learner cannot declare its own tests passed.
-5. A passing immutable version activates automatically. **Accumulated skills & learning** shows the change, evidence, and status. A later request still requires every approval.
+5. A passing immutable version activates automatically. **Accumulated skills & learning** shows the change, evidence, and status. A later request still requires an active employee and server authorization.
 6. Use **Suspend** or **Activate this version** to stop future retrieval or roll back. Already running skill graphs retain their pinned version; cancel a running request if it must stop immediately.
 
 Seeded source packages live in `src/edge-harness/skills/`. Installed versions live under the edge's `EAS_DATA_DIR/skills/`, with `manifest.json`, `SKILL.md`, hashes, and a local registry. Executable specifications reference trusted operations; Markdown cannot execute shell snippets or import Python. File or dependency changes invalidate the installed package until it is requalified.
 
-The first slice supports Finance discrepancy reports, correction drafts, and guidance derived from accepted observed answers. Optional supporting text is retrieved only through a separately approved read. The learning view includes the instruction diff, operation changes, supporting evidence and runtime checks. Missing tools become development suggestions; they do not appear as invented capabilities.
+The first slice supports Finance discrepancy reports, correction drafts, and guidance derived from accepted observed answers. Optional supporting text is retrieved only through a separately authorized read. The learning view includes the instruction diff, operation changes, supporting evidence and runtime checks. Missing tools become development suggestions; they do not appear as invented capabilities.
 
-Workflow admission runs synthetic behavioral checks. Guidance-only admission checks contracts and evidence and explicitly labels behavioral evaluation as not performed. Neither proves that model instructions are correct. Strict approval remains in force regardless of test outcomes. Model changes are recorded without automatically replaying all historical experiences. Arbitrary applications and new Python functions remain outside this learning surface.
+Workflow admission runs synthetic behavioral checks. Guidance-only admission checks contracts and evidence and explicitly labels behavioral evaluation as not performed. Neither proves that model instructions are correct. Successful admission does not activate an employee or expand its permissions. Model changes are recorded without automatically replaying all historical experiences. Arbitrary applications and new Python functions remain outside this learning surface.
 
 The original PR-based resolver experiment has been removed. Git history and historical validation records preserve its results. Learned skills activate through runtime admission and use the skill registry for suspension and rollback; ordinary harness code changes remain development work.
 
@@ -192,9 +189,9 @@ ruff check src tools tests
 ruff format --check src tools tests
 ```
 
-Browser tests start their own backend and worker using temporary databases and a separate port. They cover parent/child approval, rejected Auto requests, stale and duplicate decisions, permissions, navigation and UI variants, known/unfamiliar/unsaved dialogs, screenshot corrections, takeover, exclusive control, and worker restart after an ambiguous save. Skill tests cover immutable versions, tampering, scope, dependency changes, queue replay, automatic admission and rollback.
+Browser tests start their own backend and worker using temporary databases and a separate port. They cover independently authorized graph steps, stale observations, duplicate execution prevention, permissions, navigation and UI variants, known/unfamiliar/unsaved dialogs, screenshots, takeover, exclusive control, and worker restart after an ambiguous save. Lifecycle tests cover observation-only shadowing, supervisor activation, revocation and teaching provenance. Skill tests cover immutable versions, tampering, scope, dependency changes, queue replay, automatic admission and rollback.
 
-See the [original requirement audit](docs/original-prompt-audit.md) and [validation record](docs/validation.md) for actual native Windows runs, including covered-window recovery and staff takeover. GitHub Actions installs Chromium and runs lint, formatting, and the test suite. The metrics view separates simulated and live runs and reports completion, approval requests, corrections, fallback jobs, model calls/tokens, elapsed time, and recorded incorrect-action events. Zero recorded incorrect actions is not proof that every possible UI action is correct.
+See the [original requirement audit](docs/original-prompt-audit.md) and [validation record](docs/validation.md) for actual native Windows runs, including covered-window recovery and staff takeover. GitHub Actions installs Chromium and runs lint, formatting, and the test suite. The metrics view separates simulated and live runs and reports completion, server authorizations, historical approvals, corrections, fallback jobs, model calls/tokens, elapsed time, and recorded incorrect-action events. Zero recorded incorrect actions is not proof that every possible UI action is correct.
 
 ## Project map
 
@@ -241,9 +238,11 @@ For an existing Windows checkout, stop the idle worker **before** upgrading and 
 
 | Status | Scope |
 | --- | --- |
-| **Implemented** | Runnable console, backend, worker, mock app; real cyclic LangGraph and Deep Agents; real browser automation; durable approval/evidence storage; Strict-only enforcement; agent-led skill tools; correction/takeover; bounded recovery; save reconciliation; declarative skill learning, automatic admission, version pinning and rollback |
+| **Implemented** | Runnable console, backend, worker, mock app; real cyclic LangGraph and Deep Agents; real browser automation; durable authority/evidence storage; shadowing/active/paused lifecycle; agent-led skill tools; correction/takeover; bounded recovery; save reconciliation; declarative skill learning, automatic admission, version pinning and rollback |
 | **Simulated by default** | The model's decisions, all accounting records, and staff decisions only when the explicit demo/test driver is used |
 | **Bounded prototype choices** | One synthetic company, Windows Finance and Ubuntu Marketing workers, bounded declarative learning, individual email/password accounts, SQLite persistence |
 | **Deferred** | Real QuickBooks and generic third-party Windows automation; broad real-model quality evaluation; general autonomous code generation; arbitrary graph-code deployment and checkpoint migration; multiworker fleet orchestration |
 
 The native adapter targets our own DemoBooks application. Generic Windows automation and real QuickBooks integration remain separate future adapters. No real accounting integration or production readiness is claimed.
+
+Private team channels can be the main communication surface: [Discord setup](docs/discord.md). The console remains available for supervision and debugging. Future MCP integrations should use MCP Apps where supported to preserve interactive shadowing; that integration is planned, not implemented.

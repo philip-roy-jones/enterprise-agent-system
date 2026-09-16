@@ -62,7 +62,7 @@ def test_hard_limit_rotates_complete_tool_pairs_without_erasing_history(tmp_path
 
 
 def test_persistent_chat_survives_reconnect_and_routes_guidance(browser_server):
-    from conftest import pending
+    from conftest import wait_for
 
     c = browser_server["client"]
     session = c.get("/api/chat").json()
@@ -81,7 +81,7 @@ def test_persistent_chat_survives_reconnect_and_routes_guidance(browser_server):
         ).json()["job"]["id"]
         == job["id"]
     )
-    pending(c, job["id"])
+    wait_for(c, job["id"], lambda d: d["job"]["status"] == "running")
     response = c.post(
         "/api/chat",
         json={

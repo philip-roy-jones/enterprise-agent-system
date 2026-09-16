@@ -86,7 +86,11 @@ class SessionContext:
     @staticmethod
     def scope(job):
         fields = ("conversation_id", "staff_id", "organization_id", "department_id", "role_id", "company_id")
-        return hashlib.sha256(canonical({k: job.get(k) for k in fields}).encode()).hexdigest()
+        values = {k: job.get(k) for k in fields}
+        if (job.get("communication") or {}).get("kind") == "discord":
+            values["staff_id"] = None  # Server-enrolled shared room, never client-selected.
+            values["employee_id"] = job.get("employee_id")
+        return hashlib.sha256(canonical(values).encode()).hexdigest()
 
     def archive(self, job, messages):
         scope = self.scope(job)

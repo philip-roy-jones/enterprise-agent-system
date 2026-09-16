@@ -27,7 +27,7 @@ def test_failed_refresh_never_relabels_historical_state_as_fresh(browser_server,
 def test_chat_replaces_assessment_form_and_existing_assessments_remain_in_metrics(browser_server):
     c = browser_server["client"]
     response = c.post(
-        "/api/chat", json={"invoice_id": "INV-1042", "task": "invoice_correction", "selected_mode": "strict"}
+        "/api/chat", json={"invoice_id": "INV-1042", "task": "invoice_correction", "selected_mode": "auto"}
     )
     response.raise_for_status()
     job_id = response.json()["job"]["id"]

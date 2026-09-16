@@ -7,7 +7,6 @@ from pydantic import ValidationError
 from eas_harness.adapters.adapter import BrowserAdapter
 from eas_harness.execution import ExecutionLayer
 from eas_harness.integrations.finance.operations import OPERATIONS
-from eas_harness.errors import Paused
 from eas_shared.types import Recovery
 from conftest import approve_operation
 from test_execution import FakeAdapter, node_args
@@ -90,14 +89,12 @@ def test_retry_in_strict_mode_needs_a_new_approval(store, job):
     def unavailable(args):
         raise Recovery("temporary", "Page loading")
 
-    with pytest.raises(Paused):
-        layer.run(job["id"], "first", "validate", node_args(job), unavailable)
-    store.decide(store.approvals(job["id"])[0]["id"], {"decision": "approve"})
-    with pytest.raises(Recovery):
-        layer.run(job["id"], "first", "validate", node_args(job), unavailable)
-    with pytest.raises(Paused):
-        layer.run(job["id"], "retry", "validate", node_args(job), unavailable)
-    assert store.approvals(job["id"])[-1]["status"] == "pending"
+    for invocation in ("first", "retry"):
+        with pytest.raises(Recovery):
+            layer.run(job["id"], invocation, "validate", node_args(job), unavailable)
+    records = store.approvals(job["id"])
+    assert len(records) == 2 and records[0]["id"] != records[1]["id"]
+    assert all(a["authorization"]["kind"] == "employee_policy" and a["decision"] is None for a in records)
 
 
 def test_unverified_save_output_never_becomes_confirmed_success(store, job):

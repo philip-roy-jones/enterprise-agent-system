@@ -130,7 +130,11 @@ def evidence_for(episode, library, *, review=False, related=()):
     approvals = {
         a["invocation"]: a
         for a in episode["approvals"]
-        if a["status"] == "executed" and a.get("decision", {}).get("decision") in {"approve", "correct"}
+        if a["status"] == "executed"
+        and (
+            a.get("authorization", {}).get("kind") == "employee_policy"
+            or (a.get("decision") or {}).get("decision") in {"approve", "correct"}
+        )
     }
     trace = job.get("operation_trace", [])
     for step in trace:
@@ -243,6 +247,50 @@ def validate_recommendations(proposals, evidence):
             }
         )
     return result
+
+
+def demonstration_evidence(episode, library):
+    job, events = episode["job"], episode["events"]
+    if (
+        job.get("execution_engine") != "shadow-1"
+        or job["status"] != "completed"
+        or job.get("acceptance_provenance") != "human_demonstration"
+        or not job.get("accepted")
+    ):
+        raise ValueError("Only a mentor-finished demonstration can teach guidance")
+    frames = [e for e in events if e["kind"] == "shadow_observation"]
+    outcome = next(
+        (e for e in reversed(events) if e["kind"] == "mentor_outcome" and e.get("actor") == job["staff_id"]),
+        None,
+    )
+    if not frames or not outcome:
+        raise ValueError("Demonstration has no captured evidence or attributed outcome")
+    previous, version = previous_skill(job, library, [], "guidance")
+    evidence = dict(
+        kind="demonstration",
+        episode_id=job["id"],
+        task=job["task"],
+        steps=[],
+        previous=previous,
+        labels=previous["amount_labels"] if previous else ["Correction amount"],
+        scope={
+            **{k: job[k] for k in SCOPE},
+            "application_version": job["app_version"],
+            "capability_version": "marketing-1" if job["role_id"] == "campaign_review" else "finance-1",
+        },
+        verification={},
+        mentor_outcome=outcome,
+        catalog=library.catalog(job),
+        guidance=[e for e in events if e["kind"] in {"mentor_message", "shadow_notes"}][-20:],
+        samples=[
+            {"revision": e["revision"], "state": e["state"], "screenshot": e["screenshot"]}
+            for e in frames[:: max(1, len(frames) // 8)]
+        ][:8],
+        authority="Sampled human demonstration; no verified agent operations. Guidance only, steps must remain empty.",
+    )
+    if len(canonical(evidence)) > 40000:
+        raise ValueError("Demonstration exceeds learning context budget")
+    return evidence, version
 
 
 def admit(library, candidate, evidence, previous_version, provenance=None):
@@ -371,11 +419,15 @@ def maintain(settings, store, worker_id, library=None):
 
                     result = review(settings, store, library, item)
                 else:
-                    evidence, previous_version = evidence_for(
-                        item["episode"],
-                        library,
-                        review=item["kind"] == "review",
-                        related=item.get("related", []),
+                    evidence, previous_version = (
+                        demonstration_evidence(item["episode"], library)
+                        if item["kind"] == "shadow_review"
+                        else evidence_for(
+                            item["episode"],
+                            library,
+                            review=item["kind"] == "review",
+                            related=item.get("related", []),
+                        )
                     )
                     output = subprocess_json(
                         "eas_harness.learner_process",

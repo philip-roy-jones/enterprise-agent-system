@@ -58,7 +58,7 @@ OPERATIONS["observe_app"] = Operation(
 )
 OPERATIONS["review_discovery"] = Operation(
     "Review the assistant's answer against the requested outcome and campaign evidence",
-    "Staff confirms the reported outcome; acceptance is recorded separately",
+    "Agent report only; human acceptance is recorded separately",
     input_model=CampaignReview,
     output_model=Reviewed,
     conditions="Recorded campaign evidence",

@@ -11,7 +11,6 @@ const $ = (id) => document.getElementById(id),
           "'": "&#39;",
         })[c],
     );
-const submitted = new Set();
 const streamedEvents = new Map();
 const renderedBubbles = new Map();
 let renderedSession = null, renderedJobs = [];
@@ -20,10 +19,8 @@ let roles = [];
 let desktopAdapter = "browser";
 let activeView = "jobs";
 let active = null,
-  selectedApproval = null,
   current = null,
   source = null,
-  lastImage = "",
   refreshing = false;
 function toast(text) {
   $("toast").textContent = text;
@@ -47,7 +44,6 @@ async function api(path, body) {
     renderedSession = null;
     renderedJobs = [];
     $("chat-controls").hidden = true;
-    $("review-panel").hidden = true;
     $("session-messages").replaceChildren();
     if (!$("login-dialog").open) $("login-dialog").showModal();
     throw Error("Connect to your workspace to continue.");
@@ -131,127 +127,38 @@ function selectRequest(id) {
   if (active === id) return;
   active = id;
   streamedEvents.clear();
-  selectedApproval = null;
   current = null;
   $("chat-controls").hidden = true;
-  $("review-panel").hidden = true;
-  lastImage = "";
   connectStream();
 }
 function renderDetail(d) {
   current = d;
-  const j = d.job,
-    pending = d.approvals.find(
-      (a) => a.status === "pending" && !submitted.has(a.id),
-    ),
-    done = ["completed", "cancelled", "rejected", "failed", "denied"].includes(
-      j.status,
-    );
+  const done = ["completed", "cancelled", "rejected", "failed", "denied"].includes(d.job.status);
   $("chat-controls").hidden = done;
   $("cancel-job").disabled = done;
-  $("takeover").disabled = done || d.lease.job_id !== j.id;
+  $("takeover").disabled = done || d.lease.job_id !== d.job.id;
   $("takeover").textContent = d.lease.owner === "staff" ? "Release control" : "Take control";
-  const latestObs = [...d.events]
-    .reverse()
-    .find((e) => e.kind === "observation")?.data;
-  let obs = pending?.observation || latestObs;
-  if (obs?.screenshot && obs.screenshot !== lastImage) {
-    $("screenshot").src = "/api/artifacts/" + obs.screenshot;
-    lastImage = obs.screenshot;
-  }
-  $("screenshot-wrap").hidden = !obs?.screenshot;
-  $("review-panel").hidden = !pending;
-  $("review-controls").hidden = !pending;
-  if (pending) {
-    $("review-title").textContent =
-      pending.kind === "tool"
-        ? "Agent requests your decision"
-        : "Review next operation";
-    $("review-kind").textContent =
-      pending.kind === "tool" ? "STRICT · TOOL APPROVAL" : "NODE APPROVAL";
-    $("proposal-copy").innerHTML =
-      `<h3>${esc(pending.name.replaceAll("_", " "))}</h3><p>${esc(pending.description)}</p><div class="proposal-meta"><span>Target<strong>${esc(pending.inputs.department_id || "finance")} / ${esc(pending.inputs.record_id || pending.inputs.invoice_id)}</strong></span><span>Expected result<strong>${esc(pending.expected)}</strong></span></div>${pending.inputs.assistant_report ? `<p><strong>Requested outcome</strong><br>${esc(pending.inputs.request)}</p><p><strong>Assistant report</strong><br>${esc(pending.inputs.assistant_report)}</p>` : ""}`;
-    const expected = pending.inputs.expected;
-    if (pending.inputs.judgment) {
-      const judgment = pending.inputs.judgment;
-      const comparison = judgment.context.comparison;
-      $("proposal-copy").innerHTML += `<p><strong>Independent model judgment</strong><br>Invoice: $${esc((comparison.invoice_amount / 100).toFixed(2))} · Purchase order: $${esc((comparison.purchase_order_amount / 100).toFixed(2))} · Difference: $${esc((comparison.difference / 100).toFixed(2))}<br>Model: ${esc(judgment.model)} · Prompt: ${esc(judgment.prompt_version)}</p><details><summary>Exact judgment inputs and prompt</summary><pre>${esc(JSON.stringify(judgment, null, 2))}</pre></details>`;
-    }
-    if (["prepare", "save", "save_draft"].includes(pending.name) && expected) {
-      $("proposal-copy").innerHTML += `<p><strong>Correction amount:</strong> $${esc((expected.amount / 100).toFixed(2))}<br><strong>Explanation:</strong> ${esc(expected.note)}</p>`;
-    }
-    if (pending.name === "set_field") {
-      $("proposal-copy").innerHTML += `<p><strong>Text to enter in ${esc(pending.arguments.field === "amount" ? "correction amount" : "correction explanation")}:</strong><br>${esc(pending.arguments.value)}</p>`;
-    }
-    if (pending.name === "share_screenshot") {
-      const captured = d.events.filter(e => e.kind === "action_result").map(e => e.data.result?.value).find(v => v?.screenshot === pending.arguments.screenshot);
-      if (captured) $("proposal-copy").innerHTML += renderScreenshot({...captured, ...pending.arguments});
-    }
-    if (pending.name === "ask_staff") $("proposal-copy").innerHTML += `<p><strong>Question:</strong> ${esc(pending.arguments.question)}</p>`;
-    if (pending.name === "search_knowledge") $("proposal-copy").innerHTML += `<p><strong>Search for:</strong> ${esc(pending.arguments.query)}</p>`;
-    if (selectedApproval?.id !== pending.id) {
-      selectedApproval = pending;
-      $("arguments").value = JSON.stringify(pending.arguments, null, 2);
-      $("decision-note").value = "";
-      drawTarget(pending.arguments, obs);
-    }
-    $("arguments").readOnly = pending.kind !== "tool";
-    $("correct").hidden = pending.kind !== "tool";
-    $("approve").textContent =
-      pending.kind === "tool" ? "Approve tool call" : "Approve operation";
-  } else {
-    selectedApproval = null;
-    $("review-title").textContent = "Review operation";
-    $("review-kind").textContent =
-      j.model_mode === "simulated" ? "SIMULATED ASSISTANCE" : "LIVE MODEL";
-    $("proposal-copy").innerHTML = "";
-    $("target-circle").hidden = true;
-  }
 }
-function drawTarget(args, obs) {
-  let t = obs.targets.find((t) => t.target === args.target);
-  if (args.x != null) t = args;
-  if (!t) {
-    $("target-circle").hidden = true;
-    return;
-  }
-  $("target-circle").hidden = false;
-  $("target-circle").style.left = (t.x / obs.width) * 100 + "%";
-  $("target-circle").style.top = (t.y / obs.height) * 100 + "%";
-}
-$("screenshot").onclick = (e) => {
-  if (selectedApproval?.name !== "click") return;
-  const r = e.target.getBoundingClientRect(),
-    obs = selectedApproval.observation,
-    args = {
-      x: Math.round(((e.clientX - r.left) / r.width) * obs.width),
-      y: Math.round(((e.clientY - r.top) / r.height) * obs.height),
-    };
-  $("arguments").value = JSON.stringify(args, null, 2);
-  drawTarget(args, obs);
+$("employee-state-form").onsubmit = event => {
+  event.preventDefault();
+  action(async () => {
+    const c = workforceView.scope();
+    await api(`/api/employees/${encodeURIComponent(c.employee_id)}/state`, {state: $("employee-state").value, reason: $("employee-reason").value});
+    $("employee-reason").value = "";
+    $("employee-management").open = false;
+    transcriptCache.clear();
+    transcriptSession = null;
+    $("session-messages").replaceChildren();
+    delete $("session-messages").dataset.shadowMarkup;
+  });
 };
-async function decide(decision) {
-  if (!selectedApproval) return;
-  const id = selectedApproval.id;
-  for (const b of ["approve", "correct", "reject"]) $(b).disabled = true;
-  try {
-    await api(`/api/approvals/${id}`, {
-      decision,
-      explanation: $("decision-note").value,
-      ...(decision === "correct"
-        ? { arguments: JSON.parse($("arguments").value) }
-        : {}),
-    });
-    submitted.add(id);
-    selectedApproval = null;
-    $("review-controls").hidden = true;
-  } finally {
-    for (const b of ["approve", "correct", "reject"]) $(b).disabled = false;
-  }
-}
-$("approve").onclick = () => action(() => decide("approve"));
-$("correct").onclick = () => action(() => decide("correct"));
-$("reject").onclick = () => action(() => decide("reject"));
+$("finish-demonstration").onsubmit = event => {
+  event.preventDefault();
+  action(async () => {
+    await api(`/api/demonstrations/${workforceView.demo.job.id}/finish`, {text: $("demonstration-outcome").value});
+    $("demonstration-outcome").value = "";
+  });
+};
 $("cancel-job").onclick = () =>
   action(() => api(`/api/jobs/${active}/cancel`, {}));
 $("takeover").onclick = () =>
@@ -277,7 +184,7 @@ function selectView(view) {
   $("page-title").textContent = metrics ? "Evaluation metrics" : "Work, with oversight.";
   $("page-description").textContent = metrics
     ? "Compare simulated and live runs. Results refresh automatically."
-    : "Describe the outcome. Approve the work. Teach the next request.";
+    : "Teach by demonstration. Delegate work. Follow the results.";
 }
 function metricValue(name, value) {
   if (value == null) return "—";
@@ -303,12 +210,26 @@ async function refresh() {
   if (refreshing) return;
   refreshing = true;
   try {
-    if (!roles.length) {
-      roles = await api("/api/roles");
-      $("chat-workspace").innerHTML = roles.map(r => `<option value="${esc(r.id)}">${esc(r.department_name)} · ${esc(r.name)}</option>`).join("");
+    if (!roles.length) roles = await api("/api/roles");
+    const selection = await workforceView.refresh();
+    const health = await api("/api/health");
+    desktopAdapter = health.desktop_adapter;
+    $("test-workspace").hidden = desktopAdapter !== "browser";
+    $("model-label").textContent = health.model_mode === "simulated" ? "Simulated assistance" : "Live model";
+    if (!selection) return;
+    if (workforceView.render()) {
+      if (activeView === "metrics") await refreshMetrics();
+      else await refreshLearning();
+      return;
     }
-    if (!roles.length) return;
-    const session = await api("/api/chat?role_id=" + encodeURIComponent($("chat-workspace").value));
+    document.querySelector("#chat-form button").textContent = "Send";
+    const params = new URLSearchParams({role_id:selection.role_id, company_id:selection.company_id, organization_id:selection.organization_id, employee_id:selection.employee_id});
+    let session;
+    if (selection.channel_id) {
+      const turns = (await api("/api/jobs")).filter(j => j.conversation_id === selection.conversation_id);
+      session = {conversation_id:selection.conversation_id, current:turns.sort((a,b)=>b.created_at-a.created_at)[0] || null};
+      $("chat-request").placeholder = "Send messages in the connected Discord channel";
+    } else session = await api("/api/chat?" + params);
     // Display only this authenticated conversation. Browser storage and the
     // all-request audit endpoint cannot select another identity's execution.
     const jobs = (await api("/api/jobs")).filter(j => j.conversation_id === session.conversation_id);
@@ -324,14 +245,8 @@ async function refresh() {
       renderDetail(detail);
     } else {
       $("chat-controls").hidden = true;
-      $("review-panel").hidden = true;
     }
     await renderSession(session, jobs, detail);
-    const health = await api("/api/health");
-    desktopAdapter = health.desktop_adapter;
-    $("test-workspace").hidden = desktopAdapter !== "browser";
-    $("model-label").textContent =
-      health.model_mode === "simulated" ? "Simulated assistance" : "Live model";
     if (activeView === "metrics") await refreshMetrics();
     else await refreshLearning();
   } catch (e) {
@@ -346,6 +261,7 @@ $("chat-workspace").onchange = () => {
   requestDraft = null;
   transcriptCache.clear();
   $("session-messages").replaceChildren();
+  delete $("session-messages").dataset.shadowMarkup;
   refresh();
 };
 let conversationId = null;
@@ -384,11 +300,13 @@ $("chat-form").onsubmit = (e) => {
   e.preventDefault();
   action(async () => {
     const task = $("chat-request").value.trim();
+    if (await workforceView.send(task)) { $("chat-request").value = ""; return; }
     if (!requestDraft || requestDraft.task !== task || requestDraft.conversation_id !== conversationId) {
       conversationId ||= crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`;
-      const role = roles.find(r => r.id === $("chat-workspace").value);
+      const scope = workforceView.scope();
+      const role = roles.find(r => r.id === scope?.role_id);
       if (!role) throw Error("Select an authorized workspace");
-      requestDraft = {task, department_id:role.department_id, role_id:role.id, conversation_id:conversationId,request_id:crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`};
+      requestDraft = {employee_id:scope.employee_id, organization_id:scope.organization_id, company_id:scope.company_id, task, department_id:role.department_id, role_id:role.id, conversation_id:conversationId,request_id:crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`};
     }
     const result = await api("/api/chat",requestDraft);
     const job = result.job;
@@ -412,7 +330,7 @@ async function renderSession(session, jobs, selectedDetail) {
   const done = !j || ["completed", "cancelled", "rejected", "failed", "denied"].includes(j.status);
   $("chat-request").placeholder = done
     ? "Continue the conversation or describe your next task…"
-    : "Reply, clarify, or give guidance. This does not approve an operation…";
+    : "Reply, clarify, or give guidance. The employee continues within its assigned permissions…";
   const history = jobs.filter(turn => turn.conversation_id === session.conversation_id)
     .sort((a,b) => a.created_at - b.created_at || a.id.localeCompare(b.id));
   const visible = history.slice(-transcriptLimit);
@@ -458,9 +376,9 @@ function renderTranscript(session, jobs) {
     const messages = chatStream.events(data.events, data.job.status).filter(event => ["staff_message", "assistant_message", "assistant_question"].includes(event.kind) || (event.kind === "action_result" && shares.has(event.data.invocation)));
     const last = messages.at(-1) || data.events.at(-1) || {at:turn.created_at, seq:0};
     const notice = outcomeNotice(data.job);
-    return [{id: "request-"+turn.id, requestId: turn.id, modelMode:turn.model_mode, at: turn.created_at, seq: created?.seq || 0, speaker: "staff", text: turn.task, record: turn.record_id}, ...debug,
+    return [{id: "request-"+turn.id, requestId: turn.id, modelMode:turn.model_mode, at: turn.created_at, seq: created?.seq || 0, speaker: "staff", actor:turn.staff_name || turn.staff_id, text: turn.task, record: turn.record_id}, ...debug,
       ...(chatDebug ? [{at:turn.created_at, seq:(created?.seq || 0) + 0.1, execution:data}] : []),
-      ...messages.map(event => ({id: event.data.message_id && event.kind === "assistant_message" ? "reply-"+event.data.message_id : "event-"+event.seq, at: event.at, seq: event.seq, speaker: event.kind === "staff_message" ? "staff" : "agent", text: event.data.text || event.data.question || "", partial:event.partial, interrupted:event.interrupted, attachment: event.kind === "action_result" ? event.data.result?.value?.data : null})),
+      ...messages.map(event => ({id: event.data.message_id && event.kind === "assistant_message" ? "reply-"+event.data.message_id : "event-"+event.seq, at: event.at, seq: event.seq, speaker: event.kind === "staff_message" ? "staff" : "agent", actor:event.data.actor, text: event.data.text || event.data.question || "", partial:event.partial, interrupted:event.interrupted, attachment: event.kind === "action_result" ? event.data.result?.value?.data : null})),
       ...(notice ? [{at:last.at, seq:last.seq + 0.5, requestId:turn.id, notice}] : [])];
   }).sort((a,b) => a.at-b.at || a.seq-b.seq);
   const markup = entries.map(entry => {
@@ -468,7 +386,7 @@ function renderTranscript(session, jobs) {
     if (entry.execution) return activityView.execution(entry.execution);
     if (entry.notice) return `<div class="chat-outcome" data-message-id="outcome-${esc(entry.requestId)}">${entry.notice === "acceptance" ? `<button type="button" class="primary" data-accept-request="${esc(entry.requestId)}" ${accepting.has(entry.requestId) ? "disabled" : ""}>Accept completed work</button>` : `<p>${esc(entry.notice)}</p>`}</div>`;
     const date = new Date(entry.at*1000);
-    return `<div class="chat-message ${entry.speaker}${entry.partial && !entry.interrupted ? " streaming" : ""}" data-message-id="${esc(entry.id)}"><div class="chat-message-meta"><strong>${entry.speaker === "staff" ? "Staff" : "Worker"}${entry.record ? ` · ${esc(entry.record)}` : ""}</strong><time datetime="${date.toISOString()}" title="${esc(date.toLocaleString())}">${esc(date.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}))}</time></div><p>${esc(entry.text)}</p>${entry.partial ? `<small class="stream-status">${entry.interrupted ? "Response interrupted" : "Responding…"}</small>` : ""}${entry.attachment ? renderScreenshot(entry.attachment) : ""}${entry.requestId && chatDebug ? `<div class="chat-debug-request"><span>${entry.modelMode === "live" ? "Live model" : "Simulated model"}</span><a class="chat-activity-link" href="/api/jobs/${encodeURIComponent(entry.requestId)}/episode" target="_blank" rel="noopener">Export episode ↗</a></div>` : ""}</div>`;
+    return `<div class="chat-message ${entry.speaker}${entry.partial && !entry.interrupted ? " streaming" : ""}" data-message-id="${esc(entry.id)}"><div class="chat-message-meta"><strong>${entry.speaker === "staff" ? esc(entry.actor || "Staff") : "Worker"}${entry.record ? ` · ${esc(entry.record)}` : ""}</strong><time datetime="${date.toISOString()}" title="${esc(date.toLocaleString())}">${esc(date.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}))}</time></div><p>${esc(entry.text)}</p>${entry.partial ? `<small class="stream-status">${entry.interrupted ? "Response interrupted" : "Responding…"}</small>` : ""}${entry.attachment ? renderScreenshot(entry.attachment) : ""}${entry.requestId && chatDebug ? `<div class="chat-debug-request"><span>${entry.modelMode === "live" ? "Live model" : "Simulated model"}</span><a class="chat-activity-link" href="/api/jobs/${encodeURIComponent(entry.requestId)}/episode" target="_blank" rel="noopener">Export episode ↗</a></div>` : ""}</div>`;
   }).join("");
   const transcript = $("session-messages");
   if (markup !== transcriptMarkup) {
@@ -515,7 +433,7 @@ function setChatDebug(enabled) {
   localStorage.setItem("eas-chat-debug", String(enabled));
   $("debug-mode").setAttribute("aria-pressed", String(enabled));
   $("session-messages").classList.toggle("debug-enabled", enabled);
-  renderCurrentTranscript();
+  if (!workforceView.render()) renderCurrentTranscript();
 }
 $("debug-mode").onclick = () => setChatDebug(!chatDebug);
 setChatDebug(chatDebug);

@@ -7,7 +7,6 @@ from eas_shared.types import JobInput
 from eas_shared.screenshots import Annotation, captured_screen
 from eas_harness.execution import ExecutionLayer
 from eas_harness.screenshots import screen_tool
-from eas_harness.errors import Paused
 from test_security_boundaries import secured, new_job  # noqa: F401
 
 
@@ -49,11 +48,6 @@ def test_full_screen_capture_and_share_need_approval_but_no_invoice_or_focus(sto
             kind="tool",
         )
 
-    with pytest.raises(Paused):
-        run("capture_screen", {})
-    assert not captured
-    approval = store.approvals(job["id"])[-1]
-    store.decide(approval["id"], {"decision": "approve"}, actor="simulated-staff")
     result = run("capture_screen", {})
     assert result["value"]["surface"] == "desktop"
     args = dict(
@@ -61,10 +55,6 @@ def test_full_screen_capture_and_share_need_approval_but_no_invoice_or_focus(sto
         caption="The visible test screen",
         annotations=[dict(kind="arrow", x=0.1, y=0.2, x2=0.7, y2=0.8, label="Look here")],
     )
-    with pytest.raises(Paused):
-        run("share_screenshot", args)
-    approval = store.approvals(job["id"])[-1]
-    store.decide(approval["id"], {"decision": "approve"}, actor="simulated-staff")
     shared = run("share_screenshot", args)["value"]["data"]
     assert shared["captured_at"] == result["value"]["captured_at"]
     assert len(shared["annotations"]) == 1 and len(captured) == 1
