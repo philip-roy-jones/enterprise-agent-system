@@ -12,7 +12,7 @@ Publish both Windows executables:
 
 ```bash
 dotnet publish src/test-software/demobooks/DemoBooks/DemoBooks.csproj -c Release -r win-x64 --self-contained true -o src/test-software/demobooks/publish
-dotnet publish src/application-mediator/windows/DesktopAgent/DesktopAgent.csproj -c Release -r win-x64 --self-contained true -o src/application-mediator/windows/desktop-publish
+dotnet publish src/edge-harness/windows/DesktopAgent/DesktopAgent.csproj -c Release -r win-x64 --self-contained true -o src/edge-harness/windows/desktop-publish
 ```
 
 Copy both published directories and the installers to the Windows machine. In PowerShell, install DemoBooks with its application API disabled and install the independent controller:
@@ -28,7 +28,15 @@ Run LangGraph and the Deep Agent harness **on the same Windows machine** as the 
 
 The private controller token is in `%LOCALAPPDATA%\EnterpriseAgentSystem\DesktopAgent\data\bridge.token`. Configure it only on the Windows worker. Set `EAS_DESKTOP_INPUT_MODE=mouse_keyboard` for actual clicks and typing, or `accessibility` for control patterns. The controller belongs to the automation infrastructure; DemoBooks' application API on port 8765 remains disabled.
 
-For filtered observations and office-authorized controls, install the separate [Application Mediator](application-mediator.md). The harness then connects to mediator port 8768 and the native token belongs only in mediator configuration. The raw connection described above is an unmediated test setup.
+## Upgrading a former mediator installation
+
+The Application Mediator experiment has been removed. Existing installations must reconnect the executor to the native controller before resuming work:
+
+1. Wait for active work to finish, stop the planner/executor/learner tasks, and back up configuration and runtime data.
+2. Stop and unregister `EAS-ApplicationMediator`. Remove its service principal (`kind: mediator`) from the office identity registry before restarting the upgraded server; keep all other identities and historical evidence. Existing browser sessions may require sign-in again after this registry change.
+3. Remove `EAS_MEDIATOR_*` settings from the executor configuration. Set `EAS_DESKTOP_AGENT_URL=http://127.0.0.1:8766` and securely copy the controller token into `EAS_DESKTOP_AGENT_TOKEN`. Keep this credential out of planner and learner configuration.
+4. Install the updated shared contracts and harness. With `EAS_ENV_FILE` pointing to the executor configuration, run `python -m eas_harness.migrate --from-root PATH_TO_EXECUTOR_RUNTIME` while the worker is stopped to requalify existing skills against the restored adapter. Preserve chat, checkpoints, and skill history.
+5. Archive the retired service's runtime evidence, remove its installation and enrollment credentials, and restart the worker components. The native controller and DemoBooks stay installed. Old filtered screenshots retain their original label in chat history.
 
 ## Observation, approvals, and verification
 

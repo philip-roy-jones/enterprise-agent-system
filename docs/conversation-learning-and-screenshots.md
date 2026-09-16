@@ -20,13 +20,15 @@ Reviews are bounded, and the model can miss or misunderstand a correction. They 
 
 ## Screenshots in chat
 
-`capture_screen` needs current server authority and the desktop lease, but no invoice selection. With the separate [Application Mediator](application-mediator.md) configured, it returns a filtered accessibility projection labeled `mediated_application`; unknown content and restricted fields are withheld. It does not reveal other windows. The unmediated Windows adapter captures the entire virtual desktop, while the browser fixture captures its test viewport. The API-only Marketing worker has no desktop capture tool.
+`capture_screen` reads the entire Windows virtual desktop, including other visible windows and monitors, without activating DemoBooks. It needs current server authority and the desktop lease, but no invoice selection. The authenticated Windows controller must run in an interactive desktop session. The browser fixture captures its test viewport and labels it accordingly. The API-only Ubuntu Marketing worker has no desktop capture tool.
 
 The model sees the captured image. Durable context stores its artifact reference; image bytes are loaded only at the provider boundary. The newest capture in the current request is included, avoiding repeated image copies in checkpoints and premature context rotation from base64 text.
 
 `share_screenshot` proposes a caption and optional rectangles, circles, arrows or text labels. A simple request to see the screen defaults to a plain screenshot; the agent adds drawings only when they help explain something or staff requests them. Coordinates are normalized to the full image. Annotations are bounded typed data rendered by trusted frontend code; the model cannot supply HTML, SVG or executable drawing scripts. Active employees use server authorization for capture and sharing; historical staff approvals retain their original provenance.
 
 Only a completed capture from the same request can be shared or retrieved by the planner. The server checks the assigned worker, current staff authorization and artifact ownership. Chat renders the completed share receipt, not an unverified model message. Attachments show the capture time and remain chronological with the rest of the conversation. They are historical evidence, not live application state or authorization to click.
+
+The Application Mediator experiment has been removed. Existing filtered captures retain their original `mediated_application` label so old evidence is not misrepresented as a full desktop screenshot. Current captures use the native desktop controller directly.
 
 ## Verification
 

@@ -195,7 +195,3 @@ The legacy database table and some protocol fields retain the name `approvals` f
 Keep server and worker clocks synchronized (Windows Time or an equivalent NTP service). Grants are short-lived. The edge allows two seconds of clock difference during its preliminary signature check; authoritative expiry and one-time consumption remain enforced on the server without grace. A clock failure stops the operation rather than bypassing authorization.
 
 For private team communication, see [Discord setup](discord.md). The optional bridge runs on the server, not inside each employee's VM. Future MCP Apps support is described in the [digital-employee plan](plans/digital-employees.md#future-mcp-apps-direction-not-implemented-in-this-delivery).
-
-## Optional application mediation
-
-The [Application Mediator](application-mediator.md) is a separately installed application with its own service identity, protected credentials, native controller and input ledger. Enroll it for an existing employee, assign office policy, and connect the executor to it. Its central developer inspector shows the last filtered observation. Native controller source and installer now live under `src/application-mediator/windows/`.

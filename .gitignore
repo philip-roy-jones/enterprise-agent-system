@@ -6,7 +6,6 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 runtime/
-mediator-runtime/
 .sites-runtime/
 **/bin/
 **/obj/

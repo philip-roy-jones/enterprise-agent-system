@@ -10,6 +10,8 @@ class ScreenCapture(WireModel):
     width: int = Field(gt=0, le=20000)
     height: int = Field(gt=0, le=20000)
     captured_at: float
+    # Keep the retired surface readable in historical captures and chat attachments.
+    # Current adapters produce only desktop or browser_fixture.
     surface: Literal["desktop", "browser_fixture", "mediated_application"]
 
 

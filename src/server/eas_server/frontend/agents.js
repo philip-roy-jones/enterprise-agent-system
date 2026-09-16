@@ -23,8 +23,6 @@ const agentPages = {
     $("agent-grid").replaceChildren();
     $("agent-details-content").replaceChildren();
     $("agent-details").hidden = true;
-    $("mediated-view").hidden = true;
-    $("mediated-surface").replaceChildren();
     $("agent-channels").replaceChildren();
     $("chat-composer").hidden = $("learning-panel").hidden = true;
     $("agent-unavailable").hidden = true;
@@ -64,9 +62,6 @@ const agentPages = {
       return false;
     }
     this.agent = data;
-    $("mediated-view").hidden = !data.services.some(s => s.kind === "mediator" && s.enabled);
-    $("mediated-view").ontoggle = () => { if ($("mediated-view").open) this.mediatedView(); };
-    $("mediated-refresh").onclick = () => this.mediatedView();
     $("page-title").textContent = data.name;
     $("page-description").textContent = `${data.id} · ${this.state(data)}`;
     document.title = `${data.name} · Enterprise Agent System`;
@@ -79,30 +74,5 @@ const agentPages = {
     const links = choices.filter(c=>c.channel_id).map(c=>`<a class="agent-channel" href="https://discord.com/channels/${encodeURIComponent(c.communication.guild_id)}/${encodeURIComponent(c.channel_id)}" target="_blank" rel="noopener noreferrer">#${esc(c.name)} <span aria-hidden="true">↗</span></a>`).join("");
     $("agent-channels").innerHTML = links;
     $("agent-channels").hidden = !links;
-  },
-  async mediatedView() {
-    const surface = $("mediated-surface");
-    surface.replaceChildren();
-    try {
-      const result = await api(`/api/employees/${encodeURIComponent(this.employeeId)}/mediated-view`);
-      const view = result.view;
-      $("mediated-status").textContent = `Last observation: ${new Date(result.updated_at * 1000).toLocaleString()} · Filtered accessibility view · Hover a control for its description`;
-      const image = document.createElement("img");
-      image.alt = "DemoBooks mediated accessibility view. Restricted and unknown content is withheld.";
-      if (!/^[A-Za-z0-9+/=]+$/.test(view.screenshot)) throw new Error("Invalid mediated image");
-      image.src = `data:image/png;base64,${view.screenshot}`;
-      surface.append(image);
-      for (const node of view.elements.filter(n => n.mediated_target)) {
-        const outline = document.createElement("span");
-        outline.className = `mediated-control${node.enabled ? "" : " blocked"}`;
-        outline.title = `${node.description}${node.blocked_reason ? ` · ${node.blocked_reason}` : ""}`;
-        outline.setAttribute("aria-label", outline.title);
-        outline.tabIndex = 0;
-        Object.assign(outline.style, {left:`${(node.x - node.width/2)/view.width*100}%`, top:`${(node.y - node.height/2)/view.height*100}%`, width:`${node.width/view.width*100}%`, height:`${node.height/view.height*100}%`});
-        surface.append(outline);
-      }
-    } catch (error) {
-      $("mediated-status").textContent = error.status === 404 ? "No observation is available yet. This viewer does not capture or control the desktop." : error.status === 403 ? "You do not have access to this application's evidence." : "Mediated view unavailable.";
-    }
   },
 };

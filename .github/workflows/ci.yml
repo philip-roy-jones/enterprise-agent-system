@@ -42,7 +42,7 @@ jobs:
           dotnet-version: '10.0.x'
       - run: dotnet run --project src/test-software/demobooks/AccountingSmoke/AccountingSmoke.csproj -c Release
       - run: dotnet publish src/test-software/demobooks/DemoBooks/DemoBooks.csproj -c Release -r win-x64 --self-contained true -o src/test-software/demobooks/publish
-      - run: dotnet publish src/application-mediator/windows/DesktopAgent/DesktopAgent.csproj -c Release -r win-x64 --self-contained true -o src/application-mediator/windows/desktop-publish
+      - run: dotnet publish src/edge-harness/windows/DesktopAgent/DesktopAgent.csproj -c Release -r win-x64 --self-contained true -o src/edge-harness/windows/desktop-publish
       - uses: actions/upload-artifact@v4
         with:
           name: DemoBooks-Windows-x64
@@ -50,14 +50,14 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: Enterprise-DesktopAgent-Windows-x64
-          path: src/application-mediator/windows/desktop-publish/
+          path: src/edge-harness/windows/desktop-publish/
 
   standalone-install:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
       matrix:
-        component: [server, edge-harness, application-mediator]
+        component: [server, edge-harness]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

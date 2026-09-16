@@ -1,4 +1,5 @@
 {
+  "feature_status": "Removed; this is a historical validation record, not a currently available feature.",
   "kind": "actual Windows deployment and live model; automated staff test request",
   "model_mode": "live",
   "job_id": "13b7ab2a8d6f413987275e3a49d471ff",
@@ -59,5 +60,55 @@
     "bank_value_withheld": true,
     "read_only_save_disabled": true,
     "input_sent": false
+  },
+  "removal_validation": {
+    "kind": "Actual Windows deployment and live model; automated staff test request",
+    "model_mode": "live",
+    "job_id": "6575446ad774467c9abc3f90c1da9ceb",
+    "status": "completed",
+    "model_calls": 4,
+    "answer": "Invoice INV-1042 currently costs **$1,480.00 USD**. No edits or saves were made.",
+    "business_writes": 0,
+    "direct_native_controller": true,
+    "mediator_task_removed": true,
+    "mediator_installation_removed": true,
+    "mediator_service_identity_removed": true,
+    "mediator_configuration_removed": true,
+    "historical_evidence_preserved": true,
+    "active_skills_requalified": 4,
+    "quarantined_skills": 0,
+    "operator_desktop_probe": {
+      "model_mode": "none",
+      "capture_dimensions": [
+        1280,
+        800
+      ],
+      "business_actions_sent": 0
+    },
+    "frontend": {
+      "chat_visible": true,
+      "inspector_removed": true,
+      "page_errors": []
+    },
+    "standalone_installations": [
+      "server",
+      "edge-harness"
+    ],
+    "native_accounting_invariants_passed": 10,
+    "native_windows_builds": [
+      "DemoBooks",
+      "DesktopAgent"
+    ],
+    "unchanged_historical_rows": {
+      "jobs": 171,
+      "events": 7806,
+      "approvals": 572
+    },
+    "regression_cases_passed": 253,
+    "regression_method": "Complete local regression suite; simulated model and staff fixtures.",
+    "python_lint_and_format": "passed",
+    "frontend_syntax": "passed",
+    "mediator_listener_removed": true,
+    "demobooks_application_api_enabled": false
   }
 }

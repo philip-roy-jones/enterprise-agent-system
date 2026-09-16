@@ -139,9 +139,9 @@
   },
   "capture_screen": {
     "conditions": "Server-authorized read of the assigned worker desktop; no record required",
-    "description": "Capture the permitted visual surface for this conversation; mediated applications disclose only their filtered view",
+    "description": "Capture the entire interactive desktop, including other visible windows, for this conversation",
     "desktop": true,
-    "expected": "A timestamped image labeled desktop, browser_fixture, or mediated_application; never assume it shows the whole screen",
+    "expected": "A timestamped screenshot of all monitors; browser fixtures capture only their test viewport",
     "input_schema": {
       "additionalProperties": false,
       "properties": {},

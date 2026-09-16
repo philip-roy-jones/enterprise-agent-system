@@ -28,7 +28,7 @@ Use the existing Windows VM and synthetic data for development. Individual emplo
 | Learning | Runtime validation and automatic activation; edge-local immutable packages | Protect admission authority and scope distribution, evidence, memory, and package content |
 | Deployment | One trusted organization and desktop; local development configuration | Explicit security profiles, revocable credentials, protected transport, and documented isolation limits |
 
-Relevant implementation: [backend routes](../../src/server/eas_server/backend.py), [server action ledger](../../src/server/eas_server/store.py), [worker RPC contract](../../src/shared/eas_shared/protocol.py), [execution layer](../../src/edge-harness/eas_harness/execution.py), [desktop controller](../../src/application-mediator/windows/DesktopAgent/Program.cs), and [skill library](../../src/edge-harness/eas_harness/skill_library.py).
+Relevant implementation: [backend routes](../../src/server/eas_server/backend.py), [server action ledger](../../src/server/eas_server/store.py), [worker RPC contract](../../src/shared/eas_shared/protocol.py), [execution layer](../../src/edge-harness/eas_harness/execution.py), [desktop controller](../../src/edge-harness/windows/DesktopAgent/Program.cs), and [skill library](../../src/edge-harness/eas_harness/skill_library.py).
 
 The existing server approval check is real: `begin_action` rejects work without a matching decision. However, the server cannot prevent a compromised Windows account from accessing its already logged-in application directly. Broad worker reporting methods also assume a trusted worker; passing the current tests does not establish containment of a malicious worker client.
 

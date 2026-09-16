@@ -147,7 +147,6 @@ def decode_observation(raw):
         observation_source="Windows UI Automation",
         revision=raw["revision"],
         desktop_session=raw["desktop_session"],
-        **({"mediation": raw["mediation"]} if raw.get("mediation") else {}),
     )
     return state, targets
 
@@ -158,10 +157,8 @@ class AccessibilityAdapter(WindowsAdapter):
         self.bridge = WindowsBridge(
             replace(
                 settings,
-                windows_bridge_url=settings.mediator_url or settings.desktop_agent_url,
-                windows_token=settings.mediator_token
-                if settings.mediator_url
-                else settings.desktop_agent_token,
+                windows_bridge_url=settings.desktop_agent_url,
+                windows_token=settings.desktop_agent_token,
             )
         )
         self.bridge.call("/health")
@@ -169,8 +166,6 @@ class AccessibilityAdapter(WindowsAdapter):
         if self.input_mode not in {"accessibility", "mouse_keyboard"}:
             raise ValueError("EAS_DESKTOP_INPUT_MODE must be accessibility or mouse_keyboard")
         self.job = None
-        if settings.mediator_url:
-            self.bridge.request_context = lambda: self.job["id"] if self.job else None
         self.fence = lambda: (_ for _ in ()).throw(PermissionError("No active operation"))
 
     def correction_note(self, note):

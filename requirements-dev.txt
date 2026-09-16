@@ -5,5 +5,4 @@
 -e src/test-software/campaign-desk
 -e src/server
 -e src/edge-harness[browser]
--e src/application-mediator
 -e .[dev]

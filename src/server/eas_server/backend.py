@@ -559,9 +559,6 @@ def create_app(settings=None):
     from eas_server.worker_api import install_worker_api
 
     install_worker_api(app, security)
-    from eas_server.mediation import install_mediation
-
-    install_mediation(app, security)
 
     @app.get("/api/artifacts/{name}", dependencies=[Depends(staff)])
     def get_artifact(name: str):

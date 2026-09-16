@@ -33,8 +33,6 @@ class WindowsBridge:
         )
 
     def call(self, path, data=None):
-        if getattr(self, "request_context", None):
-            self.client.headers["X-EAS-Job"] = self.request_context() or ""
         deadline = getattr(self, "deadline", None)
         timeout = deadline.remaining(12) if deadline else 12
         try:

@@ -31,18 +31,14 @@ class PassiveScreen:
             self.bridge = WindowsBridge(
                 replace(
                     settings,
-                    windows_bridge_url=(settings.mediator_url or settings.desktop_agent_url)
+                    windows_bridge_url=settings.desktop_agent_url
                     if settings.desktop_adapter == "windows_accessibility"
                     else settings.windows_bridge_url,
-                    windows_token=(
-                        settings.mediator_token if settings.mediator_url else settings.desktop_agent_token
-                    )
+                    windows_token=settings.desktop_agent_token
                     if settings.desktop_adapter == "windows_accessibility"
                     else settings.windows_token,
                 )
             )
-            if settings.mediator_url and settings.desktop_adapter == "windows_accessibility":
-                self.bridge.request_context = lambda: self.job["id"]
         elif job["role_id"] == "invoice_correction" and settings.desktop_adapter == "browser":
             from eas_harness.roles import get_role
 
@@ -83,11 +79,7 @@ class PassiveScreen:
                 screenshot=self.store.artifact(png),
                 width=width,
                 height=height,
-                state={
-                    "surface": raw.get("surface", "entire_desktop") if self.bridge else "entire_desktop",
-                    "capture": "passive_sample",
-                    **({"mediation": raw["mediation"]} if self.bridge and raw.get("mediation") else {}),
-                },
+                state={"surface": "entire_desktop", "capture": "passive_sample"},
             )
         with Image.open(io.BytesIO(png)) as image:
             image.thumbnail((1200, 900))

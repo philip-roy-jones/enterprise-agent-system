@@ -31,7 +31,7 @@ class Grant(BaseModel):
 class Principal(BaseModel):
     model_config = ConfigDict(extra="forbid")
     id: str = Field(pattern=r"^[a-zA-Z0-9_-]{1,80}$")
-    kind: str = Field(pattern=r"^(human|planner|executor|admission|mediator)$")
+    kind: str = Field(pattern=r"^(human|planner|executor|admission)$")
     name: str
     enabled: bool = True
     token_sha256: str | None = None

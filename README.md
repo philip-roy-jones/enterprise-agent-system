@@ -28,7 +28,7 @@ Staff can teach through ordinary chat. After a request ends, a separate edge rev
 
 Agent replies stream into chat as the model generates them. Reconnecting resumes from the last received event; completed replies replace their partial text, and interrupted replies remain labeled. Streaming does not change execution authority. See [response streaming](docs/response-streaming.md) for implementation and validation.
 
-The agent can capture its permitted Windows surface and send an optionally annotated image in chat. With mediation enabled, this is a labeled filtered application view; unmediated setups can capture the entire desktop. An active employee needs server authority for capture and sharing; attachments retain their capture time. The browser test fixture captures only its own viewport. The Ubuntu Marketing worker uses an application API and does not currently expose an interactive desktop screenshot tool.
+The agent can capture the entire Windows desktop and send an optionally annotated screenshot in chat. An active employee needs server authority for capture and sharing; attachments retain their capture time. The browser test fixture captures only its own viewport. The Ubuntu Marketing worker uses an application API and does not currently expose an interactive desktop screenshot tool.
 
 The [digital-employee validation](docs/digital-employee-validation.md) records the current tests, installed-worker checks and integration limits. The [digital-employee plan](docs/plans/digital-employees.md) supersedes the Strict-only policy. It builds on the [agent-led learning plan](docs/plans/agent-led-learning-plan.md), which replaced the graph-first ordering and mandatory learned-package PR review in the [original specification](docs/plans/original-prompt.txt). Earlier reviewed releases and PRs remain historical evidence; they are not silently activated by this change.
 
@@ -54,7 +54,7 @@ The shared platform supports **Finance** on Windows and **Marketing** on Ubuntu.
 
 The server plus separate Windows and Ubuntu workers has been exercised with concurrent live requests, scoped authorization and Marketing skill learning/reuse ([two-host evidence](docs/evidence/two-host-workers.json)). Follow the [two-machine developer setup](docs/developer-setup.md): start `enterprise-server` on the developer machine and install the isolated planner/executor/learner tasks on Windows. Addresses and credentials are configured locally. The backend does not connect directly to the desktop controller.
 
-The native application can run with its API disabled. The separate [Application Mediator](docs/application-mediator.md) owns the native controller connection, projects permitted content, describes controls, and checks input against office policy. Its DemoBooks profile withholds synthetic bank details and unknown content. It is a filtered accessibility view, not a transparent overlay or a universal desktop security boundary. The central agent page can inspect its last observation without hosting a UI on every edge. The direct controller and optional [application API adapter](docs/windows-accounting-machine.md) remain available for unmediated test setups.
+The native application can run with its API disabled. A separate controller reads accessibility controls and supplies accessibility actions or real clicks/typing. See [legacy desktop setup](docs/legacy-desktop.md) and the optional [application API adapter](docs/windows-accounting-machine.md).
 
 ![Native DemoBooks Desktop on the Windows accounting machine](docs/images/demobooks-windows.png)
 
@@ -127,9 +127,7 @@ flowchart LR
         Learner[Isolated model learner] -->|Candidate data| Checks[Protected admission checks]
         Checks --> Skills
     end
-    Authority --> Mediator[Independent Application Mediator]
-    Server -->|Scoped application policy| Mediator
-    Mediator --> Controller[Native desktop controller]
+    Authority --> Controller[Desktop controller or optional application API]
     Controller --> DemoBooks[Independent DemoBooks Desktop]
     Server -->|Accepted evidence| Learner
 ```
@@ -206,12 +204,9 @@ src/
 │   │   ├── integrations/           Trusted reusable application operations
 │   │   └── skill_runtime.py        Skill graph compiler and checkpoints
 │   ├── skills/                     Bundled generic skill packages
-│   ├── windows/                    Isolated harness task installer
+│   ├── windows/                    Desktop controller and isolated task installer
 │   └── linux/                      Isolated service installer and access probes
 ├── server/                         Independent backend and staff frontend
-├── application-mediator/           Independent legacy-application mediation service
-│   ├── eas_mediator/               Trusted profiles, filtered views, input ledger
-│   └── windows/                    Native controller and mediator installer
 ├── shared/                         Data contracts; no running service
 └── test-software/
     ├── demobooks/                  Synthetic Windows accounting desktop
@@ -223,7 +218,7 @@ docs/                              Setup, architecture and validation records
 docs/plans/                        Original specification and accepted plans
 ```
 
-The server, edge harness, and application mediator are **independently installable applications** with separate dependencies, startup commands and configuration classes. The Windows harness installer separates its planner, executor and learner into differently privileged processes; they remain components of one edge application. These packages communicate through shared contracts; none imports another application package. The Deep Agent and skill graphs execute inside the harness. DemoBooks remains a separate .NET application. The shared package contains public contracts and validation definitions, with no credentials, environment loading, databases, desktop actions or graph factories.
+The server and edge harness are **independently installable applications** with separate dependencies, startup commands and configuration classes. The Windows harness installer separates its planner, executor and learner into differently privileged processes; they remain components of one edge application. Neither package depends on the other. The Deep Agent and skill graphs execute inside the harness. DemoBooks remains a separate .NET application. The shared package contains public contracts and validation definitions, with no credentials, environment loading, databases, desktop actions or graph factories.
 
 From the repository root, install only the software a machine needs:
 
@@ -237,7 +232,7 @@ python -m pip install -c requirements.lock ./src/shared ./src/edge-harness
 # For the Windows account boundary, use install-isolated-worker.ps1 in the setup guide.
 ```
 
-The server/harness read `.env` from their launch directory or `EAS_ENV_FILE`; the mediator uses `EAS_MEDIATOR_ENV_FILE`. Keep the model and desktop-controller credentials on the edge machine. Development tooling is a separate root package; `pip install -r requirements-dev.txt` installs the full local test environment. Its `enterprise` CLI provides local development, simulated staff demos, and aliases for `serve` and `worker`.
+Each application reads `.env` from its launch directory, or the file named by `EAS_ENV_FILE`. Keep the model and desktop-controller credentials on the edge machine. Development tooling is a separate root package; `pip install -r requirements-dev.txt` installs the full local test environment. Its `enterprise` CLI provides local development, simulated staff demos, and aliases for `serve` and `worker`.
 
 For an existing Windows checkout, stop the idle worker **before** upgrading and rerun `src/edge-harness/windows/install-worker.ps1`. The installer updates the launcher and installs only the contracts and harness. For a clean package boundary when migrating an old all-in-one installation, recreate its virtual environment after stopping it; reinstalling packages alone does not remove previously installed server dependencies. Preserve `.env` and `runtime/`, including checkpoint databases. The [developer setup](docs/developer-setup.md) has machine-specific steps.
 

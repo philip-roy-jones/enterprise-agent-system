@@ -918,9 +918,3 @@ th {
 .agent-channels { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 20px; }
 .agent-channel { background: #fff; border: 1px solid var(--line); padding: 8px 12px; border-radius: 6px; font-size: .83rem; }
 .empty-agents { text-align: center; padding: 48px 24px; }
-.mediated-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
-.mediated-surface { position: relative; width: 100%; margin-top: 1rem; }
-.mediated-surface img { display: block; width: 100%; height: auto; }
-.mediated-control { position: absolute; border: 1px solid transparent; box-sizing: border-box; cursor: help; }
-.mediated-control:hover, .mediated-control:focus { border: 2px solid #087e79; background: #087e7915; outline: none; }
-.mediated-control.blocked:hover, .mediated-control.blocked:focus { border-color: #a33b35; background: #a33b3515; }
